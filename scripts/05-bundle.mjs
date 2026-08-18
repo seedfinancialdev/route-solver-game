@@ -19,6 +19,11 @@ const read = (f) => JSON.parse(readFileSync(new URL(`../data/${f}`, import.meta.
 const graph = read('graph.json');
 const map = read('map.json');
 const pack = read('puzzles.json');
+// Optional: real road names/refs (scripts/06-road-names.mjs), for narration
+// only. Missing this file just means hop narration falls back to a generic
+// line — it was never part of the routing data.
+let roadNames = null;
+try { roadNames = read('road-names.json'); } catch { /* not built yet */ }
 
 const round = (v) => Math.round(v * 2) / 2;
 
@@ -131,6 +136,17 @@ const bundle = {
   // Decoration only: they connect to nothing and cost nothing to draw wrong.
   towns: (map.towns || []).map((t) => [t.x, t.y, t.tier]),
   graticule: map.graticule || [],
+  // [label, km, sharePercent] aligned index-for-index with `edges` above, or
+  // null where OSRM had no ref and no name for the road's longest stretch.
+  // Decoration for narration — the game's routing never reads this.
+  roadNames: graph.edges.map((e, i) => {
+    // road-names.json was built by walking these same edges in this same
+    // order (06-road-names.mjs), so index i lines up directly — no need to
+    // re-match by (a, b).
+    const r = roadNames && roadNames.roads[i];
+    if (!r || r.a !== e.a || r.b !== e.b || !r.dominant) return null;
+    return [r.dominant.label, r.dominant.km, Math.round(r.dominant.share * 100)];
+  }),
   cities,
   edges,
   currency: pack.currency,

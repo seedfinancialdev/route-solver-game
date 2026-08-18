@@ -20,12 +20,16 @@ export function buildGraph(data) {
   const cities = data.cities.map(([name, country, x, y], i) => ({ i, name, country, x, y }));
   const adj = cities.map(() => []);
   const quant = data.quant || 4;
-  for (const [a, b, km, min, tiers, ...deltas] of data.edges) {
+  const roadNames = data.roadNames || [];
+  data.edges.forEach(([a, b, km, min, tiers, ...deltas], i) => {
     const shape = decodeShape(deltas, quant);
     const pace = [...tiers].map(Number);
-    adj[a].push({ to: b, km, min, shape, pace });
-    adj[b].push({ to: a, km, min, shape, pace });
-  }
+    // [label, km, sharePercent] of the road's longest named stretch — real
+    // OSRM refs/names, for narration only. Never read by the routing itself.
+    const road = roadNames[i] ? { label: roadNames[i][0], km: roadNames[i][1], share: roadNames[i][2] } : null;
+    adj[a].push({ to: b, km, min, shape, pace, road });
+    adj[b].push({ to: a, km, min, shape, pace, road });
+  });
   return {
     cities, adj, n: cities.length,
     view: data.view, countries: data.countries,
@@ -174,6 +178,42 @@ export const speedOf = (h) => h.km / (h.min / 60);
 export function hopGlyph(h) {
   const kmh = speedOf(h);
   return kmh < 65 ? '▲' : kmh < 85 ? '◆' : '·';
+}
+
+const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+
+export function bearingWord(g, from, to) {
+  const a = g.cities[from], b = g.cities[to];
+  const deg = (Math.atan2(b.x - a.x, a.y - b.y) * 180 / Math.PI + 360) % 360;
+  return COMPASS[Math.round(deg / 45) % 8];
+}
+
+/**
+ * One sentence about how a hop actually went — the road's own name/ref
+ * (scripts/06-road-names.mjs, from OSRM; narration only, never routing), the
+ * direction, and the pace mix that was already shown as line weight before
+ * the player committed. Deliberately stops short of the time/km/km-h receipt
+ * — that's shown numerically alongside this, not restated in prose.
+ */
+export function narrateHop(g, h) {
+  const edge = g.adj[h.from].find((e) => e.to === h.to);
+  const from = g.cities[h.from].name, to = g.cities[h.to].name;
+  const dir = bearingWord(g, h.from, h.to);
+  const kmh = speedOf(h);
+  const mix = edge ? paceMix(edge) : [0, 1, 0];
+  const road = edge && edge.road;
+
+  const onRoad = road
+    ? (road.share >= 55 ? `the ${road.label}` : `mostly the ${road.label}`)
+    : 'back roads';
+
+  const verdict = kmh >= 85
+    ? `clear on ${onRoad} the whole way`
+    : kmh >= 65
+      ? (mix[0] > 0.35 ? `on ${onRoad}, but it slows for stretches` : `a steady run on ${onRoad}`)
+      : (mix[2] > 0.15 ? `on ${onRoad} — fast where it can be, crawling everywhere else` : `on ${onRoad}, and it never opens up`);
+
+  return `Out of ${from} heading ${dir}, ${verdict} to ${to}.`;
 }
 
 export function shareString(g, round, dayNumber) {

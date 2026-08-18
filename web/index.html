@@ -25,7 +25,10 @@
         <div class="gauge__over" id="gaugeOver"></div>
       </div>
       <p class="gauge__caption" id="caption">remaining of <span id="budget">0</span> km</p>
-      <p class="paid" id="paid" aria-live="polite"></p>
+      <p class="paid" id="paid" aria-live="polite">
+        <span class="paid__story" id="paidStory"></span>
+        <span class="paid__stat" id="paidStat"></span>
+      </p>
       <p class="race-clock" id="raceClock" hidden></p>
     </div>
   </header>
@@ -72,6 +75,15 @@
     <ol id="hops"></ol>
     <div class="log__total" id="logTotal"></div>
   </aside>
+
+  <section class="brief" id="brief" hidden>
+    <p class="brief__eyebrow">Today's route</p>
+    <h2 id="briefTrip">— → —</h2>
+    <p class="brief__stats" id="briefStats"></p>
+    <p class="brief__pace" id="briefPace"></p>
+    <p class="brief__corridor" id="briefCorridor"></p>
+    <button id="briefStart" type="button">Start driving</button>
+  </section>
 
   <section class="reveal" id="reveal" hidden>
     <h2 id="revealVerdict">—</h2>

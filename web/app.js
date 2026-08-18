@@ -1,6 +1,7 @@
 import {
   buildGraph, crow, roadPath, roadRuns, paceMix, fastestRoute, shortestRoute,
   newRound, options, hop, remaining, hopGlyph, speedOf, hhmm, shareString, dayNumber,
+  bearingWord, narrateHop,
 } from './engine.js';
 
 const $ = (id) => document.getElementById(id);
@@ -10,7 +11,6 @@ const el = (name, attrs = {}) => {
   for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
   return node;
 };
-const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
 
 const app = $('app');
 const params = new URLSearchParams(location.search);
@@ -205,6 +205,53 @@ $('dots').append(targetRing, hereRing);
 $('origin').textContent = g.cities[START].name;
 $('destination').textContent = g.cities[TARGET].name;
 $('budget').textContent = hhmm(BUDGET);
+
+// --- the brief ---------------------------------------------------------
+// Everything here is already visible once play starts — crow-flies distance,
+// the named-ranges/seas layer — just handed over before the first click
+// instead of making the player scroll around to find it. It stops at naming
+// what's in the way, never which road through it is the quick one: that's
+// still the puzzle.
+function distToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2)) : 0;
+  return { d: Math.hypot(px - (ax + t * dx), py - (ay + t * dy)), t };
+}
+
+// The physical-labels source (Natural Earth's geography_regions) writes
+// bigger features in ALL CAPS and smaller ones in title case — a size cue
+// that works fine as a map label but reads like a typo inline in a sentence
+// ("...then CARPATHIAN MOUNTAINS"). Normalised for prose only; the map labels
+// keep the source casing.
+const titleCase = (s) => s.replace(/\S+/g, (w) => w[0].toUpperCase() + w.slice(1).toLowerCase());
+
+/** Named ranges/plains/seas that sit near the straight line, in travel order. */
+function corridorLabels(aIdx, bIdx, maxKm = 180, limit = 3) {
+  const a = g.cities[aIdx], b = g.cities[bIdx];
+  const hits = [];
+  for (const p of g.physicalLabels) {
+    const { d, t } = distToSegment(p.x, p.y, a.x, a.y, b.x, b.y);
+    if (d <= maxKm) hits.push({ name: titleCase(p.name), t });
+  }
+  hits.sort((x, y) => x.t - y.t);
+  return hits.slice(0, limit).map((h) => h.name);
+}
+
+function renderBrief() {
+  const crowKm = Math.round(crow(g, START, TARGET));
+  const kmh = crowKm / (BUDGET / 60);
+  $('briefTrip').textContent = `${g.cities[START].name} → ${g.cities[TARGET].name}`;
+  $('briefStats').textContent = `${crowKm.toLocaleString()} km as the crow flies · ${hhmm(BUDGET)} in the bank`;
+  $('briefPace').textContent =
+    `That's an average of ${Math.round(kmh)} km/h, door to door, if you drove it in a straight line.`;
+  const names = corridorLabels(START, TARGET);
+  $('briefCorridor').textContent = names.length ? `Between here and there: ${names.join(', then ')}.` : '';
+}
+$('briefStart').addEventListener('click', () => {
+  $('brief').hidden = true;
+  app.dataset.stage = 'playing';
+});
 
 // --- camera ----------------------------------------------------------------
 // The frame above is only a starting position. Past that the player drives the
@@ -435,7 +482,7 @@ function paint({ animate = false } = {}) {
       node.setAttribute('role', 'button');
       // The name is deliberately withheld, so describe the dot the way the map
       // does: a direction and a distance.
-      node.setAttribute('aria-label', `city to the ${COMPASS[bearingIndex(round.at, i)]}, about ${km} km away`);
+      node.setAttribute('aria-label', `city to the ${bearingWord(g, round.at, i)}, about ${km} km away`);
     } else {
       node.removeAttribute('role');
       node.removeAttribute('aria-label');
@@ -492,12 +539,6 @@ function edgePath(from, to) {
   return road || `M${g.cities[from].x} ${g.cities[from].y}L${g.cities[to].x} ${g.cities[to].y}`;
 }
 
-function bearingIndex(from, to) {
-  const a = g.cities[from], b = g.cities[to];
-  const deg = (Math.atan2(b.x - a.x, a.y - b.y) * 180 / Math.PI + 360) % 360;
-  return Math.round(deg / 45) % 8;
-}
-
 // --- interaction -----------------------------------------------------------
 let paidTimer;
 /** What the map suggested, against what the road charged — said out loud, now. */
@@ -506,19 +547,64 @@ function showPaid(h) {
   const verdict = kmh < 65 ? 'slow road' : kmh < 85 ? 'ordinary going' : 'motorway pace';
   const node = $('paid');
   node.className = `paid paid--on ${kmh < 65 ? 'paid--hard' : kmh < 85 ? 'paid--mid' : 'paid--easy'}`;
-  node.innerHTML = '';
+
+  $('paidStory').textContent = narrateHop(g, h);
+
+  const stat = $('paidStat');
+  stat.replaceChildren();
   const cost = document.createElement('strong');
   cost.textContent = hhmm(h.min);
   const second = document.createElement('span');
   second.className = 'paid__verdict';
   second.textContent = `${Math.round(kmh)} km/h · ${verdict}`;
-  node.append(cost, document.createTextNode(` for ${h.km} km`), second);
+  stat.append(cost, document.createTextNode(` for ${h.km} km`), second);
+
   clearTimeout(paidTimer);
   paidTimer = setTimeout(() => node.classList.remove('paid--on'), 4000);
 }
 
-function choose(i) {
-  if (round.finished || !options(g, round).some((e) => e.to === i)) return;
+/**
+ * Draw the hop actually happening — a marker riding the real road geometry —
+ * before any state changes. Fast rather than true-to-pace (that's what the
+ * reveal race is for): this is about feeling the hop happen, not measuring it.
+ */
+function animateHop(from, to) {
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const d = edgePath(from, to);
+  const node = el('path', { d, class: 'hop-preview' });
+  const head = el('circle', { r: 5 * unit, class: 'hop-head' });
+  $('travelled').append(node, head);
+  const len = node.getTotalLength();
+  if (reduced || !len) { node.remove(); head.remove(); return Promise.resolve(); }
+
+  node.style.strokeDasharray = `${len}`;
+  node.style.strokeDashoffset = `${len}`;
+  const duration = Math.min(900, Math.max(280, len * 1.1));
+
+  return new Promise((resolve) => {
+    const started = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, (now - started) / duration);
+      const eased = 1 - (1 - t) ** 2;
+      node.style.strokeDashoffset = `${len * (1 - eased)}`;
+      const p = node.getPointAtLength(len * eased);
+      head.setAttribute('cx', p.x); head.setAttribute('cy', p.y);
+      if (t < 1) requestAnimationFrame(step);
+      else { node.remove(); head.remove(); resolve(); }
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+let hopBusy = false;
+async function choose(i) {
+  if (hopBusy || round.finished || !options(g, round).some((e) => e.to === i)) return;
+  hopBusy = true;
+  try {
+    await animateHop(round.at, i);
+  } finally {
+    hopBusy = false;
+  }
   hop(g, round, i);
   showPaid(round.hops[round.hops.length - 1]);
   paint({ animate: true });
@@ -798,11 +884,14 @@ try {
 } catch { restored = false; }
 
 if (restored) {
+  $('brief').hidden = true;
   paint();
   await finish();
 } else {
   if (saved) localStorage.removeItem(storeKey);
   round = newRound(g, { a: START, b: TARGET, budget: BUDGET });
-  app.dataset.stage = 'playing';
+  renderBrief();
+  $('brief').hidden = false;
+  app.dataset.stage = 'brief';
   paint();
 }

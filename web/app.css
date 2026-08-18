@@ -163,6 +163,15 @@ html, body {
   fill: none; stroke: var(--accent); stroke-width: 2.5;
   stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
 }
+
+/* The hop actually happening: a marker riding the real road, drawn a moment
+   before the committed `.leg` it becomes. Same accent, so the handoff between
+   "travelling" and "travelled" is invisible. */
+.hop-preview {
+  fill: none; stroke: var(--accent); stroke-width: 2.5; opacity: .85;
+  stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
+}
+.hop-head { fill: var(--accent); pointer-events: none; }
 .best.pace-2 { stroke-width: 3.4; }
 .best.pace-1 { stroke-width: 2; }
 .best.pace-0 { stroke-width: 1.2; }
@@ -264,14 +273,22 @@ html, body {
 /* The teaching moment: what the map suggested, against what the road charged.
    Aggregating this until the end is too late to learn anything from. */
 .paid {
-  /* Two lines are reserved whether or not they're used: this sits directly
-     under the gauge, and a line appearing must not shove the HUD around. */
-  margin: 8px 0 0; min-height: 2.8em; font-family: var(--mono); font-size: 12px;
+  /* Room for the story line plus the two-line receipt is reserved whether or
+     not they're used: this sits directly under the gauge, and a line
+     appearing must not shove the HUD around. */
+  margin: 8px 0 0; min-height: 4.6em; font-family: var(--mono); font-size: 12px;
   line-height: 1.4;
   color: var(--dim); opacity: 0; transform: translateY(-3px);
   transition: opacity .35s ease, transform .35s ease;
 }
 .paid--on { opacity: 1; transform: none; }
+/* The narrated line reads like a travelogue, not a receipt — a different
+   voice from the stat line under it, which stays the plain, exact number. */
+.paid__story {
+  display: block; margin-bottom: 6px; font-family: var(--sans); font-style: italic;
+  color: var(--dim); opacity: .9;
+}
+.paid__stat { display: block; }
 .paid strong { font-weight: 500; color: var(--ink); }
 .paid--mid strong { color: var(--amber); }
 .paid--hard strong { color: var(--red); }
@@ -319,6 +336,45 @@ html, body {
 .log li em { font-style: normal; color: var(--dimmer); margin-left: 8px; }
 .log__total { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--dimmer); color: var(--ink); }
 .log__total:empty { display: none; }
+
+/* --- brief ---------------------------------------------------------------
+   The pre-game beat: start, target, budget, and the macro-geography between
+   them — everything already visible once play starts (crow-flies distance,
+   the named ranges/seas layer), just handed over before the first click
+   instead of making the player go find it. Deliberately stops short of
+   naming which road through a range is the fast one — that's still the
+   puzzle. Centred, not side-docked like the reveal: this is the one moment
+   nothing else on screen has happened yet. */
+.brief {
+  position: absolute; z-index: 4; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 52px));
+  padding: 28px; border: 1px solid var(--land-edge); border-radius: 3px;
+  background: var(--panel); backdrop-filter: blur(10px);
+  text-align: center;
+  animation: rise .6s cubic-bezier(.2,.7,.3,1) both;
+}
+.brief[hidden] { display: none; }
+.brief__eyebrow {
+  margin: 0 0 6px; font-family: var(--mono); font-size: 11px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--dim);
+}
+.brief h2 {
+  margin: 0 0 16px; font-family: var(--mono); font-weight: 500;
+  font-size: 1.4rem; letter-spacing: -.01em; color: var(--accent);
+}
+.brief__stats {
+  margin: 0 0 10px; font-family: var(--mono); font-size: 13px; color: var(--ink);
+}
+.brief__pace { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: var(--dim); }
+.brief__corridor {
+  margin: 0 0 20px; font-size: 13px; font-style: italic; line-height: 1.5; color: var(--dim);
+}
+.brief__corridor:empty { margin: 0 0 8px; }
+#briefStart {
+  font: inherit; font-size: 13px; padding: 10px 22px; cursor: pointer;
+  color: var(--bg); background: var(--accent); border: 0; border-radius: 2px;
+}
+[data-stage="brief"] .hint { opacity: 0; }
 
 /* --- reveal ------------------------------------------------------------- */
 .reveal {
