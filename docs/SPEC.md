@@ -41,6 +41,8 @@ then filtered:
 | built-up footprints and background towns | yes — decoration only, unconnected to any road | yes |
 | a lat/long grid and a scale bar | yes | grid only; the scale bar hides at the reveal |
 | the average pace the rest of the trip needs | yes, recalculated every hop from where you're standing | n/a — the round is over |
+| what that pace becomes for each candidate hop | yes, an estimate next to each reachable dot | n/a |
+| a hop's needed-vs-got verdict | yes, at the city you arrive at and in the hop log | yes, in the hop log |
 | the fastest route, and the shortest one | never | both, drawn against yours |
 
 The pace figure is arithmetic on numbers already on screen — remaining budget
@@ -49,6 +51,13 @@ floor, not a promise: real roads run longer than the straight line, so the
 true number is always at least this. Its purpose is to turn "the corridor
 choice is a bet" from something tracked in the player's head into a number
 they can weigh a hop's visible pace tier against.
+
+The per-candidate preview does the same arithmetic once per reachable dot,
+using an *estimated* cost for that hop (nominal midpoint speed per pace tier,
+weighted by how much of the hop is in each) rather than the real one — a hop's
+actual cost is still hidden until it's taken. It's a judgement aid, not a new
+fact: the same reasoning a player is already asked to do from the drawn line
+weight, done for them instead of left to mental arithmetic.
 
 The named ranges/seas, the urban footprints and the background towns are all
 static geography: none of them is wired to a road or an edge, so none of them

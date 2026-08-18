@@ -1,7 +1,7 @@
 import {
   buildGraph, crow, roadPath, roadRuns, paceMix, fastestRoute, shortestRoute,
   newRound, options, hop, remaining, hopGlyph, speedOf, hhmm, shareString, dayNumber,
-  bearingWord, narrateHop,
+  bearingWord, narrateHop, requiredPace, previewPace, paceRisk,
 } from './engine.js';
 
 const $ = (id) => document.getElementById(id);
@@ -32,6 +32,11 @@ const trap = shortestRoute(g, START, TARGET);
 const storeKey = day === null ? null : `route:day:${day}`;
 
 let round = newRound(g, { a: START, b: TARGET, budget: BUDGET });
+// The required pace at the moment each hop was chosen, parallel to
+// round.hops — for scoring "needed vs. got" after the fact. Live play only;
+// a restored (already-finished) round has no history to reconstruct this
+// from, so its log simply shows no delta.
+let neededAtHop = [];
 
 // --- static map ------------------------------------------------------------
 const map = $('map');
@@ -338,6 +343,7 @@ function resizeMarks() {
   for (const node of towns) {
     node.setAttribute('r', (node.classList.contains('town--big') ? townR * 1.7 : townR) * unit);
   }
+  for (const chip of $('pacePreview').children) chip.setAttribute('font-size', 11 * unit);
   updateScaleBar();
 
   // The relief is 1.8 km per pixel at source. Zoomed in past roughly a
@@ -509,15 +515,14 @@ function paint({ animate = false } = {}) {
   // remaining time — so it can't leak a single road's speed. It's a floor,
   // not a promise: real roads run longer than the straight line.
   const pace = $('gaugePace');
-  if (round.finished || left <= 0) {
+  const needed = requiredPace(g, round);
+  if (round.finished || !Number.isFinite(needed)) {
     pace.replaceChildren();
     pace.className = 'gauge__pace';
   } else {
-    const kmh = crow(g, round.at, TARGET) / (left / 60);
-    const tier = kmh >= 85 ? 'lost' : kmh >= 65 ? 'tight' : 'ok';
     const strong = document.createElement('strong');
-    strong.textContent = `${Math.round(kmh)} km/h`;
-    pace.className = `gauge__pace gauge__pace--${tier}`;
+    strong.textContent = `${Math.round(needed)} km/h`;
+    pace.className = `gauge__pace gauge__pace--${paceRisk(needed)}`;
     pace.replaceChildren(document.createTextNode('needs '), strong, document.createTextNode(' minimum from here'));
   }
 
@@ -551,6 +556,20 @@ function paint({ animate = false } = {}) {
       return node;
     })));
 
+  // The comparison itself, not just the ingredients for one: what required
+  // pace becomes for each candidate, sitting right on the map next to the
+  // dot it's about. An estimate ("~"), not a promise — see previewPace.
+  $('pacePreview').replaceChildren(...[...reachable].map((i) => {
+    const c = g.cities[i];
+    const preview = previewPace(g, round, i);
+    const risk = Number.isFinite(preview) ? paceRisk(preview) : 'lost';
+    const node = el('text', {
+      x: c.x, y: c.y - 14 * unit, class: `pace-chip pace-chip--${risk}`, 'font-size': 11 * unit,
+    });
+    node.textContent = Number.isFinite(preview) ? `~${Math.round(preview)}` : 'over';
+    return node;
+  }));
+
   $('travelled').replaceChildren(...round.hops.flatMap((h, i) =>
     paceRuns(h.from, h.to).map((r) => el('path', {
       d: r.d,
@@ -562,7 +581,18 @@ function paint({ animate = false } = {}) {
     const name = document.createElement('span');
     name.textContent = `${i + 1}. ${g.cities[h.to].name}`;
     const cost = document.createElement('span');
-    cost.textContent = hhmm(h.min);
+    // Needed vs. got, scored: the same bet the pace gauge quantified live,
+    // at the moment it was made (neededAtHop), against what the road
+    // actually charged. Absent for a restored round — no history to score.
+    const wasNeeded = neededAtHop[i];
+    if (Number.isFinite(wasNeeded)) {
+      const ahead = speedOf(h) >= wasNeeded;
+      const delta = document.createElement('b');
+      delta.className = `log__delta log__delta--${ahead ? 'ahead' : 'behind'}`;
+      delta.textContent = ahead ? '▲' : '▼';
+      cost.append(delta);
+    }
+    cost.append(document.createTextNode(hhmm(h.min)));
     const dist = document.createElement('em');
     dist.textContent = `${h.km} km`;
     cost.append(dist);
@@ -614,6 +644,40 @@ function showPaid(h) {
 }
 
 /**
+ * The verdict on the hop that just landed, floating at the city you actually
+ * arrived at — where you were looking when it happened — rather than only in
+ * the corner HUD. `neededKmh` is the pace the bet was made against, snapshot
+ * the instant the hop was chosen (before this one's real cost was known).
+ */
+let arrivalTimer;
+function showArrival(h, neededKmh) {
+  $('arrivalCallout').replaceChildren();
+  const c = g.cities[h.to];
+  const kmh = speedOf(h);
+  const ahead = !Number.isFinite(neededKmh) || kmh >= neededKmh;
+
+  const group = el('g', { class: `arrival-callout arrival-callout--${ahead ? 'ahead' : 'behind'}` });
+  const headline = el('text', {
+    x: c.x, y: c.y - 22 * unit, class: 'arrival-callout__kmh', 'font-size': 15 * unit,
+  });
+  headline.textContent = `${Math.round(kmh)} km/h`;
+  const sub = el('text', {
+    x: c.x, y: c.y - 8 * unit, class: 'arrival-callout__delta', 'font-size': 11 * unit,
+  });
+  sub.textContent = Number.isFinite(neededKmh)
+    ? `${ahead ? '▲' : '▼'} ${Math.abs(Math.round(kmh - neededKmh))} ${ahead ? 'above' : 'below'} pace`
+    : 'arrived';
+  group.append(headline, sub);
+  $('arrivalCallout').append(group);
+
+  clearTimeout(arrivalTimer);
+  arrivalTimer = setTimeout(() => {
+    group.classList.add('arrival-callout--out');
+    setTimeout(() => group.remove(), 400);
+  }, 2200);
+}
+
+/**
  * Draw the hop actually happening — a marker riding the real road geometry —
  * before any state changes. Fast rather than true-to-pace (that's what the
  * reveal race is for): this is about feeling the hop happen, not measuring it.
@@ -650,13 +714,31 @@ let hopBusy = false;
 async function choose(i) {
   if (hopBusy || round.finished || !options(g, round).some((e) => e.to === i)) return;
   hopBusy = true;
+
+  // Acknowledge the click before anything else happens: a pulse on the dot
+  // you picked, and the road you didn't pick stepping back, so there's no
+  // dead beat between doing something and seeing something respond.
+  dots[i].classList.add('dot--picked');
+  setTimeout(() => dots[i].classList.remove('dot--picked'), 600);
+  map.classList.add('map--travelling');
+  $('pacePreview').replaceChildren();
+
+  // The bet, snapshot at the moment it was made — before this hop's real
+  // cost is known — so the arrival verdict and the hop log can score
+  // "needed vs. got" against what the player actually knew when they chose.
+  const neededKmh = requiredPace(g, round);
+
   try {
     await animateHop(round.at, i);
   } finally {
     hopBusy = false;
+    map.classList.remove('map--travelling');
   }
   hop(g, round, i);
-  showPaid(round.hops[round.hops.length - 1]);
+  neededAtHop.push(neededKmh);
+  const h = round.hops[round.hops.length - 1];
+  showPaid(h);
+  showArrival(h, neededKmh);
   paint({ animate: true });
   followPlayer();
   if (round.finished) finish();
@@ -837,6 +919,8 @@ async function finish() {
   }
 
   $('reach').replaceChildren();
+  clearTimeout(arrivalTimer);
+  $('arrivalCallout').replaceChildren();
 
   // The terrain has been there all along; what the reveal adds is the names of
   // everywhere the routes went, and then the race.

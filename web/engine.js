@@ -170,6 +170,53 @@ export function hop(g, round, to) {
 
 export const remaining = (round) => round.budget - round.spent;
 
+// --- the corridor bet, made comparable --------------------------------
+// The current hop's pace tier is exact — it's drawn that way. What's still
+// unknown is exactly how fast the "ordinary" 65-85 km/h stretch of it runs.
+// ASSUMED_KMH is a nominal midpoint per tier, used only to estimate that —
+// the same judgement a player is already asked to make from the drawn line
+// weight, just doing the arithmetic instead of leaving it to be eyeballed.
+const ASSUMED_KMH = [50, 75, 95]; // slow, ordinary, motorway
+
+/** A rough, honestly-labelled minutes estimate for a hop not yet taken. */
+export function estimateHopMinutes(edge) {
+  const mix = paceMix(edge);
+  const kmh = mix[0] * ASSUMED_KMH[0] + mix[1] * ASSUMED_KMH[1] + mix[2] * ASSUMED_KMH[2];
+  return (edge.km / kmh) * 60;
+}
+
+/**
+ * Budget remaining ÷ crow-flies distance to the target, from wherever the
+ * player is actually standing. Pure arithmetic on numbers already on
+ * screen — it can't leak a single road's speed. A floor, not a promise:
+ * real roads run longer than the straight line.
+ */
+export function requiredPace(g, round) {
+  const left = remaining(round);
+  if (left <= 0) return Infinity;
+  return crow(g, round.at, round.target) / (left / 60);
+}
+
+/**
+ * What requiredPace becomes if the player takes a specific hop next — an
+ * ESTIMATE (built on estimateHopMinutes), not a promise, since the real
+ * minutes a hop costs are still hidden until it's actually taken. Lets a
+ * player compare candidates side by side instead of holding the arithmetic
+ * for each one in their head.
+ */
+export function previewPace(g, round, to) {
+  const edge = g.adj[round.at].find((e) => e.to === to);
+  if (!edge) return null;
+  const leftAfter = remaining(round) - estimateHopMinutes(edge);
+  if (leftAfter <= 0) return Infinity;
+  return crow(g, to, round.target) / (leftAfter / 60);
+}
+
+/** The same safe/tight/lost read the pace-tier lines already use. */
+export function paceRisk(kmh) {
+  return kmh >= 85 ? 'lost' : kmh >= 65 ? 'tight' : 'ok';
+}
+
 /** Minutes as a driver reads them: 27h15. */
 export function hhmm(minutes) {
   const sign = minutes < 0 ? '−' : '';
