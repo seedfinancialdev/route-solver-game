@@ -4,10 +4,13 @@
    the whole screen tightens with the situation. */
 
 :root {
-  --bg: #080a0d;
+  /* Sea and land are told apart by hue, not just by lightness: water is blue
+     and cold, land is neutral. Coastlines then read without needing an outline. */
+  --bg: #071119;
   --land: #232b35;
-  --land-edge: #38424f;
-  --water: #35505f;
+  --land-edge: #4b5468;
+  --water: #12283a;
+  --water-line: #47738c;
   --ink: #e9ecf0;
   --dim: #79828f;
   --dimmer: #414b58;
@@ -65,19 +68,24 @@ html, body {
 #terrainDetail { opacity: 0; }
 #terrainDetail.is-ready { opacity: var(--terrain-opacity, .95); transition: opacity .8s ease; }
 
+/* Borders are dashed, as they are on every paper map, because otherwise they
+   are the same thin grey line as a road and the eye cannot separate them. */
 .country {
-  fill: var(--land); stroke: var(--land-edge); stroke-width: 1.4;
-  vector-effect: non-scaling-stroke;
+  fill: var(--land); stroke: var(--land-edge); stroke-width: 1.1;
+  stroke-dasharray: 7 4; vector-effect: non-scaling-stroke;
 }
 
 /* Water reads as the sea does, because that is what it is. Rivers matter less
    for their own sake than for explaining why a road bends or waits for a
-   bridge. */
+   bridge — so they are drawn to be followed, not to be decorative. */
 .river {
-  fill: none; stroke: var(--water); stroke-width: 1; opacity: .8;
+  fill: none; stroke: var(--water-line); stroke-width: 1.3; opacity: .85;
+  stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
+}
+.lake {
+  fill: var(--water); stroke: var(--water-line); stroke-width: 1; opacity: .95;
   vector-effect: non-scaling-stroke;
 }
-.lake { fill: var(--bg); stroke: var(--water); stroke-width: .8; vector-effect: non-scaling-stroke; }
 
 .dot { fill: var(--speck); transition: fill .25s, r .25s; }
 .dot--reachable { fill: var(--reachable); cursor: pointer; }
@@ -135,12 +143,14 @@ html, body {
 [data-stage="reveal"] .trap { opacity: .45; }
 
 .country-label {
-  fill: var(--dim); opacity: .34; pointer-events: none;
-  font-family: var(--sans); font-weight: 500;
-  letter-spacing: .18em; text-anchor: middle;
+  fill: var(--ink); opacity: .42; pointer-events: none;
+  font-family: var(--sans); font-weight: 600;
+  letter-spacing: .22em; text-anchor: middle;
+  paint-order: stroke; stroke: var(--bg); stroke-width: 3px;
+  stroke-linejoin: round; vector-effect: non-scaling-stroke;
   transition: opacity .6s ease;
 }
-[data-stage="reveal"] .country-label { opacity: .22; }
+[data-stage="reveal"] .country-label { opacity: .28; }
 
 /* No font-size here, and no `font:` shorthand — the shorthand sets font-size and
    CSS beats the presentation attribute, so the labels were sized in map

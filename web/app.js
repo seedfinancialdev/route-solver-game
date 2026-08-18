@@ -156,7 +156,7 @@ function resizeMarks() {
   for (const label of $('labels').children) label.setAttribute('font-size', 12.5 * unit);
   // Country names hold a constant screen size too, but shrink away when the
   // player zooms right in — at that scale they are noise, not orientation.
-  const countryPx = camera && camera.w < 900 ? 0 : 13;
+  const countryPx = camera && camera.w < 900 ? 0 : 16;
   for (const label of countryLabels) label.setAttribute('font-size', countryPx * unit);
 
   // The relief is 1.8 km per pixel at source. Zoomed in past roughly a

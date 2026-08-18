@@ -52,9 +52,9 @@ const geo = JSON.parse(readFileSync(CLIPPED, 'utf8'));
 // scalerank filters to the waters worth drawing: the Danube and the Rhine, not
 // every tributary in the Massif Central.
 const lakesGeo = prepareWater('ne_10m_lakes',
-  ['-filter', 'scalerank <= 4', '-simplify', '20%', 'keep-shapes', '-filter-fields', 'name']);
+  ['-filter', 'scalerank <= 6', '-simplify', '30%', 'keep-shapes', '-filter-fields', 'name']);
 const riversGeo = prepareWater('ne_10m_rivers_lake_centerlines',
-  ['-filter', 'scalerank <= 5', '-simplify', '25%', 'keep-shapes', '-filter-fields', 'name']);
+  ['-filter', 'scalerank <= 7', '-simplify', '35%', 'keep-shapes', '-filter-fields', 'name']);
 const graph = JSON.parse(readFileSync(new URL('../data/graph.json', import.meta.url), 'utf8'));
 
 // --- view window ------------------------------------------------------------
