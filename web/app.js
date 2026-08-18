@@ -503,6 +503,24 @@ function paint({ animate = false } = {}) {
 
   $('remaining').textContent = hhmm(left);
 
+  // The bet, quantified: what average pace the rest of the trip needs, given
+  // where you're actually standing and what's actually left of the budget.
+  // Pure arithmetic on numbers already on screen — crow-flies distance and
+  // remaining time — so it can't leak a single road's speed. It's a floor,
+  // not a promise: real roads run longer than the straight line.
+  const pace = $('gaugePace');
+  if (round.finished || left <= 0) {
+    pace.replaceChildren();
+    pace.className = 'gauge__pace';
+  } else {
+    const kmh = crow(g, round.at, TARGET) / (left / 60);
+    const tier = kmh >= 85 ? 'lost' : kmh >= 65 ? 'tight' : 'ok';
+    const strong = document.createElement('strong');
+    strong.textContent = `${Math.round(kmh)} km/h`;
+    pace.className = `gauge__pace gauge__pace--${tier}`;
+    pace.replaceChildren(document.createTextNode('needs '), strong, document.createTextNode(' minimum from here'));
+  }
+
   const reachable = new Set(options(g, round).map((e) => e.to));
   dots.forEach((node, i) => {
     node.classList.toggle('dot--reachable', reachable.has(i));

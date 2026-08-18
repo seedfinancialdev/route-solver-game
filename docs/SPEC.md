@@ -40,7 +40,15 @@ then filtered:
 | named mountain ranges, plateaus and seas | yes | yes |
 | built-up footprints and background towns | yes — decoration only, unconnected to any road | yes |
 | a lat/long grid and a scale bar | yes | grid only; the scale bar hides at the reveal |
+| the average pace the rest of the trip needs | yes, recalculated every hop from where you're standing | n/a — the round is over |
 | the fastest route, and the shortest one | never | both, drawn against yours |
+
+The pace figure is arithmetic on numbers already on screen — remaining budget
+and crow-flies distance to the target — not a new fact about any road. It's a
+floor, not a promise: real roads run longer than the straight line, so the
+true number is always at least this. Its purpose is to turn "the corridor
+choice is a bet" from something tracked in the player's head into a number
+they can weigh a hop's visible pace tier against.
 
 The named ranges/seas, the urban footprints and the background towns are all
 static geography: none of them is wired to a road or an edge, so none of them

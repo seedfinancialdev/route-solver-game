@@ -276,6 +276,22 @@ html, body {
 }
 .gauge__caption { margin: 10px 0 0; font-size: 12px; color: var(--dim); font-family: var(--mono); }
 
+/* The bet, quantified: budget remaining ÷ crow-flies distance from here,
+   recalculated every hop. This is arithmetic on numbers already on screen —
+   it doesn't reveal a single road's speed, it just makes the stakes of the
+   next guess explicit instead of something you track in your head. Colour
+   answers "how much slack do I actually have" the same way the pace-tier
+   lines already do: the tiers a driver would recognise as safe / tight / a
+   bet you probably lose. */
+.gauge__pace {
+  margin: 4px 0 0; font-size: 12px; font-family: var(--mono); color: var(--dim);
+}
+.gauge__pace strong { font-weight: 500; }
+.gauge__pace--ok strong { color: var(--ink); }
+.gauge__pace--tight strong { color: var(--amber); }
+.gauge__pace--lost strong { color: var(--red); }
+.gauge__pace:empty { display: none; }
+
 /* The teaching moment: what the map suggested, against what the road charged.
    Aggregating this until the end is too late to learn anything from. */
 .paid {
