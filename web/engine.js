@@ -17,7 +17,10 @@ function decodeShape(deltas, quant) {
 }
 
 export function buildGraph(data) {
-  const cities = data.cities.map(([name, country, x, y], i) => ({ i, name, country, x, y }));
+  const countryNames = data.countryNames || {};
+  const cities = data.cities.map(([name, country, x, y], i) => (
+    { i, name, country, countryName: countryNames[country] || country, x, y }
+  ));
   const adj = cities.map(() => []);
   const quant = data.quant || 4;
   const roadNames = data.roadNames || [];
@@ -36,7 +39,9 @@ export function buildGraph(data) {
     lakes: data.lakes || [], rivers: data.rivers || [],
     countryLabels: (data.countryLabels || []).map(([name, x, y]) => ({ name, x, y })),
     urbanAreas: data.urbanAreas || [],
-    physicalLabels: (data.physicalLabels || []).map(([name, x, y, kind]) => ({ name, x, y, kind })),
+    physicalLabels: (data.physicalLabels || []).map(([name, x, y, kind, lengthKm, peakName, peakM, blurb]) => (
+      { name, x, y, kind, lengthKm, peakName, peakM, blurb }
+    )),
     towns: (data.towns || []).map(([x, y, tier]) => ({ x, y, tier })),
     graticule: data.graticule || [],
   };

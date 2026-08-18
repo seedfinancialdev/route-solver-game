@@ -146,6 +146,57 @@ function roughCentroid(geometry) {
   return n ? { x: sx / n, y: sy / n } : null;
 }
 
+// spanKm was tried as the convex-hull diameter of the region's own polygon —
+// then checked against reality before shipping. ne_10m_geography_regions_polys
+// is built for label placement across zoom levels, not as an accurate
+// boundary: the polygon behind "Tatra Mts." spans 18.0-23.1°E, ~366 km,
+// against a real Tatras that are about 60 km end to end — a 6x miss. Some
+// features came out close (Pyrenees: computed 468 km vs a real ~430 km); the
+// error isn't consistent enough to correct for. A wrong number that looks
+// measured is worse than no number, so the geometry isn't used for size at
+// all now — only real, independently-sourced figures below, or none.
+//
+// FACTS is hand-curated (length in km, highest point in m) for the named
+// ranges a player is actually likely to recognise, checked against general
+// reference knowledge rather than this dataset. Anything not in here gets
+// the type-blurb only — no invented specific. Matched on the exact NE name
+// string, before the display-only title-casing app.js applies.
+const RANGE_FACTS = {
+  ALPS: { lengthKm: 1200, peak: ['Mont Blanc', 4809] },
+  PYRENEES: { lengthKm: 430, peak: ['Aneto', 3404] },
+  'CARPATHIAN MOUNTAINS': { lengthKm: 1500, peak: ['Gerlachovský štít', 2655] },
+  'Tatra Mts.': { lengthKm: 60, peak: ['Gerlachovský štít', 2655] },
+  'Dinaric Alps': { lengthKm: 645, peak: ['Maja Jezercë', 2694] },
+  APPENNINI: { lengthKm: 1200, peak: ['Corno Grande', 2912] },
+  'Balkan Mts.': { lengthKm: 530, peak: ['Botev Peak', 2376] },
+  Vosges: { lengthKm: 120, peak: ['Grand Ballon', 1424] },
+  Jura: { lengthKm: 360, peak: ['Crêt de la Neige', 1720] },
+  Harz: { lengthKm: 110, peak: ['Brocken', 1141] },
+  Erzgebirge: { lengthKm: 150, peak: ['Klínovec', 1244] },
+  'Sudetes Mts.': { lengthKm: 300, peak: ['Śnieżka', 1603] },
+  'Cord. Cantábrica': { lengthKm: 300, peak: ['Torre de Cerredo', 2650] },
+  'S. Nevada': { lengthKm: 90, peak: ['Mulhacén', 3479] },
+  'Pindus Mts.': { lengthKm: 160, peak: ['Smolikas', 2637] },
+  'KJØLEN MOUNTAINS': { lengthKm: 1700, peak: ['Galdhøpiggen', 2469] },
+  'Grampian Mts.': { lengthKm: 400, peak: ['Ben Nevis', 1345] },
+  Böhmerwald: { lengthKm: 100, peak: ['Großer Arber', 1456] },
+};
+
+// What kind of going a landform generally implies — true of the type, not a
+// specific claim about any one range. This is the fallback (and, for ranges
+// without a RANGE_FACTS entry, the whole of it) — real peak/length data is a
+// natural follow-on for more of these once the DEM-based colour terrain
+// (phase 6) is in place and peak elevation can be sampled from that raster
+// instead of hand-curated one range at a time.
+const RELIEF_BLURB = {
+  'Range/mtn': 'a mountain range — roads through it tend to climb, switchback, and slow down',
+  Plateau: 'raised, fairly level tableland — higher ground, but usually straighter going than true mountains',
+  Plain: 'flat, low-lying ground — typically the easiest terrain on the map to build a fast road across',
+  Basin: 'a lower-lying depression ringed by higher ground',
+  Lowland: 'flat, low ground — like a plain, usually easy going for a road',
+  'Pen/cape': 'a peninsula — the coastline tends to shape which roads exist',
+};
+
 // Anything entirely outside the frame is dead weight in the payload.
 const inFrame = (geometry) => {
   if (!geometry) return false;   // mapshaper's clip leaves empty features behind
@@ -211,7 +262,15 @@ const reliefLabels = reliefGeo.features
   .filter((f) => RELIEF_CLASSES.has(f.properties.FEATURECLA) && inFrame(f.geometry))
   .map((f) => {
     const p = roughCentroid(f.geometry);
-    return p && { name: f.properties.NAME, x: round(p.x), y: round(p.y), kind: 'relief' };
+    const facts = RANGE_FACTS[f.properties.NAME] || null;
+    return p && {
+      name: f.properties.NAME, x: round(p.x), y: round(p.y), kind: 'relief',
+      featurecla: f.properties.FEATURECLA,
+      lengthKm: facts ? facts.lengthKm : null,
+      peakName: facts ? facts.peak[0] : null,
+      peakM: facts ? facts.peak[1] : null,
+      blurb: RELIEF_BLURB[f.properties.FEATURECLA] || null,
+    };
   })
   .filter(Boolean)
   .filter((l) => l.x > view.x && l.x < view.x + view.w && l.y > view.y && l.y < view.y + view.h);

@@ -19,6 +19,11 @@
   /* A third hue, warm where land is neutral and water is cold, so a metro's
      built-up footprint reads as human rather than as more terrain. */
   --urban: #8a7a5c;
+  /* Roads read as roads the way a paper atlas draws them: red. Distinct from
+     --red below, which is the budget gauge's alarm colour — the two shouldn't
+     mean the same thing, so they're not the same hue. */
+  --road: #c0392b;
+  --road-hot: #e6503c;
 
   --neutral: #cdd5e0;
   --amber: #e6b455;
@@ -145,7 +150,7 @@ html, body {
    fast they run, the way a road atlas weights a motorway against a B road.
    Heavy and bright is quick; hairline is a slow road. */
 .reach-line {
-  fill: none; stroke: var(--reachable);
+  fill: none; stroke: var(--road);
   stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
 }
 /* Weight carries the hierarchy; opacity only supports it. A slow road still has
@@ -153,7 +158,7 @@ html, body {
 .reach-line.pace-2 { stroke-width: 3.4; opacity: .95; }
 .reach-line.pace-1 { stroke-width: 2; opacity: .74; }
 .reach-line.pace-0 { stroke-width: 1.2; opacity: .56; }
-.reach-line--hot { stroke: var(--ink); opacity: 1; }
+.reach-line--hot { stroke: var(--road-hot); opacity: 1; }
 
 .leg.pace-2 { stroke-width: 3.6; }
 .leg.pace-1 { stroke-width: 2.4; }
@@ -165,13 +170,14 @@ html, body {
 }
 
 /* The hop actually happening: a marker riding the real road, drawn a moment
-   before the committed `.leg` it becomes. Same accent, so the handoff between
-   "travelling" and "travelled" is invisible. */
+   before the committed `.leg` it becomes. Road red while it's still a road
+   you're driving; it hands off to the budget-accent colour of `.leg` the
+   instant it's paid for and becomes part of your travelled route. */
 .hop-preview {
-  fill: none; stroke: var(--accent); stroke-width: 2.5; opacity: .85;
+  fill: none; stroke: var(--road); stroke-width: 2.5; opacity: .9;
   stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
 }
-.hop-head { fill: var(--accent); pointer-events: none; }
+.hop-head { fill: var(--road); pointer-events: none; }
 .best.pace-2 { stroke-width: 3.4; }
 .best.pace-1 { stroke-width: 2; }
 .best.pace-0 { stroke-width: 1.2; }
@@ -366,10 +372,18 @@ html, body {
   margin: 0 0 10px; font-family: var(--mono); font-size: 13px; color: var(--ink);
 }
 .brief__pace { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: var(--dim); }
-.brief__corridor {
-  margin: 0 0 20px; font-size: 13px; font-style: italic; line-height: 1.5; color: var(--dim);
-}
+.brief__corridor { margin: 0 0 20px; text-align: left; }
 .brief__corridor:empty { margin: 0 0 8px; }
+.brief__seas { margin: 0 0 10px; font-size: 13px; font-style: italic; line-height: 1.5; color: var(--dim); }
+/* The educational part of the ask: not just a name, but how big the thing
+   actually is (measured off its own geometry) and what that kind of terrain
+   generally means for a road — real facts, not flavour text. */
+.brief__relief { margin: 0; padding: 0; list-style: none; }
+.brief__relief li {
+  margin: 0 0 8px; font-size: 12.5px; line-height: 1.5; color: var(--dim);
+}
+.brief__relief strong { color: var(--ink); font-weight: 500; }
+.brief__relief li:last-child { margin-bottom: 0; }
 #briefStart {
   font: inherit; font-size: 13px; padding: 10px 22px; cursor: pointer;
   color: var(--bg); background: var(--accent); border: 0; border-radius: 2px;
@@ -465,7 +479,7 @@ html, body {
   display: flex; align-items: center; justify-content: flex-end; gap: 9px;
   font-family: var(--mono); font-size: 11px; padding: 2px 0;
 }
-.roadkey__line { display: block; width: 26px; border-top-style: solid; border-top-color: var(--reachable); }
+.roadkey__line { display: block; width: 26px; border-top-style: solid; border-top-color: var(--road); }
 .roadkey__line--2 { border-top-width: 3.4px; opacity: .95; }
 .roadkey__line--1 { border-top-width: 2px; opacity: .74; }
 .roadkey__line--0 { border-top-width: 1.2px; opacity: .56; }

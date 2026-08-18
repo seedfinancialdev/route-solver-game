@@ -9,6 +9,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { project } from './lib/proj.mjs';
+import { COUNTRIES } from './lib/cities.mjs';
 
 const SIMPLIFY_KM = 0.12;  // Douglas-Peucker tolerance. The map zooms to 90 km
                            // across, where a tenth of a kilometre is about a
@@ -124,14 +125,26 @@ const bundle = {
   // once already and every road silently landed in the wrong place.
   quant: QUANT,
   view: map.view,
+  // ISO2 -> full name, for showing a city's country in the brief. Sourced
+  // from the same map scripts/00-cities.mjs used to pick the roster, so it
+  // can't drift from the country list the game actually uses.
+  countryNames: Object.fromEntries(COUNTRIES),
   countries: map.countries.map((c) => c.d),
   // [name, x, y]
   countryLabels: map.labels.map((l) => [l.name, l.x, l.y]),
   lakes: map.lakes,
   rivers: map.rivers,
   urbanAreas: map.urbanAreas,
-  // [name, x, y, kind] — kind is "relief" (a range, plateau, plain) or "sea"
-  physicalLabels: (map.physicalLabels || []).map((l) => [l.name, l.x, l.y, l.kind]),
+  // [name, x, y, kind, lengthKm, peakName, peakM, blurb] — kind is "relief"
+  // (a range, plateau, plain) or "sea". The four relief-only fields are null
+  // for sea, and lengthKm/peakName/peakM are null unless the range is one of
+  // the hand-curated RANGE_FACTS entries in 03-map.mjs (real reference
+  // figures, not derived from this dataset's own — deliberately inaccurate
+  // for this purpose — polygon geometry). blurb is the generic landform-type
+  // explainer and is set for every relief feature.
+  physicalLabels: (map.physicalLabels || []).map((l) => [
+    l.name, l.x, l.y, l.kind, l.lengthKm ?? null, l.peakName ?? null, l.peakM ?? null, l.blurb ?? null,
+  ]),
   // [x, y, tier] — background towns below the playable roster's spacing cut.
   // Decoration only: they connect to nothing and cost nothing to draw wrong.
   towns: (map.towns || []).map((t) => [t.x, t.y, t.tier]),

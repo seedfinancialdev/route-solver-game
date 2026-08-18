@@ -227,26 +227,58 @@ function distToSegment(px, py, ax, ay, bx, by) {
 const titleCase = (s) => s.replace(/\S+/g, (w) => w[0].toUpperCase() + w.slice(1).toLowerCase());
 
 /** Named ranges/plains/seas that sit near the straight line, in travel order. */
-function corridorLabels(aIdx, bIdx, maxKm = 180, limit = 3) {
+function corridorFeatures(aIdx, bIdx, maxKm = 180, limit = 6) {
   const a = g.cities[aIdx], b = g.cities[bIdx];
   const hits = [];
   for (const p of g.physicalLabels) {
     const { d, t } = distToSegment(p.x, p.y, a.x, a.y, b.x, b.y);
-    if (d <= maxKm) hits.push({ name: titleCase(p.name), t });
+    if (d <= maxKm) hits.push({ ...p, name: titleCase(p.name), t });
   }
   hits.sort((x, y) => x.t - y.t);
-  return hits.slice(0, limit).map((h) => h.name);
+  return hits.slice(0, limit);
 }
 
 function renderBrief() {
   const crowKm = Math.round(crow(g, START, TARGET));
   const kmh = crowKm / (BUDGET / 60);
-  $('briefTrip').textContent = `${g.cities[START].name} → ${g.cities[TARGET].name}`;
+  const from = g.cities[START], to = g.cities[TARGET];
+  $('briefTrip').textContent = `${from.name}, ${from.countryName} → ${to.name}, ${to.countryName}`;
   $('briefStats').textContent = `${crowKm.toLocaleString()} km as the crow flies · ${hhmm(BUDGET)} in the bank`;
   $('briefPace').textContent =
     `That's an average of ${Math.round(kmh)} km/h, door to door, if you drove it in a straight line.`;
-  const names = corridorLabels(START, TARGET);
-  $('briefCorridor').textContent = names.length ? `Between here and there: ${names.join(', then ')}.` : '';
+
+  const features = corridorFeatures(START, TARGET);
+  const seas = features.filter((f) => f.kind === 'sea').map((f) => f.name).slice(0, 2);
+  const relief = features.filter((f) => f.kind === 'relief').slice(0, 3);
+
+  const corridor = $('briefCorridor');
+  corridor.replaceChildren();
+  if (seas.length) {
+    const p = document.createElement('p');
+    p.className = 'brief__seas';
+    p.textContent = `Along the way: the ${seas.join(' and the ')} coast.`;
+    corridor.append(p);
+  }
+  if (relief.length) {
+    const ul = document.createElement('ul');
+    ul.className = 'brief__relief';
+    for (const r of relief) {
+      const li = document.createElement('li');
+      const strong = document.createElement('strong');
+      strong.textContent = r.name;
+      // Real, hand-checked figures for the ranges most players will
+      // recognise (03-map.mjs RANGE_FACTS); the generic landform-type note
+      // otherwise. No invented specifics for the rest — see 03-map.mjs for
+      // why the polygon geometry itself isn't trustworthy for size.
+      const facts = r.lengthKm
+        ? ` About ${r.lengthKm} km end to end, rising to ${r.peakName} at ${r.peakM.toLocaleString()} m.`
+        : '';
+      const blurb = r.blurb ? ` ${r.blurb.charAt(0).toUpperCase()}${r.blurb.slice(1)}.` : '';
+      li.append(strong, document.createTextNode(` —${facts}${blurb}`));
+      ul.append(li);
+    }
+    corridor.append(ul);
+  }
 }
 $('briefStart').addEventListener('click', () => {
   $('brief').hidden = true;
