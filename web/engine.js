@@ -21,29 +21,66 @@ function decodeShape(deltas) {
 export function buildGraph(data) {
   const cities = data.cities.map(([name, country, x, y], i) => ({ i, name, country, x, y }));
   const adj = cities.map(() => []);
-  for (const [a, b, km, min, ...deltas] of data.edges) {
+  for (const [a, b, km, min, tiers, ...deltas] of data.edges) {
     const shape = decodeShape(deltas);
-    adj[a].push({ to: b, km, min, shape });
-    adj[b].push({ to: a, km, min, shape });
+    const pace = [...tiers].map(Number);
+    adj[a].push({ to: b, km, min, shape, pace });
+    adj[b].push({ to: a, km, min, shape, pace });
   }
   return {
     cities, adj, n: cities.length,
     view: data.view, countries: data.countries,
+    lakes: data.lakes || [], rivers: data.rivers || [],
     countryLabels: (data.countryLabels || []).map(([name, x, y]) => ({ name, x, y })),
   };
 }
 
 /** The road's own shape, as an SVG path. Reversed when driven the other way. */
-export function roadPath(edge, from, to) {
+/** Geometry is stored a->b; driving it the other way reverses shape and pace alike. */
+function oriented(edge, from, to) {
   const pts = edge.shape;
   if (!pts || pts.length < 2) return null;
-  // Geometry is stored a->b; if the first point is nearer `to`, we're driving it
-  // backwards. Direction matters for the race, which draws from where you start.
   const head = pts[0];
   const flip = Math.hypot(head[0] - from.x, head[1] - from.y)
     > Math.hypot(head[0] - to.x, head[1] - to.y);
-  const ordered = flip ? pts.slice().reverse() : pts;
-  return `M${ordered.map(([x, y]) => `${x} ${y}`).join('L')}`;
+  return flip
+    ? { pts: pts.slice().reverse(), pace: edge.pace.slice().reverse() }
+    : { pts, pace: edge.pace };
+}
+
+export function roadPath(edge, from, to) {
+  const o = oriented(edge, from, to);
+  return o && `M${o.pts.map(([x, y]) => `${x} ${y}`).join('L')}`;
+}
+
+/**
+ * The road broken into runs of one pace, so it can be drawn the way a road
+ * atlas draws it: the motorway stretches heavy, the slow ones hairline.
+ * Runs overlap by a point so the line stays unbroken.
+ */
+export function roadRuns(edge, from, to) {
+  const o = oriented(edge, from, to);
+  if (!o) return [];
+  const runs = [];
+  let start = 0;
+  for (let i = 1; i <= o.pts.length; i++) {
+    if (i === o.pts.length || o.pace[i] !== o.pace[start]) {
+      const slice = o.pts.slice(start, Math.min(i + 1, o.pts.length));
+      if (slice.length > 1) {
+        runs.push({ tier: o.pace[start], d: `M${slice.map(([x, y]) => `${x} ${y}`).join('L')}` });
+      }
+      start = i;
+    }
+  }
+  return runs;
+}
+
+/** What a hop is made of, for explaining afterwards why it went the way it did. */
+export function paceMix(edge) {
+  const total = edge.pace.length || 1;
+  const count = [0, 0, 0];
+  for (const t of edge.pace) count[t]++;
+  return count.map((c) => c / total);
 }
 
 export function crow(g, i, j) {

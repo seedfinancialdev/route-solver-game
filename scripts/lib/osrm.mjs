@@ -42,8 +42,16 @@ async function routePair(a, b, cacheKey) {
       if (json.code !== 'Ok') continue;
       const route = json.routes[0];
       let ferryM = 0;
+      // Per-step distance and duration is how the game knows where a road runs
+      // fast and where it crawls. A step is a stretch between manoeuvres, so it
+      // resolves to a few kilometres — enough to see a motorway give way to a
+      // mountain road partway through a hop.
+      const steps = [];
       for (const leg of route.legs) {
-        for (const step of leg.steps) if (step.mode === 'ferry') ferryM += step.distance;
+        for (const step of leg.steps) {
+          if (step.mode === 'ferry') ferryM += step.distance;
+          steps.push([Math.round(step.distance), Math.round(step.duration)]);
+        }
       }
       out = {
         km: Math.round(route.distance / 100) / 10,
@@ -51,6 +59,7 @@ async function routePair(a, b, cacheKey) {
         ferryKm: Math.round(ferryM / 100) / 10,
         geometry: (route.geometry?.coordinates || []).map(
           ([lon, lat]) => [Math.round(lon * 1e4) / 1e4, Math.round(lat * 1e4) / 1e4]),
+        steps,
       };
     } catch { /* network hiccup, retry */ }
   }

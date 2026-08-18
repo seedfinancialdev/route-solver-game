@@ -1,6 +1,6 @@
 import {
-  buildGraph, crow, roadPath, fastestRoute, shortestRoute, newRound, options, hop,
-  remaining, hopGlyph, speedOf, hhmm, shareString, dayNumber,
+  buildGraph, crow, roadPath, roadRuns, paceMix, fastestRoute, shortestRoute,
+  newRound, options, hop, remaining, hopGlyph, speedOf, hhmm, shareString, dayNumber,
 } from './engine.js';
 
 const $ = (id) => document.getElementById(id);
@@ -74,6 +74,9 @@ function computeFrame() {
 for (const attr of [['x', view.x], ['y', view.y], ['width', view.w], ['height', view.h]]) {
   $('terrain').setAttribute(attr[0], attr[1]);
 }
+for (const d of g.rivers) $('rivers').append(el('path', { d, class: 'river' }));
+for (const d of g.lakes) $('lakes').append(el('path', { d, class: 'lake' }));
+
 for (const d of g.countries) {
   $('countries').append(el('path', { d, class: 'country' }));
   // Straight into the clipPath: a <g> in there is ignored and the terrain
@@ -306,16 +309,21 @@ function paint({ animate = false } = {}) {
 
   labelPlayable(reachable);
 
-  // The roads themselves, not straight lines between dots. A switchbacking
-  // road and a motorway can be the same length; only the shape says which.
-  $('reach').replaceChildren(...[...reachable].map((i) => el('path', {
-    d: edgePath(round.at, i), class: 'reach-line',
-  })));
+  // The roads themselves, drawn the way a road atlas draws them: motorway
+  // stretches heavy, slow ones hairline. This is what you weigh before you
+  // commit — not how long it will take, but what kind of road it is.
+  $('reach').replaceChildren(...[...reachable].flatMap((i) =>
+    paceRuns(round.at, i).map((r) => {
+      const node = el('path', { d: r.d, class: `reach-line pace-${r.tier}` });
+      node.dataset.to = String(i);
+      return node;
+    })));
 
-  $('travelled').replaceChildren(...round.hops.map((h, i) => el('path', {
-    d: edgePath(h.from, h.to),
-    class: `leg${animate && i === round.hops.length - 1 ? ' leg--new' : ''}`,
-  })));
+  $('travelled').replaceChildren(...round.hops.flatMap((h, i) =>
+    paceRuns(h.from, h.to).map((r) => el('path', {
+      d: r.d,
+      class: `leg pace-${r.tier}${animate && i === round.hops.length - 1 ? ' leg--new' : ''}`,
+    }))));
 
   $('hops').replaceChildren(...round.hops.map((h, i) => {
     const li = document.createElement('li');
@@ -333,6 +341,13 @@ function paint({ animate = false } = {}) {
     ? `${hhmm(round.spent)} driving · ${round.km.toLocaleString()} km`
     : '';
   if (camera) resizeMarks(); else layout();
+}
+
+/** The road between two adjacent cities, split into runs of one pace. */
+function paceRuns(from, to) {
+  const edge = g.adj[from].find((e) => e.to === to);
+  const runs = edge && roadRuns(edge, g.cities[from], g.cities[to]);
+  return runs && runs.length ? runs : [{ tier: 1, d: edgePath(from, to) }];
 }
 
 /** The drawn road between two adjacent cities, falling back to a straight line. */
@@ -382,8 +397,9 @@ dots.forEach((node, i) => {
     if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); choose(i); }
   });
   node.addEventListener('pointerenter', () => {
-    const line = $('reach').children[[...options(g, round).map((e) => e.to)].indexOf(i)];
-    if (line) line.classList.add('reach-line--hot');
+    for (const path of $('reach').children) {
+      if (path.dataset.to === String(i)) path.classList.add('reach-line--hot');
+    }
   });
   node.addEventListener('pointerleave', () => {
     for (const line of $('reach').children) line.classList.remove('reach-line--hot');
@@ -581,9 +597,8 @@ async function finish() {
     ...trap.path.slice(1).map((to, i) => el('path', {
       d: edgePath(trap.path[i], to), class: 'trap',
     })),
-    ...best.path.slice(1).map((to, i) => el('path', {
-      d: edgePath(best.path[i], to), class: 'best',
-    })),
+    ...best.path.slice(1).flatMap((to, i) =>
+      paceRuns(best.path[i], to).map((r) => el('path', { d: r.d, class: `best pace-${r.tier}` }))),
   );
 
   const left = remaining(round);
@@ -599,10 +614,20 @@ async function finish() {
   $('glyphs').textContent = round.hops.map(hopGlyph).join('');
 
   const slowest = round.hops.slice().sort((a, b) => speedOf(a) - speedOf(b))[0];
-  $('revealNote').textContent = slowest && speedOf(slowest) < 70
-    ? `Your slowest stretch: ${g.cities[slowest.from].name} to ${g.cities[slowest.to].name} — `
-      + `${slowest.km} km at ${Math.round(speedOf(slowest))} km/h, ${hhmm(slowest.min)} of driving.`
-    : 'You kept to fast roads the whole way.';
+  if (slowest && speedOf(slowest) < 70) {
+    const edge = g.adj[slowest.from].find((e) => e.to === slowest.to);
+    const [slow, ordinary, fast] = edge ? paceMix(edge) : [0, 1, 0];
+    const why = fast < 0.05 ? 'no motorway on it at all'
+      : fast < 0.25 ? `motorway for only ${Math.round(fast * 100)}% of the way`
+        : slow > 0.5 ? `over half of it slow road` : 'slow going most of the way';
+    $('revealNote').textContent =
+      `Your slowest stretch: ${g.cities[slowest.from].name} to ${g.cities[slowest.to].name} — `
+      + `${slowest.km} km at ${Math.round(speedOf(slowest))} km/h, ${hhmm(slowest.min)} of driving. `
+      + `There was ${why}.`;
+    void ordinary;
+  } else {
+    $('revealNote').textContent = 'You kept to fast roads the whole way.';
+  }
 
   $('reveal').hidden = false;
   userMoved = false;

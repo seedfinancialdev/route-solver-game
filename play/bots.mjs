@@ -194,12 +194,18 @@ export function fastest(g, src, dst) {
  * country — but that view is off by a consistent amount per road. They look a
  * few hops ahead and estimate the rest of the trip at a plain average speed.
  */
-export function roadReader(g, src, dst, { seed = 1, sigma = 0.18, horizon = 3, assumedKmh = 80 } = {}) {
+export function roadReader(g, src, dst, {
+  seed = 1, sigma = 0.18, nearSigma = null, horizon = 3, assumedKmh = 80,
+} = {}) {
   const rng = mulberry32(seed);
   const bias = new Map();
-  const guessMin = (from, to, e) => {
-    const k = from < to ? `${from},${to}` : `${to},${from}`;
-    if (!bias.has(k)) bias.set(k, Math.exp(gaussian(rng) * sigma));
+  // `nearSigma` models the game as it is now: the roads out of the city you are
+  // standing in are drawn weighted by how fast they run, so the next hop is
+  // judged well. Everything past it is still guesswork.
+  const guessMin = (from, to, e, near) => {
+    const s = near && nearSigma != null ? nearSigma : sigma;
+    const k = `${near ? 'n' : 'f'}:${from < to ? `${from},${to}` : `${to},${from}`}`;
+    if (!bias.has(k)) bias.set(k, Math.exp(gaussian(rng) * s));
     return e.min * bias.get(k);
   };
   const restOfTrip = (node) => (haversineKm(g.cities[node], g.cities[dst]) / assumedKmh) * 60;
@@ -218,12 +224,12 @@ export function roadReader(g, src, dst, { seed = 1, sigma = 0.18, horizon = 3, a
       }
       for (const e of g.adj[node]) {
         if (visited.has(e.to)) continue;
-        search(e.to, depth - 1, spent + guessMin(node, e.to, e), first ?? e.to);
+        search(e.to, depth - 1, spent + guessMin(node, e.to, e, false), first ?? e.to);
       }
     };
     for (const e of g.adj[at]) {
       if (visited.has(e.to)) continue;
-      search(e.to, horizon - 1, guessMin(at, e.to, e), e.to);
+      search(e.to, horizon - 1, guessMin(at, e.to, e, true), e.to);
     }
     if (bestFirst === null) return { minutes: Infinity, km, path, stuck: true };
     const edge = g.adj[at].find((e) => e.to === bestFirst);

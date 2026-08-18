@@ -40,6 +40,8 @@
       <!-- Above the country fills, not below them: it blends onto the land it
            is modelling, and the clip keeps it off the sea. -->
       <image id="terrain" href="terrain.webp" clip-path="url(#landClip)" preserveAspectRatio="none"></image>
+      <g id="rivers"></g>
+      <g id="lakes"></g>
       <g id="optimalRoute"></g>
       <g id="travelled"></g>
       <g id="race"></g>
@@ -63,6 +65,7 @@
       <div><dt>budget</dt><dd><span id="budgetKm">0</span></dd></div>
     </dl>
     <p class="reveal__glyphs" id="glyphs"></p>
+    <p class="reveal__glyphkey">▲ slow road · ◆ ordinary · · motorway pace</p>
     <p class="reveal__note" id="revealNote"></p>
     <div class="reveal__actions">
       <button id="share" type="button">Copy result</button>
@@ -72,7 +75,14 @@
 
   <button class="reset-view" id="resetView" type="button" hidden>Reset view</button>
 
-  <p class="hint" id="hint">Pick a neighbouring city. You pay the hours the road takes — and the shortest road is rarely the fastest.</p>
+  <div class="hint" id="hint">
+    <p>Pick a neighbouring city. You pay the hours the road takes.</p>
+    <ul class="roadkey">
+      <li><i class="roadkey__line roadkey__line--2"></i>motorway pace</li>
+      <li><i class="roadkey__line roadkey__line--1"></i>ordinary road</li>
+      <li><i class="roadkey__line roadkey__line--0"></i>slow road</li>
+    </ul>
+  </div>
 </main>
 <script type="module" src="app.js"></script>
 </body>

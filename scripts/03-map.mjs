@@ -22,9 +22,10 @@ const QUANT = 2;             // round coordinates to 1/2 km; below that is noise
 // at this simplification they survive as triangles, which read as artefacts.
 const SOURCE = new URL('../data/raw/ne_50m_admin_0_countries.geojson', import.meta.url);
 const CLIPPED = new URL('../data/raw/europe.geojson', import.meta.url);
+const CLIP_BOX = 'bbox=-33,25,55,68';
 if (!existsSync(CLIPPED) || process.env.REBUILD_BOUNDARIES) {
   execFileSync('npx', ['mapshaper', SOURCE.pathname,
-    '-clip', 'bbox=-33,25,55,68',
+    '-clip', CLIP_BOX,
     '-filter-islands', 'min-area=1200km2', 'remove-empty',
     '-simplify', '40%', 'keep-shapes',
     // LABEL_X/LABEL_Y are Natural Earth's own placements for a country's name,
@@ -34,7 +35,26 @@ if (!existsSync(CLIPPED) || process.env.REBUILD_BOUNDARIES) {
   ], { stdio: 'inherit' });
 }
 
+// Water. Half the detours on this map are a road going round a lake or waiting
+// for a bridge, and without it the player is asked to explain a bend they cannot
+// see the reason for.
+function prepareWater(name, args) {
+  const src = new URL(`../data/raw/${name}.geojson`, import.meta.url);
+  const out = new URL(`../data/raw/${name}.clipped.geojson`, import.meta.url);
+  if (!existsSync(out) || process.env.REBUILD_BOUNDARIES) {
+    execFileSync('npx', ['mapshaper', src.pathname, '-clip', CLIP_BOX, ...args,
+      '-o', 'format=geojson', 'precision=0.001', out.pathname], { stdio: 'inherit' });
+  }
+  return JSON.parse(readFileSync(out, 'utf8'));
+}
+
 const geo = JSON.parse(readFileSync(CLIPPED, 'utf8'));
+// scalerank filters to the waters worth drawing: the Danube and the Rhine, not
+// every tributary in the Massif Central.
+const lakesGeo = prepareWater('ne_10m_lakes',
+  ['-filter', 'scalerank <= 4', '-simplify', '20%', 'keep-shapes', '-filter-fields', 'name']);
+const riversGeo = prepareWater('ne_10m_rivers_lake_centerlines',
+  ['-filter', 'scalerank <= 5', '-simplify', '25%', 'keep-shapes', '-filter-fields', 'name']);
 const graph = JSON.parse(readFileSync(new URL('../data/graph.json', import.meta.url), 'utf8'));
 
 // --- view window ------------------------------------------------------------
@@ -63,6 +83,18 @@ function ringToPath(ring) {
   return d === '' ? '' : `${d}Z`;
 }
 
+function lineToPath(line) {
+  let d = '', px = null, py = null;
+  for (const [lon, lat] of line) {
+    const p = project(lon, lat);
+    const x = round(p.x), y = round(p.y);
+    if (x === px && y === py) continue;
+    d += d === '' ? `M${x} ${y}` : `L${x} ${y}`;
+    px = x; py = y;
+  }
+  return d;
+}
+
 function shapePath(geometry) {
   const polys = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
   return polys.map((poly) => poly.map(ringToPath).join('')).join('');
@@ -70,12 +102,16 @@ function shapePath(geometry) {
 
 // Anything entirely outside the frame is dead weight in the payload.
 const inFrame = (geometry) => {
-  const polys = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
-  for (const poly of polys) {
-    for (const [lon, lat] of poly[0]) {
-      const p = project(lon, lat);
-      if (p.x > view.x - 400 && p.x < view.x + view.w + 400
-        && p.y > view.y - 400 && p.y < view.y + view.h + 400) return true;
+  if (!geometry) return false;   // mapshaper's clip leaves empty features behind
+  const rings = geometry.type === 'Polygon' ? [geometry.coordinates[0]]
+    : geometry.type === 'MultiPolygon' ? geometry.coordinates.map((p) => p[0])
+      : geometry.type === 'LineString' ? [geometry.coordinates]
+        : geometry.coordinates;
+  for (const poly of [rings]) {
+    for (const ring of poly) for (const [lon, lat] of ring) {
+      const p2 = project(lon, lat);
+      if (p2.x > view.x - 400 && p2.x < view.x + view.w + 400
+        && p2.y > view.y - 400 && p2.y < view.y + view.h + 400) return true;
     }
   }
   return false;
@@ -104,15 +140,29 @@ const labels = geo.features
   .filter((l) => l.rank <= 5)
   .filter((l) => l.x > view.x && l.x < view.x + view.w && l.y > view.y && l.y < view.y + view.h);
 
+const lakes = lakesGeo.features
+  .filter((f) => inFrame(f.geometry))
+  .map((f) => shapePath(f.geometry))
+  .filter(Boolean);
+
+const rivers = riversGeo.features
+  .filter((f) => inFrame(f.geometry))
+  .map((f) => {
+    const lines = f.geometry.type === 'LineString' ? [f.geometry.coordinates] : f.geometry.coordinates;
+    return lines.map(lineToPath).filter(Boolean).join('');
+  })
+  .filter(Boolean);
+
 writeFileSync(
   new URL('../data/map.json', import.meta.url),
   JSON.stringify({
     view: { x: round(view.x), y: round(view.y), w: round(view.w), h: round(view.h) },
     // The lon/lat window the terrain raster must be rendered to cover.
-    countries, labels,
+    countries, labels, lakes, rivers,
   }) + '\n',
 );
 
 const bytes = JSON.stringify(countries).length;
-console.log(`${countries.length} countries, ${labels.length} labels, ${(bytes / 1024).toFixed(0)} KB of path data`);
+console.log(`${countries.length} countries, ${labels.length} labels, ${lakes.length} lakes, `
+  + `${rivers.length} rivers, ${(bytes / 1024).toFixed(0)} KB of country paths`);
 console.log(`view ${view.w.toFixed(0)} x ${view.h.toFixed(0)} km, origin ${view.x.toFixed(0)},${view.y.toFixed(0)}`);

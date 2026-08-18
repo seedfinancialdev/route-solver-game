@@ -31,12 +31,21 @@ then filtered:
 | | during play | after the route is locked |
 | --- | --- | --- |
 | country outlines and names | yes | yes |
-| the roads out of your current city | yes, drawn as they actually run | all roads taken |
+| the roads out of your current city | yes, drawn as they actually run, weighted by how fast each stretch of them runs | all roads taken, and the fastest route weighted the same way |
+| rivers and major lakes | yes | yes |
 | the map itself | pan and zoom freely; the frame follows you as you move | framed on both routes |
 | how long a road takes | only after you commit to it | every hop, with its average speed |
 | city names | start, target, and everywhere you can move to | all |
 | terrain | yes, from the first move | yes |
 | the fastest route, and the shortest one | never | both, drawn against yours |
+
+Road pace is shown **only for the roads you can move to**, never for the network
+at large. Standing in Rzeszów you can see that the road south is a slow mountain
+two-lane and the road north is a main road; you cannot see what the corridor
+beyond looks like. That is the whole balance. Simulating a player who reads the
+next hop well (σ 0.08) and still guesses beyond it (σ 0.25) moves the win rate
+from 54% to 56% — because the difficulty was never in judging one hop, it is in
+choosing the corridor. The shortest-road player still wins 0 of 2,147.
 
 Terrain is on from the start rather than held back for the reveal. It does not
 hand over the answer: any European mountain range has several roads through it

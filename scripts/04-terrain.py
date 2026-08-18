@@ -69,7 +69,7 @@ sample = (src[y0, x0] * (1 - fx) * (1 - fy) + src[y0, x0 + 1] * fx * (1 - fy)
 # well above mid grey, which is why this is a recentre and not a stretch.
 land = sample[sample < 250]
 flat = np.median(land)
-GAIN = 1.7
+GAIN = 2.3
 print(f'relief range {sample.min():.0f}-{sample.max():.0f}, flat ground at {flat:.0f} -> 128')
 norm = np.clip(0.5 + (sample - flat) * GAIN / 255.0, 0, 1)
 

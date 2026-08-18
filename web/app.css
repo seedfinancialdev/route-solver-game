@@ -7,6 +7,7 @@
   --bg: #080a0d;
   --land: #232b35;
   --land-edge: #38424f;
+  --water: #35505f;
   --ink: #e9ecf0;
   --dim: #79828f;
   --dimmer: #414b58;
@@ -63,6 +64,15 @@ html, body {
   vector-effect: non-scaling-stroke;
 }
 
+/* Water reads as the sea does, because that is what it is. Rivers matter less
+   for their own sake than for explaining why a road bends or waits for a
+   bridge. */
+.river {
+  fill: none; stroke: var(--water); stroke-width: 1; opacity: .8;
+  vector-effect: non-scaling-stroke;
+}
+.lake { fill: var(--bg); stroke: var(--water); stroke-width: .8; vector-effect: non-scaling-stroke; }
+
 .dot { fill: var(--speck); transition: fill .25s, r .25s; }
 .dot--reachable { fill: var(--reachable); cursor: pointer; }
 .dot--reachable:hover, .dot--reachable:focus-visible { fill: var(--ink); outline: none; }
@@ -76,17 +86,29 @@ html, body {
 }
 .dot--reachable { stroke: var(--bg); stroke-width: 2; vector-effect: non-scaling-stroke; }
 
-/* The roads you could take, drawn as they actually run. */
+/* The roads you could take, drawn as they actually run — and weighted by how
+   fast they run, the way a road atlas weights a motorway against a B road.
+   Heavy and bright is quick; hairline is a slow road. */
 .reach-line {
-  fill: none; stroke: var(--reachable); stroke-width: 1.4; opacity: .55;
+  fill: none; stroke: var(--reachable);
   stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
 }
-.reach-line--hot { stroke: var(--ink); opacity: 1; stroke-width: 2; }
+.reach-line.pace-2 { stroke-width: 3; opacity: .95; }
+.reach-line.pace-1 { stroke-width: 1.8; opacity: .6; }
+.reach-line.pace-0 { stroke-width: 1; opacity: .38; }
+.reach-line--hot { stroke: var(--ink); opacity: 1; }
+
+.leg.pace-2 { stroke-width: 3.6; }
+.leg.pace-1 { stroke-width: 2.4; }
+.leg.pace-0 { stroke-width: 1.5; }
 
 .leg {
   fill: none; stroke: var(--accent); stroke-width: 2.5;
   stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
 }
+.best.pace-2 { stroke-width: 3.4; }
+.best.pace-1 { stroke-width: 2; }
+.best.pace-0 { stroke-width: 1.2; }
 .best {
   fill: none; stroke: var(--ink); stroke-width: 2;
   stroke-linecap: round; stroke-linejoin: round;
@@ -259,6 +281,9 @@ html, body {
   margin: 18px 0 0; font-family: var(--mono); font-size: 17px;
   letter-spacing: .22em; color: var(--dim);
 }
+.reveal__glyphkey {
+  margin: 8px 0 0; font-family: var(--mono); font-size: 11px; color: var(--dimmer);
+}
 .reveal__note { margin: 14px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--dim); }
 .reveal__actions { display: flex; align-items: center; gap: 18px; margin-top: 22px; }
 .reveal button {
@@ -280,11 +305,24 @@ html, body {
 [data-stage="reveal"] .reset-view { display: none; }
 
 .hint {
-  position: absolute; z-index: 2; right: 26px; bottom: 22px; margin: 0;
+  position: absolute; z-index: 2; right: 26px; bottom: 22px;
   max-width: 260px; text-align: right; font-size: 12px; line-height: 1.5; color: var(--dimmer);
   transition: opacity .4s;
 }
-[data-stage="reveal"] .hint, [data-stage="loading"] .reset-view {
+.hint p { margin: 0 0 10px; }
+
+/* What the weight of a road means. Without this the whole mechanic is a
+   private joke between the map and the data. */
+.roadkey { margin: 0; padding: 0; list-style: none; }
+.roadkey li {
+  display: flex; align-items: center; justify-content: flex-end; gap: 9px;
+  font-family: var(--mono); font-size: 11px; padding: 2px 0;
+}
+.roadkey__line { display: block; width: 26px; border-top-style: solid; border-top-color: var(--reachable); }
+.roadkey__line--2 { border-top-width: 3px; opacity: .95; }
+.roadkey__line--1 { border-top-width: 1.8px; opacity: .6; }
+.roadkey__line--0 { border-top-width: 1px; opacity: .38; }
+.reset-view {
   position: absolute; z-index: 3; right: 26px; top: 22px;
   font: inherit; font-size: 12px; padding: 7px 12px; cursor: pointer;
   color: var(--dim); background: var(--panel); backdrop-filter: blur(3px);
@@ -293,7 +331,7 @@ html, body {
 .reset-view:hover { color: var(--ink); }
 [data-stage="reveal"] .reset-view { display: none; }
 
-.hint { opacity: 0; }
+[data-stage="reveal"] .hint, [data-stage="loading"] .hint { opacity: 0; }
 
 @media (max-width: 720px) {
   .hud { padding: 16px 18px; }

@@ -12,9 +12,11 @@ beats a 210 km road over a pass, every time — and the road's own shape, drawn 
 it actually runs, is the tell.
 
 Every time you commit, the game says what it cost: *3h09 for 249 km · 79 km/h ·
-ordinary going*. The map shows terrain, country names and the roads out of your current city from
-the first move — none of it gives the game away, because knowing a mountain range
-is there says nothing about which of the several roads through it is quick.
+ordinary going*. The map shows terrain, rivers, country names, and the roads out of your current
+city — each drawn with the weight of how fast it runs, the way a road atlas
+weights a motorway against a B road. That is deliberately local: you can read the
+hop in front of you, but not the corridor beyond it, which is where the puzzle
+lives.
 
 When the route is locked, both routes drive it again side by side at their real
 paces, so you watch the fast one pull away exactly where it happened. Then the
