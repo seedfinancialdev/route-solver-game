@@ -338,11 +338,20 @@ function resizeMarks() {
   for (const label of physicalLabels) label.setAttribute('font-size', physicalPx * unit);
   // Background towns hold a constant dot size too, and fade out once the
   // player is zoomed out far enough that they'd just be noise between the
-  // cities that matter.
+  // cities that matter. They also go quiet in a ring around wherever the
+  // player is actually standing: parked right next to the current city, at
+  // the exact zoom where a player is scanning for candidates, a background
+  // town reads as a missed connection rather than as texture. Nowhere else
+  // does that ambiguity matter — the decision only happens here.
   const townR = camera && camera.w > 2600 ? 0 : 1;
-  for (const node of towns) {
-    node.setAttribute('r', (node.classList.contains('town--big') ? townR * 1.7 : townR) * unit);
-  }
+  const TOWN_KEEPOUT_KM = 120;
+  const at = g.cities[round.at];
+  towns.forEach((node, i) => {
+    const t = g.towns[i];
+    const near = Math.hypot(t.x - at.x, t.y - at.y) < TOWN_KEEPOUT_KM;
+    const r = near ? 0 : (node.classList.contains('town--big') ? townR * 1.7 : townR);
+    node.setAttribute('r', r * unit);
+  });
   for (const chip of $('pacePreview').children) chip.setAttribute('font-size', 11 * unit);
   updateScaleBar();
 
