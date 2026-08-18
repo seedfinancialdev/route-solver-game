@@ -96,19 +96,37 @@ $('origin').textContent = g.cities[START].name;
 $('destination').textContent = g.cities[TARGET].name;
 $('budget').textContent = hhmm(BUDGET);
 
-// Dots and labels should hold their size on screen, not in map kilometres.
+// --- camera ----------------------------------------------------------------
+// The frame above is only a starting position. Past that the player drives the
+// camera: wheel or pinch to zoom, drag to pan. Once they have taken control we
+// stop re-framing under them, and only pan far enough to keep the city they are
+// standing in on screen.
+
+const MIN_SPAN_KM = 220;                       // how far in you may go
+const MAX_SPAN_KM = () => view.w * 1.15;       // and how far out
+
+let camera = null;
+let userMoved = false;
 let unit = 1;
-function layout() {
-  const box = map.getBoundingClientRect();
-  if (!box.width) return;
-  frame = computeFrame();
-  map.setAttribute('viewBox', `${frame.x} ${frame.y} ${frame.w} ${frame.h}`);
-  unit = Math.max(frame.w / box.width, frame.h / box.height);
-  for (const [i, node] of dots.entries()) {
+
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+function applyCamera(box) {
+  const rect = map.getBoundingClientRect();
+  if (!rect.width) return;
+  camera = box;
+  map.setAttribute('viewBox', `${box.x} ${box.y} ${box.w} ${box.h}`);
+  unit = Math.max(box.w / rect.width, box.h / rect.height);
+  resizeMarks();
+  $('resetView').hidden = !userMoved;
+}
+
+/** Dots and labels hold their size on screen, not in map kilometres. */
+function resizeMarks() {
+  for (const node of dots) {
     node.setAttribute('r', (node.classList.contains('dot--current') ? 5
       : node.classList.contains('dot--reachable') ? 4.5
         : node.classList.contains('dot--visited') ? 3.2 : 2.6) * unit);
-    void i;
   }
   targetRing.setAttribute('r', 9 * unit);
   hereRing.setAttribute('r', 10 * unit);
@@ -116,7 +134,118 @@ function layout() {
   hereRing.setAttribute('cy', g.cities[round.at].y);
   for (const label of $('labels').children) label.setAttribute('font-size', 12.5 * unit);
 }
+
+function layout() {
+  const rect = map.getBoundingClientRect();
+  if (!rect.width) return;
+  if (!userMoved) { frame = computeFrame(); applyCamera(frame); return; }
+  // Keep the player's zoom through a resize; only correct the aspect ratio.
+  const aspect = rect.width / rect.height;
+  const w = camera.h * aspect;
+  applyCamera({ x: camera.x + (camera.w - w) / 2, y: camera.y, w, h: camera.h });
+}
 new ResizeObserver(layout).observe(map);
+
+function resetView() {
+  userMoved = false;
+  layout();
+}
+
+/** Screen pixels -> map kilometres, letterboxing and all. */
+function toUser(clientX, clientY) {
+  const pt = map.createSVGPoint();
+  pt.x = clientX; pt.y = clientY;
+  return pt.matrixTransform(map.getScreenCTM().inverse());
+}
+
+function zoomAt(clientX, clientY, factor) {
+  if (!camera) return;
+  const p = toUser(clientX, clientY);
+  const w = clamp(camera.w * factor, MIN_SPAN_KM, MAX_SPAN_KM());
+  const k = w / camera.w;
+  userMoved = true;
+  applyCamera({
+    x: p.x - (p.x - camera.x) * k,
+    y: p.y - (p.y - camera.y) * k,
+    w, h: camera.h * k,
+  });
+}
+
+map.addEventListener('wheel', (ev) => {
+  ev.preventDefault();
+  zoomAt(ev.clientX, ev.clientY, Math.exp(ev.deltaY * 0.0015));
+}, { passive: false });
+
+// Drag to pan, with a threshold so a slightly shaky click still picks a city.
+const pointers = new Map();
+let dragFrom = null;
+let pinchFrom = null;
+let dragged = false;
+
+map.addEventListener('pointerdown', (ev) => {
+  pointers.set(ev.pointerId, ev);
+  if (pointers.size === 1) {
+    dragged = false;
+    dragFrom = { client: { x: ev.clientX, y: ev.clientY }, camera };
+  } else if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinchFrom = { dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) };
+    dragFrom = null;
+  }
+});
+
+map.addEventListener('pointermove', (ev) => {
+  if (!pointers.has(ev.pointerId)) return;
+  pointers.set(ev.pointerId, ev);
+
+  if (pointers.size === 2 && pinchFrom) {
+    const [a, b] = [...pointers.values()];
+    const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    if (dist > 0) {
+      zoomAt((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2, pinchFrom.dist / dist);
+      pinchFrom.dist = dist;
+    }
+    return;
+  }
+
+  if (!dragFrom || !dragFrom.camera) return;
+  const rect = map.getBoundingClientRect();
+  const dx = (ev.clientX - dragFrom.client.x) * (dragFrom.camera.w / rect.width);
+  const dy = (ev.clientY - dragFrom.client.y) * (dragFrom.camera.h / rect.height);
+  if (!dragged && Math.hypot(dx, dy) < unit * 4) return;
+  dragged = true;
+  userMoved = true;
+  map.classList.add('map--dragging');
+  applyCamera({ ...dragFrom.camera, x: dragFrom.camera.x - dx, y: dragFrom.camera.y - dy });
+});
+
+const endPointer = (ev) => {
+  pointers.delete(ev.pointerId);
+  if (pointers.size < 2) pinchFrom = null;
+  if (pointers.size === 0) { dragFrom = null; map.classList.remove('map--dragging'); }
+};
+map.addEventListener('pointerup', endPointer);
+map.addEventListener('pointercancel', endPointer);
+map.addEventListener('dblclick', resetView);
+$('resetView').addEventListener('click', resetView);
+
+window.addEventListener('keydown', (ev) => {
+  const rect = map.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+  if (ev.key === '+' || ev.key === '=') zoomAt(cx, cy, 1 / 1.3);
+  else if (ev.key === '-' || ev.key === '_') zoomAt(cx, cy, 1.3);
+  else if (ev.key === '0') resetView();
+});
+
+/** After a hop, keep the city you are standing in comfortably on screen. */
+function followPlayer() {
+  if (!userMoved || !camera) return;
+  const c = g.cities[round.at];
+  const insetX = camera.w * 0.2, insetY = camera.h * 0.2;
+  const outside = c.x < camera.x + insetX || c.x > camera.x + camera.w - insetX
+    || c.y < camera.y + insetY || c.y > camera.y + camera.h - insetY;
+  if (outside) applyCamera({ ...camera, x: c.x - camera.w / 2, y: c.y - camera.h / 2 });
+}
 
 // --- painting the round ----------------------------------------------------
 function accentFor(fraction) {
@@ -181,7 +310,7 @@ function paint({ animate = false } = {}) {
   $('logTotal').textContent = round.hops.length
     ? `${hhmm(round.spent)} driving · ${round.km.toLocaleString()} km`
     : '';
-  layout();
+  if (camera) resizeMarks(); else layout();
 }
 
 /** The drawn road between two adjacent cities, falling back to a straight line. */
@@ -221,11 +350,12 @@ function choose(i) {
   hop(g, round, i);
   showPaid(round.hops[round.hops.length - 1]);
   paint({ animate: true });
+  followPlayer();
   if (round.finished) finish();
 }
 
 dots.forEach((node, i) => {
-  node.addEventListener('click', () => choose(i));
+  node.addEventListener('click', () => { if (!dragged) choose(i); });
   node.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); choose(i); }
   });
@@ -266,7 +396,109 @@ function labelPlayable(reachable) {
 }
 
 
-function finish() {
+
+// --- the race ---------------------------------------------------------------
+// Both routes leave the origin together and drive at their real paces: a hop
+// that took four hours takes four hours' worth of the animation. You watch the
+// fast route pull away, on the stretch where it actually happened.
+
+function hopsOf(path) {
+  const out = [];
+  for (let i = 1; i < path.length; i++) {
+    const from = path[i - 1], to = path[i];
+    const edge = g.adj[from].find((e) => e.to === to);
+    out.push({ from, to, min: edge.min });
+  }
+  return out;
+}
+
+function raceRoutes(lanes) {
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const group = $('race');
+  group.replaceChildren();
+
+  const built = lanes.map((lane) => {
+    let cursor = 0;
+    const segments = lane.hops.map((h) => {
+      const node = el('path', { d: edgePath(h.from, h.to), class: `race-lane race-lane--${lane.key}` });
+      group.append(node);
+      const len = node.getTotalLength();
+      node.style.strokeDasharray = len;
+      node.style.strokeDashoffset = len;
+      const seg = { node, len, t0: cursor, t1: cursor + h.min };
+      cursor += h.min;
+      return seg;
+    });
+    const head = el('circle', { r: 4, class: `race-head race-head--${lane.key}` });
+    group.append(head);
+    return { ...lane, segments, head, total: cursor };
+  });
+
+  const total = Math.max(...built.map((l) => l.total));
+  const clock = $('raceClock');
+
+  const drawAt = (virtual) => {
+    for (const lane of built) {
+      let head = null;
+      for (const seg of lane.segments) {
+        if (virtual >= seg.t1) {
+          seg.node.style.strokeDashoffset = 0;
+          head = seg.node.getPointAtLength(seg.len);
+        } else if (virtual > seg.t0) {
+          const done = (virtual - seg.t0) / (seg.t1 - seg.t0);
+          seg.node.style.strokeDashoffset = seg.len * (1 - done);
+          head = seg.node.getPointAtLength(seg.len * done);
+        }
+      }
+      if (head) { lane.head.setAttribute('cx', head.x); lane.head.setAttribute('cy', head.y); }
+      lane.head.classList.toggle('race-head--done', virtual >= lane.total);
+    }
+    clock.hidden = false;
+    clock.innerHTML = '';
+    const t = document.createElement('strong');
+    t.textContent = hhmm(Math.min(virtual, total));
+    const who = document.createElement('em');
+    const arrived = built.filter((l) => virtual >= l.total).map((l) => l.label);
+    who.textContent = arrived.length ? `  ${arrived.join(' and ')} arrived` : '  on the road';
+    clock.append(t, who);
+  };
+
+  if (reduced) { drawAt(total); return Promise.resolve(); }
+
+  const duration = Math.min(5200, 2400 + total * 4);
+  return new Promise((resolve) => {
+    const started = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, (now - started) / duration);
+      drawAt(t * total);
+      if (t < 1) requestAnimationFrame(step);
+      else setTimeout(resolve, 350);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+/** Frame both routes, so nothing important happens off screen. */
+function frameRoutes(paths) {
+  const all = paths.flat().map((i) => g.cities[i]);
+  const pad = 160;
+  const box = {
+    x: Math.min(...all.map((c) => c.x)) - pad,
+    y: Math.min(...all.map((c) => c.y)) - pad,
+  };
+  box.w = Math.max(...all.map((c) => c.x)) + pad - box.x;
+  box.h = Math.max(...all.map((c) => c.y)) + pad - box.y;
+  const rect = map.getBoundingClientRect();
+  const aspect = rect.width / rect.height;
+  if (box.w / box.h < aspect) {
+    const w = box.h * aspect; box.x -= (w - box.w) / 2; box.w = w;
+  } else {
+    const h = box.w / aspect; box.y -= (h - box.h) / 2; box.h = h;
+  }
+  applyCamera(box);
+}
+
+async function finish() {
   if (storeKey) {
     localStorage.setItem(storeKey, JSON.stringify({
       hops: round.hops, spent: round.spent, km: round.km, deadEnd: round.deadEnd,
@@ -274,16 +506,6 @@ function finish() {
   }
 
   $('reach').replaceChildren();
-  // Both the fastest way and the short way, because the whole lesson is that
-  // they are different roads.
-  $('optimalRoute').replaceChildren(
-    ...trap.path.slice(1).map((to, i) => el('path', {
-      d: edgePath(trap.path[i], to), class: 'trap',
-    })),
-    ...best.path.slice(1).map((to, i) => el('path', {
-      d: edgePath(best.path[i], to), class: 'best',
-    })),
-  );
 
   // Fog lifts: terrain, then the names of everywhere any of the routes went.
   app.dataset.stage = 'reveal';
@@ -294,6 +516,27 @@ function finish() {
     const node = label(i, mine.has(i) ? '' : 'label--best');
     setTimeout(() => node.classList.add('label--on'), 420 + k * 45);
   });
+
+  // Now run them side by side. The static routes only appear once the race is
+  // over, so nothing is given away while it is still driving.
+  $('paid').classList.remove('paid--on');
+  frameRoutes([round.hops.map((h) => h.to).concat(START), best.path]);
+  $('travelled').replaceChildren();
+  await raceRoutes([
+    { key: 'you', label: 'you', hops: round.hops },
+    { key: 'best', label: 'the fastest way', hops: hopsOf(best.path) },
+  ]);
+  $('race').replaceChildren();
+  $('raceClock').hidden = true;
+  paint();
+  $('optimalRoute').replaceChildren(
+    ...trap.path.slice(1).map((to, i) => el('path', {
+      d: edgePath(trap.path[i], to), class: 'trap',
+    })),
+    ...best.path.slice(1).map((to, i) => el('path', {
+      d: edgePath(best.path[i], to), class: 'best',
+    })),
+  );
 
   const left = remaining(round);
   $('revealVerdict').textContent = round.deadEnd ? 'Dead end.'
@@ -314,7 +557,8 @@ function finish() {
     : 'You kept to fast roads the whole way.';
 
   $('reveal').hidden = false;
-  $('paid').classList.remove('paid--on');
+  userMoved = false;
+  $('resetView').hidden = true;
 
   $('share').addEventListener('click', async () => {
     const text = shareString(g, round, day);
@@ -347,7 +591,7 @@ try {
 
 if (restored) {
   paint();
-  finish();
+  await finish();
 } else {
   if (saved) localStorage.removeItem(storeKey);
   round = newRound(g, { a: START, b: TARGET, budget: BUDGET });

@@ -26,6 +26,7 @@
       </div>
       <p class="gauge__caption" id="caption">remaining of <span id="budget">0</span> km</p>
       <p class="paid" id="paid" aria-live="polite"></p>
+      <p class="race-clock" id="raceClock" hidden></p>
     </div>
   </header>
 
@@ -40,6 +41,7 @@
       <image id="terrain" href="terrain.webp" clip-path="url(#landClip)" preserveAspectRatio="none"></image>
       <g id="optimalRoute"></g>
       <g id="travelled"></g>
+      <g id="race"></g>
       <g id="reach"></g>
       <g id="dots"></g>
       <g id="labels"></g>
@@ -66,6 +68,8 @@
       <a id="practice" href="?random">Play a random one</a>
     </div>
   </section>
+
+  <button class="reset-view" id="resetView" type="button" hidden>Reset view</button>
 
   <p class="hint" id="hint">Pick a neighbouring city. You pay the hours the road takes — and the shortest road is rarely the fastest.</p>
 </main>

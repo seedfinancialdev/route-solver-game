@@ -7,14 +7,15 @@ repeat. Reach the target with hours to spare.
 
 The core loop is judgement, not measurement. You can see exactly how long each
 road is. What you cannot see is how fast it runs, and across this map **the
-shortest route is the fastest route only 37% of the time**. A 250 km motorway
+shortest route is the fastest route only 21% of the time**. A 250 km motorway
 beats a 210 km road over a pass, every time — and the road's own shape, drawn as
 it actually runs, is the tell.
 
 Every time you commit, the game says what it cost: *3h09 for 249 km · 79 km/h ·
-ordinary going*. When the route is locked, the terrain appears and your route is
-drawn against two others — the fastest way, and the short way you were tempted
-into.
+ordinary going*. When the route is locked, both routes drive it again side by side at their real
+paces, so you watch the fast one pull away exactly where it happened. Then the
+terrain appears, and your route is drawn against the fastest way and against the
+short way you were tempted into.
 
 ## What's here
 
@@ -27,6 +28,9 @@ data/        the generated artefacts
 ```
 
 ## Running it
+
+Pan and zoom the map with drag and scroll (pinch on touch); `0` or double-click
+resets the view.
 
 ```sh
 npm install
@@ -82,12 +86,12 @@ two-lane runs at 45. Same measurement, different currency:
 
 So the game switched currency, drew the actual roads on the map — you can judge
 distance now, which is exactly the trap — and set the budget below what taking
-the shortest road costs. On the 478 shipped puzzles at a 1.08× budget:
+the shortest road costs. On the 2,538 shipped puzzles at a 1.08× budget:
 
 | player | wins |
 | --- | --- |
-| takes the shortest road, every time | **0 of 478** |
-| reads the roads, misjudges their speed, looks three hops ahead | 51% |
+| takes the shortest road, every time | **0%** |
+| reads the roads, misjudges their speed, looks three hops ahead | 52% |
 
 ## The open questions, answered
 

@@ -10,8 +10,8 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { haversineKm } from './lib/geo.mjs';
 
-const TARGET_COUNT = 200;
-const MIN_SPACING_KM = 110;
+const TARGET_COUNT = 500;
+const MIN_SPACING_KM = 75;
 
 // The continental landmass only. Britain and Ireland are excluded along with
 // Iceland/Malta/Cyprus: every route onto them runs through a ferry or the
