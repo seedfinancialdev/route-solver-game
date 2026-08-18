@@ -36,7 +36,7 @@ then filtered:
 | the map itself | pan and zoom freely; the frame follows you as you move | framed on both routes |
 | how long a road takes | only after you commit to it | every hop, with its average speed |
 | city names | start, target, and everywhere you can move to | all |
-| terrain | yes, from the first move — hillshade computed from ~390 m elevation data, in three levels down to 353 m per pixel | yes |
+| terrain | yes, from the first move — hillshade computed from ~390 m elevation data, in three levels down to 195 m per pixel | yes |
 | the fastest route, and the shortest one | never | both, drawn against yours |
 
 Road pace is shown **only for the roads you can move to**, never for the network
@@ -45,7 +45,7 @@ two-lane and the road north is a main road; you cannot see what the corridor
 beyond looks like. That is the whole balance. Simulating a player who reads the
 next hop well (σ 0.08) and still guesses beyond it (σ 0.25) moves the win rate
 from 54% to 56% — because the difficulty was never in judging one hop, it is in
-choosing the corridor. The shortest-road player still wins 0 of 2,147.
+choosing the corridor. The shortest-road player still wins 0 of 2,165.
 
 Terrain is on from the start rather than held back for the reveal. It does not
 hand over the answer: any European mountain range has several roads through it
@@ -73,7 +73,7 @@ them has already been seen.
 
 ## Puzzle selection
 
-A pair qualifies when all four hold. **2,147 of 46,043 candidate pairs do** —
+A pair qualifies when all four hold. **2,165 of 46,043 candidate pairs do** —
 nearly six years of daily puzzles.
 
 1. **The short way is measurably slower.** The distance-optimal route costs

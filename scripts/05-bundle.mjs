@@ -10,10 +10,10 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { project } from './lib/proj.mjs';
 
-const SIMPLIFY_KM = 0.4;   // Douglas-Peucker tolerance. Keeps essentially all the
-                           // detail OSRM returned, because the player can zoom
-                           // in far enough to see a road's every bend.
-const QUANT = 4;           // quarter-kilometre grid for the encoded shapes
+const SIMPLIFY_KM = 0.12;  // Douglas-Peucker tolerance. The map zooms to 90 km
+                           // across, where a tenth of a kilometre is about a
+                           // pixel and a half.
+const QUANT = 20;          // 50 m grid for the encoded shapes
 
 const read = (f) => JSON.parse(readFileSync(new URL(`../data/${f}`, import.meta.url), 'utf8'));
 const graph = read('graph.json');
@@ -115,6 +115,9 @@ const edges = graph.edges.map((e) => {
 
 const bundle = {
   generated: graph.generated,
+  // The decoder reads this rather than hardcoding it: the two drifted apart
+  // once already and every road silently landed in the wrong place.
+  quant: QUANT,
   view: map.view,
   countries: map.countries.map((c) => c.d),
   // [name, x, y]

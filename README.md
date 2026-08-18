@@ -92,7 +92,7 @@ two-lane runs at 45. Same measurement, different currency:
 
 So the game switched currency, drew the actual roads on the map — you can judge
 distance now, which is exactly the trap — and set the budget below what taking
-the shortest road costs. On the 2,147 shipped puzzles at a 1.08× budget:
+the shortest road costs. On the 2,165 shipped puzzles at a 1.08× budget:
 
 | player | wins |
 | --- | --- |

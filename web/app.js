@@ -89,7 +89,7 @@ $('terrainDetail').setAttribute('href', 'terrain-detail.webp');
 // Close work is carried by a grid of tiles at the elevation data's own
 // resolution. Only the two or three under the viewport are ever fetched, so
 // zooming in gains detail instead of losing it.
-const TILE_ZOOM_KM = 1500;
+const TILE_ZOOM_KM = 850;   // below this the detail pass is being stretched
 let tileManifest = null;
 const tilesShown = new Set();
 

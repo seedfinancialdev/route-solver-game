@@ -5,15 +5,13 @@
 // exactly the trap: across this graph the shortest route is the fastest one
 // only 37% of the time.
 
-const QUANT = 4;   // must match scripts/05-bundle.mjs
-
-/** Road shapes ship delta-encoded on a quarter-kilometre grid. */
-function decodeShape(deltas) {
+/** Road shapes ship delta-encoded on a fixed grid; the bundle states which. */
+function decodeShape(deltas, quant) {
   const pts = [];
   let x = 0, y = 0;
   for (let i = 0; i < deltas.length; i += 2) {
     x += deltas[i]; y += deltas[i + 1];
-    pts.push([x / QUANT, y / QUANT]);
+    pts.push([x / quant, y / quant]);
   }
   return pts;
 }
@@ -21,8 +19,9 @@ function decodeShape(deltas) {
 export function buildGraph(data) {
   const cities = data.cities.map(([name, country, x, y], i) => ({ i, name, country, x, y }));
   const adj = cities.map(() => []);
+  const quant = data.quant || 4;
   for (const [a, b, km, min, tiers, ...deltas] of data.edges) {
-    const shape = decodeShape(deltas);
+    const shape = decodeShape(deltas, quant);
     const pace = [...tiers].map(Number);
     adj[a].push({ to: b, km, min, shape, pace });
     adj[b].push({ to: a, km, min, shape, pace });

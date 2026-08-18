@@ -20,7 +20,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CACHE = ROOT / 'data' / 'raw' / 'dem'
 CACHE.mkdir(parents=True, exist_ok=True)
 
-ZOOM = 7                       # 512 px tiles => ~390 m/px at 50N
+import os
+ZOOM = int(os.environ.get('DEM_ZOOM', 8))   # 512 px tiles => ~195 m/px at 50N at z8
 TILE = 512
 SOURCE = 'https://s3.amazonaws.com/elevation-tiles-prod/geotiff/{z}/{x}/{y}.tif'
 # Two renders: an overview that loads instantly and a detail pass swapped in
@@ -29,8 +30,8 @@ SOURCE = 'https://s3.amazonaws.com/elevation-tiles-prod/geotiff/{z}/{x}/{y}.tif'
 # zooms, and a grid of tiles carries the close work — only the two or three a
 # player is actually looking at ever get fetched.
 OUTPUTS = [('terrain.webp', 2400, 80), ('terrain-detail.webp', 6000, 68)]
-TILE_COLS, TILE_ROWS = 4, 4
-TILE_M_PER_PX = 353          # the elevation data's own resolution at these latitudes
+TILE_COLS, TILE_ROWS = int(os.environ.get('TILE_GRID', 6)), int(os.environ.get('TILE_GRID', 6))
+TILE_M_PER_PX = int(os.environ.get('TILE_M_PER_PX', 195))   # the elevation data's own resolution
 TILE_QUALITY = 62
 
 # Must match scripts/lib/proj.mjs.
@@ -107,6 +108,11 @@ for (x, y) in tiles:
     if not path.exists():
         continue
     with Image.open(path) as im:
+        # Not every tile comes back at the nominal size; the pyramid serves 256 px
+        # where it has nothing finer to give. Scale it into its slot rather than
+        # trusting the dimensions.
+        if im.size != (TILE, TILE):
+            im = im.resize((TILE, TILE), Image.BILINEAR)
         dem[(y - y0) * TILE:(y - y0 + 1) * TILE, (x - x0) * TILE:(x - x0 + 1) * TILE] = \
             np.asarray(im, dtype=np.int32).astype(np.int16)
 

@@ -14,20 +14,23 @@ import { execFileSync } from 'node:child_process';
 import { project } from './lib/proj.mjs';
 
 const PAD_KM = 260;          // breathing room around the outermost city
-const QUANT = 2;             // round coordinates to 1/2 km; below that is noise
+const QUANT = 20;            // round coordinates to 1/20 km; the map zooms to 90 km across
 
 // The clip window is a few degrees wider than the projected view on every side,
 // so mapshaper's straight clip edges fall outside the frame instead of drawing
 // a false coastline across the corner of the map. Islands below 1200 km2 go:
 // at this simplification they survive as triangles, which read as artefacts.
-const SOURCE = new URL('../data/raw/ne_50m_admin_0_countries.geojson', import.meta.url);
+// 1:10m rather than 1:50m. At 50m scale a border has kilometres between its
+// vertices, which is fine at continental zoom and a polygon close up — and the
+// player can zoom to 90 km across.
+const SOURCE = new URL('../data/raw/ne_10m_admin_0_countries.geojson', import.meta.url);
 const CLIPPED = new URL('../data/raw/europe.geojson', import.meta.url);
 const CLIP_BOX = 'bbox=-33,25,55,68';
 if (!existsSync(CLIPPED) || process.env.REBUILD_BOUNDARIES) {
   execFileSync('npx', ['mapshaper', SOURCE.pathname,
     '-clip', CLIP_BOX,
     '-filter-islands', 'min-area=1200km2', 'remove-empty',
-    '-simplify', '40%', 'keep-shapes',
+    '-simplify', '18%', 'keep-shapes',
     // LABEL_X/LABEL_Y are Natural Earth's own placements for a country's name,
     // which beat a centroid for awkward shapes like Norway or Croatia.
     '-filter-fields', 'ISO_A2,NAME,LABEL_X,LABEL_Y,LABELRANK',
@@ -52,9 +55,9 @@ const geo = JSON.parse(readFileSync(CLIPPED, 'utf8'));
 // scalerank filters to the waters worth drawing: the Danube and the Rhine, not
 // every tributary in the Massif Central.
 const lakesGeo = prepareWater('ne_10m_lakes',
-  ['-filter', 'scalerank <= 6', '-simplify', '30%', 'keep-shapes', '-filter-fields', 'name']);
+  ['-filter', 'scalerank <= 6', '-simplify', '70%', 'keep-shapes', '-filter-fields', 'name']);
 const riversGeo = prepareWater('ne_10m_rivers_lake_centerlines',
-  ['-filter', 'scalerank <= 7', '-simplify', '35%', 'keep-shapes', '-filter-fields', 'name']);
+  ['-filter', 'scalerank <= 7', '-simplify', '70%', 'keep-shapes', '-filter-fields', 'name']);
 const graph = JSON.parse(readFileSync(new URL('../data/graph.json', import.meta.url), 'utf8'));
 
 // --- view window ------------------------------------------------------------

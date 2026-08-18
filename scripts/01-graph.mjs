@@ -11,6 +11,38 @@ import { haversineKm } from './lib/geo.mjs';
 import { project } from './lib/proj.mjs';
 import { measurePairs } from './lib/osrm.mjs';
 
+const SHAPE_TOLERANCE_KM = 0.06;  // thin the full road geometry to this before storing;
+                                  // finer than any zoom the game offers, coarse enough
+                                  // that data/graph.json stays a readable artefact
+
+/** Douglas-Peucker in projected kilometres. */
+function thin(points, tolerance) {
+  if (points.length < 3) return points;
+  const keep = new Uint8Array(points.length);
+  keep[0] = keep[points.length - 1] = 1;
+  const stack = [[0, points.length - 1]];
+  while (stack.length) {
+    const [lo, hi] = stack.pop();
+    const a = points[lo], b = points[hi];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    let worst = 0, at = -1;
+    for (let i = lo + 1; i < hi; i++) {
+      const p = points[i];
+      const d = Math.abs(dy * p.x - dx * p.y + b.x * a.y - b.y * a.x) / len;
+      if (d > worst) { worst = d; at = i; }
+    }
+    if (worst > tolerance && at !== -1) { keep[at] = 1; stack.push([lo, at], [at, hi]); }
+  }
+  return points.filter((_, i) => keep[i]);
+}
+
+const thinGeometry = (geometry) => {
+  if (!geometry || geometry.length < 3) return geometry;
+  const projectedPts = geometry.map(([lon, lat]) => ({ lon, lat, ...project(lon, lat) }));
+  return thin(projectedPts, SHAPE_TOLERANCE_KM).map((p) => [p.lon, p.lat]);
+};
+
 const KNN = 5;
 const MAX_CANDIDATE_KM = 350;   // straight-line; longer "neighbours" aren't neighbours
 const MAX_EDGE_KM = 420;        // road. One hop shouldn't eat a fifth of a typical budget
@@ -71,7 +103,7 @@ pairs.forEach(([a, b], idx) => {
   if (ratio > MAX_DETOUR_RATIO) { rejected.detour.push(`${label} ${ratio.toFixed(2)}x`); return; }
   edges.push({
     a, b, km: Math.round(r.km), min: Math.round(r.min),
-    geometry: r.geometry, steps: r.steps,
+    geometry: thinGeometry(r.geometry), steps: r.steps,
   });
 });
 
