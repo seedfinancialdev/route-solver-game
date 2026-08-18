@@ -9,47 +9,20 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { haversineKm } from './lib/geo.mjs';
+import { inGameEurope, parseRow } from './lib/cities.mjs';
 
 const TARGET_COUNT = 500;
 const MIN_SPACING_KM = 75;
-
-// The continental landmass only. Britain and Ireland are excluded along with
-// Iceland/Malta/Cyprus: every route onto them runs through a ferry or the
-// Chunnel, and a sea hop is exactly the cost a player cannot reason about from
-// a boundary map. Sicily, Sardinia and Crete drop out on their own once ferry
-// edges are rejected. Russia is excluded because only Kaliningrad and
-// St Petersburg would qualify and both distort the graph.
-const COUNTRIES = new Map(Object.entries({
-  PT: 'Portugal', ES: 'Spain', FR: 'France', BE: 'Belgium', NL: 'Netherlands',
-  LU: 'Luxembourg', DE: 'Germany', CH: 'Switzerland', AT: 'Austria', IT: 'Italy',
-  DK: 'Denmark', NO: 'Norway', SE: 'Sweden',
-  FI: 'Finland', EE: 'Estonia', LV: 'Latvia', LT: 'Lithuania', PL: 'Poland',
-  CZ: 'Czechia', SK: 'Slovakia', HU: 'Hungary', SI: 'Slovenia', HR: 'Croatia',
-  BA: 'Bosnia and Herzegovina', RS: 'Serbia', ME: 'Montenegro', MK: 'North Macedonia',
-  AL: 'Albania', GR: 'Greece', BG: 'Bulgaria', RO: 'Romania', MD: 'Moldova',
-  UA: 'Ukraine', BY: 'Belarus', TR: 'Turkey', XK: 'Kosovo',
-}));
-
-// Keeps Turkey to Thrace + the Aegean coast rather than dragging the graph
-// across Anatolia, and drops Ukrainian/Belarusian cities far past the Dnipro.
-const BBOX = { minLon: -11, maxLon: 33, minLat: 35, maxLat: 71 };
 
 const raw = readFileSync(new URL('../data/raw/cities15000.txt', import.meta.url), 'utf8');
 
 const candidates = [];
 for (const line of raw.split('\n')) {
   if (!line) continue;
-  const f = line.split('\t');
-  const [geonameid, name, , , lat, lon, featClass, , country] = f;
-  const population = Number(f[14]);
-  if (featClass !== 'P') continue;
-  if (!COUNTRIES.has(country)) continue;
-  const latN = Number(lat), lonN = Number(lon);
-  if (lonN < BBOX.minLon || lonN > BBOX.maxLon) continue;
-  if (latN < BBOX.minLat || latN > BBOX.maxLat) continue;
-  if (!population) continue;
+  const row = parseRow(line);
+  if (!inGameEurope(row)) continue;
   candidates.push({
-    id: Number(geonameid), name, country, lat: latN, lon: lonN, population,
+    id: row.id, name: row.name, country: row.country, lat: row.lat, lon: row.lon, population: row.population,
   });
 }
 

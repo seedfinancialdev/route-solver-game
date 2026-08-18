@@ -124,6 +124,13 @@ const bundle = {
   countryLabels: map.labels.map((l) => [l.name, l.x, l.y]),
   lakes: map.lakes,
   rivers: map.rivers,
+  urbanAreas: map.urbanAreas,
+  // [name, x, y, kind] — kind is "relief" (a range, plateau, plain) or "sea"
+  physicalLabels: (map.physicalLabels || []).map((l) => [l.name, l.x, l.y, l.kind]),
+  // [x, y, tier] — background towns below the playable roster's spacing cut.
+  // Decoration only: they connect to nothing and cost nothing to draw wrong.
+  towns: (map.towns || []).map((t) => [t.x, t.y, t.tier]),
+  graticule: map.graticule || [],
   cities,
   edges,
   currency: pack.currency,

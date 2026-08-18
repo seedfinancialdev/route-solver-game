@@ -36,7 +36,12 @@
         <clipPath id="landClip"></clipPath>
       </defs>
       <g id="countries"></g>
+      <!-- A lat/long grid, faint chart furniture under everything else. It's
+           computed from the same projection as the roads, not fetched, and it
+           tells a player nothing a road doesn't. -->
+      <g id="graticule" aria-hidden="true"></g>
       <g id="countryLabels" aria-hidden="true"></g>
+      <g id="physicalLabels" aria-hidden="true"></g>
       <!-- Above the country fills, not below them: it blends onto the land it
            is modelling, and the clip keeps it off the sea. -->
       <image id="terrain" href="terrain.webp" clip-path="url(#landClip)" preserveAspectRatio="none"></image>
@@ -44,11 +49,16 @@
            request starts and the image is fetched exactly once. -->
       <image id="terrainDetail" clip-path="url(#landClip)" preserveAspectRatio="none"></image>
       <g id="terrainTiles" clip-path="url(#landClip)"></g>
+      <!-- Built-up footprints, above the relief so the tint actually shows. -->
+      <g id="urban" aria-hidden="true"></g>
       <g id="rivers"></g>
       <g id="lakes"></g>
       <!-- Borders go above the relief. Underneath it they were being washed out
            by the hillshade's overlay blend, which is why they disappeared. -->
       <g id="borders"></g>
+      <!-- Background towns: unlabelled, inert, below the playable roster's own
+           dots so they never compete with something you can actually click. -->
+      <g id="towns" aria-hidden="true"></g>
       <g id="optimalRoute"></g>
       <g id="travelled"></g>
       <g id="race"></g>
@@ -81,6 +91,11 @@
   </section>
 
   <button class="reset-view" id="resetView" type="button" hidden>Reset view</button>
+
+  <div class="scale-bar" id="scaleBar" aria-hidden="true">
+    <span class="scale-bar__tick" id="scaleBarTick"></span>
+    <span class="scale-bar__label" id="scaleBarLabel">0 km</span>
+  </div>
 
   <div class="hint" id="hint">
     <p>Pick a neighbouring city. You pay the hours the road takes.</p>

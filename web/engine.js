@@ -31,6 +31,10 @@ export function buildGraph(data) {
     view: data.view, countries: data.countries,
     lakes: data.lakes || [], rivers: data.rivers || [],
     countryLabels: (data.countryLabels || []).map(([name, x, y]) => ({ name, x, y })),
+    urbanAreas: data.urbanAreas || [],
+    physicalLabels: (data.physicalLabels || []).map(([name, x, y, kind]) => ({ name, x, y, kind })),
+    towns: (data.towns || []).map(([x, y, tier]) => ({ x, y, tier })),
+    graticule: data.graticule || [],
   };
 }
 

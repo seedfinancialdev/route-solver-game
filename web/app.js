@@ -165,6 +165,32 @@ const countryLabels = g.countryLabels.map((c) => {
   return node;
 });
 
+// Named ranges, plateaus and seas — one layer further from the surface than a
+// country name, same idea: it says where you are, not which road is quick.
+const physicalLabels = g.physicalLabels.map((p) => {
+  const node = el('text', { x: p.x, y: p.y, class: `physical-label physical-label--${p.kind}` });
+  node.textContent = p.kind === 'sea' ? p.name.toUpperCase() : p.name;
+  $('physicalLabels').append(node);
+  return node;
+});
+
+// A faint lat/long grid, pure chart furniture.
+for (const d of g.graticule) $('graticule').append(el('path', { d, class: 'graticule-line' }));
+
+// Built-up footprints. A dot is a city; this is the sprawl a dot can't show —
+// static geometry that isn't connected to a single road, so it can't leak
+// anything about which one runs fast.
+for (const d of g.urbanAreas) $('urban').append(el('path', { d, class: 'urban' }));
+
+// Background towns: everything that would have qualified for the roster but
+// lost out to the 75km spacing rule (00-cities.mjs). Unlabelled and inert —
+// they connect to nothing, so they can only make the map look lived-in.
+const towns = g.towns.map((t) => {
+  const node = el('circle', { cx: t.x, cy: t.y, r: 1, class: `town${t.tier ? ' town--big' : ''}` });
+  $('towns').append(node);
+  return node;
+});
+
 const dots = g.cities.map((c) => {
   const node = el('circle', { cx: c.x, cy: c.y, r: 4, class: 'dot' });
   $('dots').append(node);
@@ -221,6 +247,19 @@ function resizeMarks() {
   // player zooms right in — at that scale they are noise, not orientation.
   const countryPx = camera && camera.w < 900 ? 0 : 16;
   for (const label of countryLabels) label.setAttribute('font-size', countryPx * unit);
+  // Physical names (ranges, seas) fade in a touch later than country names —
+  // they're the second layer of orientation, not the first — and step away
+  // at the same zoom, once the roads themselves are what's worth reading.
+  const physicalPx = camera && camera.w < 700 ? 0 : 12.5;
+  for (const label of physicalLabels) label.setAttribute('font-size', physicalPx * unit);
+  // Background towns hold a constant dot size too, and fade out once the
+  // player is zoomed out far enough that they'd just be noise between the
+  // cities that matter.
+  const townR = camera && camera.w > 2600 ? 0 : 1;
+  for (const node of towns) {
+    node.setAttribute('r', (node.classList.contains('town--big') ? townR * 1.7 : townR) * unit);
+  }
+  updateScaleBar();
 
   // The relief is 1.8 km per pixel at source. Zoomed in past roughly a
   // kilometre per pixel it stops being terrain and starts being blur, so it
@@ -238,6 +277,22 @@ function resizeMarks() {
     ensureTerrainTiles();
     updateTerrainLayers();
   }
+}
+
+// A road's length is meant to be readable off the map — "you can see exactly
+// how long each road is" is the deal the game makes with the player — so a
+// scale bar is furniture for a mechanic that's already meant to be visible,
+// not a new one. It never reveals a road's *speed*, only confirms its length.
+const SCALE_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000];
+function updateScaleBar() {
+  const rect = map.getBoundingClientRect();
+  if (!rect.width || !camera) return;
+  const kmPerPx = camera.w / rect.width;
+  const targetKm = 110 * kmPerPx;
+  const km = SCALE_STEPS.reduce((best, v) => (
+    Math.abs(Math.log(v / targetKm)) < Math.abs(Math.log(best / targetKm)) ? v : best), SCALE_STEPS[0]);
+  $('scaleBarTick').style.width = `${km / kmPerPx}px`;
+  $('scaleBarLabel').textContent = `${km.toLocaleString()} km`;
 }
 
 function layout() {

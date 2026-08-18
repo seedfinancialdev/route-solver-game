@@ -16,6 +16,9 @@
   --dimmer: #414b58;
   --speck: #4a5462;
   --reachable: #97a2b1;
+  /* A third hue, warm where land is neutral and water is cold, so a metro's
+     built-up footprint reads as human rather than as more terrain. */
+  --urban: #8a7a5c;
 
   --neutral: #cdd5e0;
   --amber: #e6b455;
@@ -79,6 +82,20 @@ html, body {
 
 .country { fill: var(--land); stroke: none; }
 
+/* Chart furniture. It sits under the relief on purpose, the same way the
+   country names do — the overlay blend lets it stay faint rather than
+   disappearing outright, and it never needs to compete with a road. */
+.graticule-line {
+  fill: none; stroke: var(--land-edge); stroke-width: 1; opacity: .08;
+  vector-effect: non-scaling-stroke; pointer-events: none;
+}
+
+/* Built-up footprints. Warm against the cool land/sea split so a metro's
+   sprawl reads as "lived in" without being mistaken for the relief itself. */
+.urban {
+  fill: var(--urban); opacity: .22; stroke: none; pointer-events: none;
+}
+
 /* Borders are dashed, as they are on every paper map, because otherwise they
    are the same thin grey line as a road and the eye cannot separate them. The
    casing underneath is what makes them hold over a relief that is itself full
@@ -103,6 +120,13 @@ html, body {
   fill: var(--water); stroke: var(--water-line); stroke-width: 1; opacity: .95;
   vector-effect: non-scaling-stroke;
 }
+
+/* Background towns: the GeoNames places that lost out to the roster's 75km
+   spacing rule. Smaller and dimmer than a speck you could ever click, on
+   purpose — they fill in the empty ground between playable cities without
+   ever being mistaken for one. */
+.town { fill: var(--speck); opacity: .55; pointer-events: none; transition: r .25s; }
+.town--big { opacity: .7; }
 
 .dot { fill: var(--speck); transition: fill .25s, r .25s; }
 .dot--reachable { fill: var(--reachable); cursor: pointer; }
@@ -168,6 +192,19 @@ html, body {
   transition: opacity .6s ease;
 }
 [data-stage="reveal"] .country-label { opacity: .28; }
+
+/* A second, quieter layer of typography: named ranges and seas. Italic marks
+   them as physical rather than political, the way a paper atlas does. */
+.physical-label {
+  fill: var(--dim); opacity: .38; pointer-events: none;
+  font-family: var(--sans); font-style: italic; letter-spacing: .05em;
+  text-anchor: middle;
+  paint-order: stroke; stroke: var(--bg); stroke-width: 3px;
+  stroke-linejoin: round; vector-effect: non-scaling-stroke;
+  transition: opacity .6s ease;
+}
+.physical-label--sea { fill: var(--water-line); letter-spacing: .16em; }
+[data-stage="reveal"] .physical-label { opacity: .24; }
 
 /* No font-size here, and no `font:` shorthand — the shorthand sets font-size and
    CSS beats the presentation attribute, so the labels were sized in map
@@ -339,6 +376,25 @@ html, body {
 .reset-view:hover { color: var(--ink); }
 [data-stage="reveal"] .reset-view { display: none; }
 
+/* A road's length is already meant to be read off the map; this just
+   calibrates the eye for it. It says nothing about how fast a road runs. */
+.scale-bar {
+  position: absolute; z-index: 2; left: 50%; bottom: 22px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+  pointer-events: none;
+}
+.scale-bar__tick {
+  display: block; height: 0; border-top: 2px solid var(--dimmer);
+  position: relative;
+}
+.scale-bar__tick::before, .scale-bar__tick::after {
+  content: ''; position: absolute; top: -4px; width: 1px; height: 8px; background: var(--dimmer);
+}
+.scale-bar__tick::before { left: 0; }
+.scale-bar__tick::after { right: 0; }
+[data-stage="reveal"] .scale-bar { opacity: 0; }
+
 .hint {
   position: absolute; z-index: 2; right: 26px; bottom: 22px;
   max-width: 260px; text-align: right; font-size: 12px; line-height: 1.5; color: var(--dimmer);
@@ -389,6 +445,9 @@ html, body {
 [data-stage="reveal"] .reset-view { display: none; }
 
 .hint { display: none; }
+  /* The hop log already claims this corner of a narrow screen; the scale bar
+     loses the fight for it. */
+  .scale-bar { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

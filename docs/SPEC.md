@@ -37,7 +37,18 @@ then filtered:
 | how long a road takes | only after you commit to it | every hop, with its average speed |
 | city names | start, target, and everywhere you can move to | all |
 | terrain | yes, from the first move — hillshade computed from ~390 m elevation data, in three levels down to 195 m per pixel | yes |
+| named mountain ranges, plateaus and seas | yes | yes |
+| built-up footprints and background towns | yes — decoration only, unconnected to any road | yes |
+| a lat/long grid and a scale bar | yes | grid only; the scale bar hides at the reveal |
 | the fastest route, and the shortest one | never | both, drawn against yours |
+
+The named ranges/seas, the urban footprints and the background towns are all
+static geography: none of them is wired to a road or an edge, so none of them
+can tell a player anything about which one is fast. They exist to answer "is
+this map alive," not "which way should I go" — the towns are exactly the
+GeoNames places that lost out to the roster's 75km spacing rule
+(`00-cities.mjs`), drawn small and inert because the emptiness between playable
+cities was the map's own doing, not the puzzle's.
 
 Road pace is shown **only for the roads you can move to**, never for the network
 at large. Standing in Rzeszów you can see that the road south is a slow mountain
