@@ -5,10 +5,24 @@
 // exactly the trap: across this graph the shortest route is the fastest one
 // only 37% of the time.
 
+const QUANT = 4;   // must match scripts/05-bundle.mjs
+
+/** Road shapes ship delta-encoded on a quarter-kilometre grid. */
+function decodeShape(deltas) {
+  const pts = [];
+  let x = 0, y = 0;
+  for (let i = 0; i < deltas.length; i += 2) {
+    x += deltas[i]; y += deltas[i + 1];
+    pts.push([x / QUANT, y / QUANT]);
+  }
+  return pts;
+}
+
 export function buildGraph(data) {
   const cities = data.cities.map(([name, country, x, y], i) => ({ i, name, country, x, y }));
   const adj = cities.map(() => []);
-  for (const [a, b, km, min, ...shape] of data.edges) {
+  for (const [a, b, km, min, ...deltas] of data.edges) {
+    const shape = decodeShape(deltas);
     adj[a].push({ to: b, km, min, shape });
     adj[b].push({ to: a, km, min, shape });
   }
@@ -21,12 +35,10 @@ export function buildGraph(data) {
 
 /** The road's own shape, as an SVG path. Reversed when driven the other way. */
 export function roadPath(edge, from, to) {
-  const { shape } = edge;
-  if (!shape || shape.length < 4) return null;
-  const pts = [];
-  for (let i = 0; i < shape.length; i += 2) pts.push([shape[i], shape[i + 1]]);
+  const pts = edge.shape;
+  if (!pts || pts.length < 2) return null;
   // Geometry is stored a->b; if the first point is nearer `to`, we're driving it
-  // backwards. Direction only matters for drawing animations, not for the shape.
+  // backwards. Direction matters for the race, which draws from where you start.
   const head = pts[0];
   const flip = Math.hypot(head[0] - from.x, head[1] - from.y)
     > Math.hypot(head[0] - to.x, head[1] - to.y);

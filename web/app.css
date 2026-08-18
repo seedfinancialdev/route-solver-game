@@ -53,7 +53,10 @@ html, body {
    what a shaded relief needs — flat ground keeps the land colour and mountains
    model themselves — so the land sits a shade light of the sea to give the
    blend something to work with. */
-#terrain { opacity: .95; mix-blend-mode: overlay; }
+/* Opacity is driven from JS: Natural Earth's relief is about 1.8 km per pixel,
+   so past a certain zoom it has no more detail to give and only muddies the
+   roads, which by then are the thing worth looking at. */
+#terrain { opacity: .95; mix-blend-mode: overlay; transition: opacity .3s linear; }
 
 .country {
   fill: var(--land); stroke: var(--land-edge); stroke-width: 1.4;
@@ -103,14 +106,20 @@ html, body {
 
 .country-label {
   fill: var(--dim); opacity: .34; pointer-events: none;
-  font: 500 13px/1 var(--sans); letter-spacing: .18em; text-anchor: middle;
+  font-family: var(--sans); font-weight: 500;
+  letter-spacing: .18em; text-anchor: middle;
   transition: opacity .6s ease;
 }
 [data-stage="reveal"] .country-label { opacity: .22; }
 
+/* No font-size here, and no `font:` shorthand — the shorthand sets font-size and
+   CSS beats the presentation attribute, so the labels were sized in map
+   kilometres and ballooned as you zoomed in. Size is set per frame in JS.
+   The halo needs non-scaling-stroke for the same reason. */
 .label {
-  fill: var(--ink); font: 500 11px/1 var(--sans); paint-order: stroke;
-  stroke: var(--bg); stroke-width: 3.5px; stroke-linejoin: round;
+  fill: var(--ink); font-family: var(--sans); font-weight: 500;
+  paint-order: stroke; stroke: var(--bg); stroke-width: 3.5px;
+  stroke-linejoin: round; vector-effect: non-scaling-stroke;
   pointer-events: none; opacity: 0; transition: opacity .6s ease;
 }
 .label--on { opacity: .92; }

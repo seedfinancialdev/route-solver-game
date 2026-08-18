@@ -112,7 +112,7 @@ $('budget').textContent = hhmm(BUDGET);
 // stop re-framing under them, and only pan far enough to keep the city they are
 // standing in on screen.
 
-const MIN_SPAN_KM = 220;                       // how far in you may go
+const MIN_SPAN_KM = 90;                        // how far in you may go
 const MAX_SPAN_KM = () => view.w * 1.15;       // and how far out
 
 let camera = null;
@@ -147,6 +147,14 @@ function resizeMarks() {
   // player zooms right in — at that scale they are noise, not orientation.
   const countryPx = camera && camera.w < 900 ? 0 : 13;
   for (const label of countryLabels) label.setAttribute('font-size', countryPx * unit);
+
+  // The relief is 1.8 km per pixel at source. Zoomed in past roughly a
+  // kilometre per pixel it stops being terrain and starts being blur, so it
+  // hands the map over to the roads.
+  if (camera) {
+    const fade = Math.max(0, Math.min(1, (camera.w - 380) / 520));
+    $('terrain').style.opacity = (0.95 * fade).toFixed(3);
+  }
 }
 
 function layout() {

@@ -10,9 +10,10 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { project } from './lib/proj.mjs';
 
-const SIMPLIFY_KM = 2.5;   // Douglas-Peucker tolerance. Below ~2 km is detail no
-                           // screen shows; above ~4 km a mountain road starts
-                           // looking like a motorway, which is the whole tell.
+const SIMPLIFY_KM = 0.4;   // Douglas-Peucker tolerance. Keeps essentially all the
+                           // detail OSRM returned, because the player can zoom
+                           // in far enough to see a road's every bend.
+const QUANT = 4;           // quarter-kilometre grid for the encoded shapes
 
 const read = (f) => JSON.parse(readFileSync(new URL(`../data/${f}`, import.meta.url), 'utf8'));
 const graph = read('graph.json');
@@ -53,14 +54,19 @@ const cities = graph.cities.map((c) => {
   return [c.name, c.country, round(p.x), round(p.y)];
 });
 
-// [a, b, km, minutes, ...flattened road shape between them]
+// [a, b, km, minutes, x0, y0, dx1, dy1, ...] — the road's shape, delta-encoded on
+// a quarter-kilometre grid. Absolute coordinates cost six or seven characters
+// each and the steps between them cost two, which is worth the decoder.
 const edges = graph.edges.map((e) => {
   const projected = (e.geometry || []).map(([lon, lat]) => {
     const p = project(lon, lat);
-    return [p.x, p.y];
+    return [Math.round(p.x * QUANT), Math.round(p.y * QUANT)];
   });
-  const shape = simplify(projected, SIMPLIFY_KM).flatMap(([x, y]) => [round(x), round(y)]);
-  return [e.a, e.b, e.km, e.min, ...shape];
+  const shape = simplify(projected, SIMPLIFY_KM * QUANT);
+  const flat = [];
+  let px = 0, py = 0;
+  for (const [x, y] of shape) { flat.push(x - px, y - py); px = x; py = y; }
+  return [e.a, e.b, e.km, e.min, ...flat];
 });
 
 const bundle = {
