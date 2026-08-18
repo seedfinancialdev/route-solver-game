@@ -12,10 +12,14 @@ beats a 210 km road over a pass, every time — and the road's own shape, drawn 
 it actually runs, is the tell.
 
 Every time you commit, the game says what it cost: *3h09 for 249 km · 79 km/h ·
-ordinary going*. When the route is locked, both routes drive it again side by side at their real
+ordinary going*. The map shows terrain, country names and the roads out of your current city from
+the first move — none of it gives the game away, because knowing a mountain range
+is there says nothing about which of the several roads through it is quick.
+
+When the route is locked, both routes drive it again side by side at their real
 paces, so you watch the fast one pull away exactly where it happened. Then the
-terrain appears, and your route is drawn against the fastest way and against the
-short way you were tempted into.
+numbers, and your route drawn against the fastest way and against the short way
+you were tempted into.
 
 ## What's here
 

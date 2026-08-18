@@ -5,7 +5,7 @@
 
 :root {
   --bg: #080a0d;
-  --land: #1c222b;
+  --land: #232b35;
   --land-edge: #38424f;
   --ink: #e9ecf0;
   --dim: #79828f;
@@ -44,18 +44,21 @@ html, body {
 }
 #map.map--dragging { cursor: grabbing; }
 
-/* Overlay leaves mid-grey alone and pushes everything else, which is exactly
-   what a shaded relief needs: flat ground keeps the land colour, mountains
-   model themselves. It needs a base with some light in it, so the land warms
-   up a shade at the same time. */
-#terrain { opacity: 0; transition: opacity 1.6s ease; mix-blend-mode: overlay; }
-[data-stage="reveal"] #terrain { opacity: .95; }
+/* Terrain is on from the first move. It does not give the game away: knowing a
+   mountain range is there tells you nothing about which of the several roads
+   through it is quick, and that is the whole question. What it does do is let
+   you read why a road bends where it bends.
+
+   Overlay leaves mid-grey alone and pushes everything else, which is exactly
+   what a shaded relief needs — flat ground keeps the land colour and mountains
+   model themselves — so the land sits a shade light of the sea to give the
+   blend something to work with. */
+#terrain { opacity: .95; mix-blend-mode: overlay; }
 
 .country {
   fill: var(--land); stroke: var(--land-edge); stroke-width: 1.4;
-  vector-effect: non-scaling-stroke; transition: fill 1.6s ease;
+  vector-effect: non-scaling-stroke;
 }
-[data-stage="reveal"] .country { fill: #232b35; }
 
 .dot { fill: var(--speck); transition: fill .25s, r .25s; }
 .dot--reachable { fill: var(--reachable); cursor: pointer; }
@@ -97,6 +100,13 @@ html, body {
   transition: opacity .8s ease .7s;
 }
 [data-stage="reveal"] .trap { opacity: .45; }
+
+.country-label {
+  fill: var(--dim); opacity: .34; pointer-events: none;
+  font: 500 13px/1 var(--sans); letter-spacing: .18em; text-anchor: middle;
+  transition: opacity .6s ease;
+}
+[data-stage="reveal"] .country-label { opacity: .22; }
 
 .label {
   fill: var(--ink); font: 500 11px/1 var(--sans); paint-order: stroke;
@@ -169,13 +179,16 @@ html, body {
 /* --- the race -------------------------------------------------------------
    Both routes drive from the origin at their real paces, so the player watches
    the fast one pull away on the stretch where they lost the time. */
+/* No `vector-effect: non-scaling-stroke` here, unlike every other line on the
+   map. With it, the browser measures the dash pattern in screen pixels while
+   getTotalLength() reports user units, so the growing line arrives as a
+   scattering of fragments. Stroke width is set in map units per frame instead. */
 .race-lane {
-  fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
+  fill: none; stroke-linecap: round; stroke-linejoin: round;
 }
 .race-lane--you { stroke: var(--accent); }
-.race-lane--best { stroke: var(--ink); opacity: .75; }
-.race-head { vector-effect: non-scaling-stroke; }
+.race-lane--best { stroke: var(--ink); opacity: .35; }
+.race-head { stroke: var(--bg); }
 .race-head--you { fill: var(--accent); }
 .race-head--best { fill: var(--ink); }
 .race-head--done { opacity: .35; }
@@ -186,6 +199,7 @@ html, body {
 }
 .race-clock strong { font-weight: 500; color: var(--ink); }
 .race-clock em { font-style: normal; color: var(--dimmer); }
+.race-clock b { display: block; font-weight: 400; color: var(--dimmer); margin-top: 3px; }
 @keyframes legIn { from { stroke-width: 6; opacity: .35; } }
 
 /* --- hop log ------------------------------------------------------------ */

@@ -29,13 +29,18 @@ then filtered:
 
 | | during play | after the route is locked |
 | --- | --- | --- |
-| country outlines | yes | yes |
+| country outlines and names | yes | yes |
 | the roads out of your current city | yes, drawn as they actually run | all roads taken |
 | the map itself | pan and zoom freely; the frame follows you as you move | framed on both routes |
 | how long a road takes | only after you commit to it | every hop, with its average speed |
 | city names | start, target, and everywhere you can move to | all |
-| terrain | no | yes |
+| terrain | yes, from the first move | yes |
 | the fastest route, and the shortest one | never | both, drawn against yours |
+
+Terrain is on from the start rather than held back for the reveal. It does not
+hand over the answer: any European mountain range has several roads through it
+and knowing the range is there says nothing about which of them is quick. What
+it gives the player is a reason for the shape of the road in front of them.
 
 **This departs from the brief**, which listed "no roads on the base map" as
 non-negotiable on the grounds that a visible road network hands the player the
@@ -49,8 +54,9 @@ distance-optimal route at a median cost of 1.004× — the game was a ruler.
 
 ## The reveal
 
-The round does not end with a table. Both routes leave the origin together and
-drive at their real paces — a hop that took four hours takes four hours' worth of
+The reveal is not a fog lifting — the map has shown everything it is going to
+show all along. It is a race: both routes leave the origin together and drive at
+their real paces — a hop that took four hours takes four hours' worth of
 the animation — so the player watches the fast route pull away on the stretch
 where it actually happened. The numbers land afterwards, once the reason for
 them has already been seen.

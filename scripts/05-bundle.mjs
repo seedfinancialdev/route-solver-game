@@ -67,6 +67,8 @@ const bundle = {
   generated: graph.generated,
   view: map.view,
   countries: map.countries.map((c) => c.d),
+  // [name, x, y]
+  countryLabels: map.labels.map((l) => [l.name, l.x, l.y]),
   cities,
   edges,
   currency: pack.currency,

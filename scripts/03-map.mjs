@@ -27,7 +27,9 @@ if (!existsSync(CLIPPED) || process.env.REBUILD_BOUNDARIES) {
     '-clip', 'bbox=-33,25,55,68',
     '-filter-islands', 'min-area=1200km2', 'remove-empty',
     '-simplify', '40%', 'keep-shapes',
-    '-filter-fields', 'ISO_A2,NAME',
+    // LABEL_X/LABEL_Y are Natural Earth's own placements for a country's name,
+    // which beat a centroid for awkward shapes like Norway or Croatia.
+    '-filter-fields', 'ISO_A2,NAME,LABEL_X,LABEL_Y,LABELRANK',
     '-o', 'format=geojson', 'precision=0.001', CLIPPED.pathname,
   ], { stdio: 'inherit' });
 }
@@ -88,15 +90,29 @@ const countries = geo.features
   }))
   .filter((c) => c.d.length > 0);
 
+// Country names, as quiet background typography: knowing you are about to cross
+// into Germany rather than Albania is exactly the kind of thing that tells you
+// what the road will be like.
+const labels = geo.features
+  .filter((f) => inFrame(f.geometry) && f.properties.LABEL_X != null)
+  .map((f) => {
+    const p = project(Number(f.properties.LABEL_X), Number(f.properties.LABEL_Y));
+    return { name: f.properties.NAME, x: round(p.x), y: round(p.y), rank: f.properties.LABELRANK ?? 5 };
+  })
+  // Rank 6 is the microstates — Liechtenstein, San Marino, Andorra, the Vatican.
+  // Their names are longer than their territory and they only add noise.
+  .filter((l) => l.rank <= 5)
+  .filter((l) => l.x > view.x && l.x < view.x + view.w && l.y > view.y && l.y < view.y + view.h);
+
 writeFileSync(
   new URL('../data/map.json', import.meta.url),
   JSON.stringify({
     view: { x: round(view.x), y: round(view.y), w: round(view.w), h: round(view.h) },
     // The lon/lat window the terrain raster must be rendered to cover.
-    countries,
+    countries, labels,
   }) + '\n',
 );
 
 const bytes = JSON.stringify(countries).length;
-console.log(`${countries.length} countries, ${(bytes / 1024).toFixed(0)} KB of path data`);
+console.log(`${countries.length} countries, ${labels.length} labels, ${(bytes / 1024).toFixed(0)} KB of path data`);
 console.log(`view ${view.w.toFixed(0)} x ${view.h.toFixed(0)} km, origin ${view.x.toFixed(0)},${view.y.toFixed(0)}`);

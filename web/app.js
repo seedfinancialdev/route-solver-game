@@ -81,6 +81,16 @@ for (const d of g.countries) {
   $('landClip').append(el('path', { d }));
 }
 
+// Country names sit under everything as quiet background typography. Knowing you
+// are about to cross into Germany rather than Albania is exactly the sort of
+// thing that tells you what the road ahead will be like.
+const countryLabels = g.countryLabels.map((c) => {
+  const node = el('text', { x: c.x, y: c.y, class: 'country-label' });
+  node.textContent = c.name.toUpperCase();
+  $('countryLabels').append(node);
+  return node;
+});
+
 const dots = g.cities.map((c) => {
   const node = el('circle', { cx: c.x, cy: c.y, r: 4, class: 'dot' });
   $('dots').append(node);
@@ -133,6 +143,10 @@ function resizeMarks() {
   hereRing.setAttribute('cx', g.cities[round.at].x);
   hereRing.setAttribute('cy', g.cities[round.at].y);
   for (const label of $('labels').children) label.setAttribute('font-size', 12.5 * unit);
+  // Country names hold a constant screen size too, but shrink away when the
+  // player zooms right in — at that scale they are noise, not orientation.
+  const countryPx = camera && camera.w < 900 ? 0 : 13;
+  for (const label of countryLabels) label.setAttribute('font-size', countryPx * unit);
 }
 
 function layout() {
@@ -420,7 +434,11 @@ function raceRoutes(lanes) {
   const built = lanes.map((lane) => {
     let cursor = 0;
     const segments = lane.hops.map((h) => {
-      const node = el('path', { d: edgePath(h.from, h.to), class: `race-lane race-lane--${lane.key}` });
+      const node = el('path', {
+        d: edgePath(h.from, h.to),
+        class: `race-lane race-lane--${lane.key}`,
+        'stroke-width': (lane.width || 2.8) * unit,
+      });
       group.append(node);
       const len = node.getTotalLength();
       node.style.strokeDasharray = len;
@@ -429,7 +447,9 @@ function raceRoutes(lanes) {
       cursor += h.min;
       return seg;
     });
-    const head = el('circle', { r: 4, class: `race-head race-head--${lane.key}` });
+    const head = el('circle', {
+      r: 4.5 * unit, 'stroke-width': 1.5 * unit, class: `race-head race-head--${lane.key}`,
+    });
     group.append(head);
     return { ...lane, segments, head, total: cursor };
   });
@@ -460,19 +480,35 @@ function raceRoutes(lanes) {
     const who = document.createElement('em');
     const arrived = built.filter((l) => virtual >= l.total).map((l) => l.label);
     who.textContent = arrived.length ? `  ${arrived.join(' and ')} arrived` : '  on the road';
-    clock.append(t, who);
+    const skip = document.createElement('b');
+    skip.textContent = 'click to skip';
+    clock.append(t, who, skip);
   };
 
   if (reduced) { drawAt(total); return Promise.resolve(); }
 
-  const duration = Math.min(5200, 2400 + total * 4);
+  // Long enough to watch the gap open. A whole day of driving takes about a
+  // second and a half, and impatience is handled by letting people skip.
+  const duration = Math.min(13000, Math.max(7000, total * 7));
   return new Promise((resolve) => {
     const started = performance.now();
+    let done = false;
+    const finishNow = () => {
+      if (done) return;
+      done = true;
+      window.removeEventListener('pointerdown', finishNow);
+      window.removeEventListener('keydown', finishNow);
+      drawAt(total);
+      setTimeout(resolve, 200);
+    };
+    window.addEventListener('pointerdown', finishNow);
+    window.addEventListener('keydown', finishNow);
     const step = (now) => {
+      if (done) return;
       const t = Math.min(1, (now - started) / duration);
       drawAt(t * total);
       if (t < 1) requestAnimationFrame(step);
-      else setTimeout(resolve, 350);
+      else finishNow();
     };
     requestAnimationFrame(step);
   });
@@ -507,7 +543,8 @@ async function finish() {
 
   $('reach').replaceChildren();
 
-  // Fog lifts: terrain, then the names of everywhere any of the routes went.
+  // The terrain has been there all along; what the reveal adds is the names of
+  // everywhere the routes went, and then the race.
   app.dataset.stage = 'reveal';
   $('labels').replaceChildren();
   const named = new Set([...best.path, ...trap.path, ...round.hops.map((h) => h.to), START]);
@@ -522,9 +559,12 @@ async function finish() {
   $('paid').classList.remove('paid--on');
   frameRoutes([round.hops.map((h) => h.to).concat(START), best.path]);
   $('travelled').replaceChildren();
+  // The fastest way goes down first and wider: the two routes share their
+  // opening hops on most puzzles, and the player should always be able to see
+  // their own line riding on top of it until the moment they part.
   await raceRoutes([
-    { key: 'you', label: 'you', hops: round.hops },
-    { key: 'best', label: 'the fastest way', hops: hopsOf(best.path) },
+    { key: 'best', label: 'the fastest way', hops: hopsOf(best.path), width: 5 },
+    { key: 'you', label: 'you', hops: round.hops, width: 2.6 },
   ]);
   $('race').replaceChildren();
   $('raceClock').hidden = true;

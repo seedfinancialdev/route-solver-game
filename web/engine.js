@@ -12,7 +12,11 @@ export function buildGraph(data) {
     adj[a].push({ to: b, km, min, shape });
     adj[b].push({ to: a, km, min, shape });
   }
-  return { cities, adj, n: cities.length, view: data.view, countries: data.countries };
+  return {
+    cities, adj, n: cities.length,
+    view: data.view, countries: data.countries,
+    countryLabels: (data.countryLabels || []).map(([name, x, y]) => ({ name, x, y })),
+  };
 }
 
 /** The road's own shape, as an SVG path. Reversed when driven the other way. */
