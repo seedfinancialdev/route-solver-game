@@ -1,0 +1,4 @@
+node_modules/
+# Build inputs and the routing cache. Re-created by `npm run data:*`;
+# data/graph.json is the artifact that matters and that one is committed.
+data/raw/
