@@ -50,11 +50,6 @@ export function estimator(g, src, dst) {
  * thing the game is teaching.
  */
 export function planner(g, src, dst) {
-  const { prev } = dijkstra(g, src, undefined, true);
-  return followCrowPlan(g, src, dst);
-}
-
-function followCrowPlan(g, src, dst) {
   // Dijkstra over crow-weighted edges, replanned at each step so the bot
   // behaves like someone re-reading the map after every hop.
   const visited = new Set([src]);

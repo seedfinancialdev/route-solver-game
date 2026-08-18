@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Route</title>
+<meta name="description" content="A daily route-budgeting puzzle across Europe.">
+<link rel="stylesheet" href="app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='3' fill='%23e6b455'/></svg>">
+</head>
+<body>
+<main id="app" data-stage="loading">
+
+  <header class="hud">
+    <div class="hud__trip">
+      <span id="origin">—</span>
+      <svg class="hud__arrow" viewBox="0 0 24 8" aria-hidden="true"><path d="M0 4h21M17 1l4 3-4 3"/></svg>
+      <span id="destination">—</span>
+    </div>
+
+    <div class="gauge">
+      <div class="gauge__readout"><span id="remaining">0</span><span class="gauge__unit">km</span></div>
+      <div class="gauge__track"><div class="gauge__fill" id="gaugeFill"></div></div>
+      <p class="gauge__caption" id="caption">remaining of <span id="budget">0</span> km</p>
+    </div>
+  </header>
+
+  <div class="board">
+    <svg id="map" aria-label="Map of Europe. Country outlines and city dots." role="application">
+      <defs>
+        <clipPath id="landClip"></clipPath>
+      </defs>
+      <g id="countries"></g>
+      <!-- Above the country fills, not below them: it blends onto the land it
+           is modelling, and the clip keeps it off the sea. -->
+      <image id="terrain" href="terrain.webp" clip-path="url(#landClip)" preserveAspectRatio="none"></image>
+      <g id="optimalRoute"></g>
+      <g id="travelled"></g>
+      <g id="reach"></g>
+      <g id="dots"></g>
+      <g id="labels"></g>
+    </svg>
+  </div>
+
+  <aside class="log">
+    <ol id="hops"></ol>
+    <div class="log__total" id="logTotal"></div>
+  </aside>
+
+  <section class="reveal" id="reveal" hidden>
+    <h2 id="revealVerdict">—</h2>
+    <dl class="reveal__rows">
+      <div><dt>your route</dt><dd><span id="yourKm">0</span> km<em id="yourMeta"></em></dd></div>
+      <div><dt>optimal</dt><dd><span id="bestKm">0</span> km<em id="bestMeta"></em></dd></div>
+      <div><dt>budget</dt><dd><span id="budgetKm">0</span> km</dd></div>
+    </dl>
+    <p class="reveal__glyphs" id="glyphs"></p>
+    <p class="reveal__note" id="revealNote"></p>
+    <div class="reveal__actions">
+      <button id="share" type="button">Copy result</button>
+      <a id="practice" href="?random">Play a random one</a>
+    </div>
+  </section>
+
+  <p class="hint" id="hint">Pick a neighbouring city. You pay what the road costs, not what the map suggests.</p>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

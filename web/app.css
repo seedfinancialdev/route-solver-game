@@ -1,0 +1,191 @@
+/* Flat, near-monochrome, one accent — and the accent is the budget itself.
+   The gauge starts neutral and warms to amber and then red as the kilometres
+   drain, and the current city and the travelled route take the same colour, so
+   the whole screen tightens with the situation. */
+
+:root {
+  --bg: #080a0d;
+  --land: #1c222b;
+  --land-edge: #38424f;
+  --ink: #e9ecf0;
+  --dim: #79828f;
+  --dimmer: #414b58;
+  --speck: #4a5462;
+  --reachable: #97a2b1;
+
+  --neutral: #cdd5e0;
+  --amber: #e6b455;
+  --red: #e0654f;
+  --accent: var(--neutral);
+
+  --panel: rgba(10, 13, 17, 0.88);
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; height: 100%;
+  background: var(--bg); color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+#app { position: relative; height: 100%; overflow: hidden; }
+
+/* --- map ---------------------------------------------------------------- */
+.board { position: absolute; inset: 0; }
+#map { width: 100%; height: 100%; display: block; touch-action: manipulation; }
+
+/* Overlay leaves mid-grey alone and pushes everything else, which is exactly
+   what a shaded relief needs: flat ground keeps the land colour, mountains
+   model themselves. It needs a base with some light in it, so the land warms
+   up a shade at the same time. */
+#terrain { opacity: 0; transition: opacity 1.6s ease; mix-blend-mode: overlay; }
+[data-stage="reveal"] #terrain { opacity: .95; }
+
+.country {
+  fill: var(--land); stroke: var(--land-edge); stroke-width: 1.4;
+  vector-effect: non-scaling-stroke; transition: fill 1.6s ease;
+}
+[data-stage="reveal"] .country { fill: #232b35; }
+
+.dot { fill: var(--speck); transition: fill .25s, r .25s; }
+.dot--reachable { fill: var(--reachable); cursor: pointer; }
+.dot--reachable:hover, .dot--reachable:focus-visible { fill: var(--ink); outline: none; }
+.dot--visited { fill: var(--dim); }
+.dot--current { fill: var(--accent); }
+.dot--target { fill: none; stroke: var(--ink); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.dot--here {
+  fill: none; stroke: var(--accent); stroke-width: 1.2; opacity: .55;
+  vector-effect: non-scaling-stroke; pointer-events: none;
+  transition: stroke .5s;
+}
+.dot--reachable { stroke: var(--bg); stroke-width: 2; vector-effect: non-scaling-stroke; }
+
+.reach-line { stroke: var(--dimmer); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.reach-line--hot { stroke: var(--reachable); stroke-dasharray: 3 4; }
+
+.leg {
+  fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.best {
+  fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round;
+  stroke-dasharray: 5 6; opacity: 0; vector-effect: non-scaling-stroke;
+  transition: opacity .8s ease .5s;
+}
+[data-stage="reveal"] .best { opacity: .55; }
+
+.label {
+  fill: var(--ink); font: 500 11px/1 var(--sans); paint-order: stroke;
+  stroke: var(--bg); stroke-width: 3.5px; stroke-linejoin: round;
+  pointer-events: none; opacity: 0; transition: opacity .6s ease;
+}
+.label--on { opacity: .92; }
+.label--best { fill: var(--dim); }
+
+/* --- hud ---------------------------------------------------------------- */
+.hud {
+  position: absolute; top: 0; left: 0; z-index: 2;
+  padding: 22px 26px; max-width: min(360px, 78vw);
+  background: linear-gradient(160deg, var(--panel) 40%, transparent);
+  backdrop-filter: blur(3px);
+  pointer-events: none;
+}
+.hud__trip {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim);
+}
+.hud__arrow { width: 24px; height: 8px; fill: none; stroke: var(--dimmer); stroke-width: 1.4; }
+.hud__trip span:last-child { color: var(--ink); }
+
+.gauge { margin-top: 14px; }
+.gauge__readout {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: clamp(2.3rem, 6.4vw, 3.1rem); line-height: 1;
+  color: var(--accent); transition: color .5s ease;
+}
+.gauge__unit { font-size: 1rem; color: var(--dim); letter-spacing: .06em; }
+.gauge__track {
+  margin-top: 12px; height: 3px; border-radius: 2px;
+  background: var(--dimmer); overflow: hidden;
+}
+.gauge__fill {
+  height: 100%; width: 100%; background: var(--accent);
+  transform-origin: left; transition: transform .6s cubic-bezier(.2,.7,.3,1), background .5s;
+}
+.gauge__caption { margin: 10px 0 0; font-size: 12px; color: var(--dim); font-family: var(--mono); }
+
+/* --- hop log ------------------------------------------------------------ */
+.log {
+  position: absolute; left: 26px; bottom: 22px; z-index: 2;
+  max-width: min(320px, 74vw); max-height: 44vh; overflow-y: auto;
+  font-family: var(--mono); font-size: 12px; color: var(--dim);
+  pointer-events: none; scrollbar-width: none;
+}
+.log::-webkit-scrollbar { display: none; }
+.log ol { margin: 0; padding: 0; list-style: none; }
+.log li { display: flex; justify-content: space-between; gap: 16px; padding: 3px 0; }
+.log li span:first-child { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log li em { font-style: normal; color: var(--dimmer); margin-left: 8px; }
+.log__total { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--dimmer); color: var(--ink); }
+.log__total:empty { display: none; }
+
+/* --- reveal ------------------------------------------------------------- */
+.reveal {
+  position: absolute; z-index: 3; right: 26px; top: 50%; transform: translateY(-50%);
+  width: min(340px, calc(100vw - 52px));
+  padding: 26px; border: 1px solid var(--land-edge); border-radius: 3px;
+  background: var(--panel); backdrop-filter: blur(10px);
+  animation: rise .6s cubic-bezier(.2,.7,.3,1) both;
+}
+@keyframes rise { from { opacity: 0; transform: translateY(calc(-50% + 14px)); } }
+.reveal h2 {
+  margin: 0 0 18px; font-family: var(--mono); font-weight: 500;
+  font-size: 1.55rem; letter-spacing: -.01em; color: var(--accent);
+}
+.reveal__rows { margin: 0; font-family: var(--mono); font-size: 12.5px; }
+.reveal__rows > div { display: flex; justify-content: space-between; padding: 5px 0; }
+.reveal__rows dt { color: var(--dim); }
+.reveal__rows dd { margin: 0; color: var(--ink); }
+.reveal__rows em { font-style: normal; color: var(--dimmer); margin-left: 10px; }
+.reveal__glyphs {
+  margin: 18px 0 0; font-family: var(--mono); font-size: 17px;
+  letter-spacing: .22em; color: var(--dim);
+}
+.reveal__note { margin: 14px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--dim); }
+.reveal__actions { display: flex; align-items: center; gap: 18px; margin-top: 22px; }
+.reveal button {
+  font: inherit; font-size: 13px; padding: 9px 16px; cursor: pointer;
+  color: var(--bg); background: var(--accent); border: 0; border-radius: 2px;
+  transition: opacity .2s;
+}
+.reveal button:hover { opacity: .85; }
+.reveal a { font-size: 12.5px; color: var(--dim); text-decoration: none; border-bottom: 1px solid var(--dimmer); }
+.reveal a:hover { color: var(--ink); }
+
+.hint {
+  position: absolute; z-index: 2; right: 26px; bottom: 22px; margin: 0;
+  max-width: 260px; text-align: right; font-size: 12px; line-height: 1.5; color: var(--dimmer);
+  transition: opacity .4s;
+}
+[data-stage="reveal"] .hint, [data-stage="loading"] .hint { opacity: 0; }
+
+@media (max-width: 720px) {
+  .hud { padding: 16px 18px; }
+  .log { left: 18px; bottom: 16px; max-height: 30vh; }
+  .reveal { right: 12px; left: 12px; width: auto; top: auto; bottom: 12px; transform: none; padding: 20px; }
+  /* The panel fills the lower half on a phone, so the hop log would only ever
+     show through it. */
+  [data-stage="reveal"] .log { display: none; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+  .hint { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

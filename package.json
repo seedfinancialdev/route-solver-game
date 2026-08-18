@@ -7,9 +7,10 @@
     "data:cities": "node scripts/00-cities.mjs",
     "data:graph": "node scripts/01-graph.mjs",
     "data:puzzles": "node scripts/02-puzzles.mjs",
-    "data:map": "node scripts/03-map.mjs",
+    "data:map": "node scripts/03-map.mjs && python3 scripts/04-terrain.py && node scripts/05-bundle.mjs",
     "play": "node play/cli.mjs",
-    "calibrate": "node play/calibrate.mjs"
+    "calibrate": "node play/calibrate.mjs",
+    "serve": "python3 -m http.server 8137 --directory web"
   },
   "devDependencies": {
     "d3-delaunay": "^6.0.4",
