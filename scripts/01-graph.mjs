@@ -18,6 +18,7 @@ const MAX_DETOUR_RATIO = 2.0;   // road/straight-line. Alpine passes run ~1.5
 const MAX_FERRY_KM = 3;         // The Danube crossings OSRM prefers are ~1-2 km and have a
                                 // bridge beside them, so they cost what a bridge costs. Every
                                 // genuine sea link measured here is 5 km or more.
+const PASS_THROUGH_KM = 12;     // A city this close to a road is, for our purposes, on it
 
 const cities = JSON.parse(readFileSync(new URL('../data/cities.json', import.meta.url), 'utf8'));
 const pts = cities.map((c) => { const p = project(c.lon, c.lat); return [p.x, p.y]; });
@@ -58,7 +59,7 @@ const measured = await measurePairs(jobs, (done, total) => {
 
 // --- sanity filter ---------------------------------------------------------
 const edges = [];
-const rejected = { ferry: [], long: [], detour: [], noroute: [] };
+const rejected = { ferry: [], long: [], detour: [], noroute: [], through: [] };
 pairs.forEach(([a, b], idx) => {
   const r = measured[idx];
   const label = `${cities[a].name}-${cities[b].name}`;
@@ -70,6 +71,46 @@ pairs.forEach(([a, b], idx) => {
   if (ratio > MAX_DETOUR_RATIO) { rejected.detour.push(`${label} ${ratio.toFixed(2)}x`); return; }
   edges.push({ a, b, km: Math.round(r.km), min: Math.round(r.min), geometry: r.geometry });
 });
+
+// --- roads that drive straight through another city -------------------------
+// The A4 from Rzeszów to Radom goes through Lublin, and Lublin is a city on this
+// map. Keeping that as its own edge draws a road across a dot it does not stop
+// at, and hands the player a hop that is really two hops glued together. The
+// shortcut only goes if both of its halves exist, so nothing is cut off by it.
+const surviving = new Set(edges.map((e) => `${Math.min(e.a, e.b)},${Math.max(e.a, e.b)}`));
+const key = (a, b) => `${Math.min(a, b)},${Math.max(a, b)}`;
+const projected = cities.map((c) => project(c.lon, c.lat));
+
+function distToSegment(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  let t = len2 ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+const throughCity = (edge) => {
+  const shape = (edge.geometry || []).map(([lon, lat]) => project(lon, lat));
+  if (shape.length < 2) return null;
+  for (let c = 0; c < cities.length; c++) {
+    if (c === edge.a || c === edge.b) continue;
+    let d = Infinity;
+    for (let i = 1; i < shape.length && d >= PASS_THROUGH_KM; i++) {
+      d = Math.min(d, distToSegment(projected[c], shape[i - 1], shape[i]));
+    }
+    if (d < PASS_THROUGH_KM && surviving.has(key(edge.a, c)) && surviving.has(key(c, edge.b))) return c;
+  }
+  return null;
+};
+
+const direct = [];
+for (const e of edges) {
+  const via = throughCity(e);
+  if (via === null) direct.push(e);
+  else rejected.through.push(`${cities[e.a].name}-${cities[e.b].name} runs through ${cities[via].name}`);
+}
+edges.length = 0;
+edges.push(...direct);
 
 // --- connectivity ----------------------------------------------------------
 // Whatever is left over after the filters is by definition unreachable by road,

@@ -7,11 +7,11 @@ reproduces the numbers.
 
 You have a budget of **driving hours**. The roads are drawn, so you can see how
 long each one is. What you cannot see is how fast it runs — and across this
-graph **the shortest route is the fastest route only 21% of the time**.
+graph **the shortest route is the fastest route only 27% of the time**.
 
 ## The board
 
-472 European cities, 1,401 roads, one connected component (`data/graph.json`).
+472 European cities, 1,226 roads, one connected component (`data/graph.json`).
 Cities are GeoNames `cities15000` filtered to continental Europe, top-by-
 population with a 75 km minimum spacing — without a spacing rule the Ruhr, the
 Randstad and Upper Silesia eat the budget and Iberia goes uncovered. Roads are Delaunay + kNN candidates
@@ -24,6 +24,7 @@ then filtered:
 | road > 420 km → not a road | one hop shouldn't eat a fifth of a budget |
 | road / straight-line > 2.0 → not a road | past this it isn't a link, it's a detour around something |
 | anything outside the largest component → not in the game | islands and the sparse far north leave on their own terms |
+| a road passing within 12 km of a third city → not a road | the A4 from Rzeszów to Radom goes through Lublin, and Lublin is a city here. Keeping it draws a road across a dot it does not stop at, and offers a hop that is really two hops glued together. Only dropped when both halves exist, so nothing is cut off |
 
 ## Visibility
 
@@ -63,11 +64,11 @@ them has already been seen.
 
 ## Puzzle selection
 
-A pair qualifies when all four hold. **2,538 of 49,293 candidate pairs do** —
-seven years of daily puzzles.
+A pair qualifies when all four hold. **2,147 of 46,043 candidate pairs do** —
+nearly six years of daily puzzles.
 
 1. **The short way is measurably slower.** The distance-optimal route costs
-   ≥ 1.12× the fastest route's time. 3,128 pairs clear this — a median of three
+   ≥ 1.12× the fastest route's time. 2,627 pairs clear this — a median of three
    hours thrown away.
 2. **It is winnable.** A good run by the simulated player comes in under budget.
 3. **It is not free.** A sloppy run by the same player does not.

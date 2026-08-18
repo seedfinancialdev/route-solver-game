@@ -7,7 +7,7 @@ repeat. Reach the target with hours to spare.
 
 The core loop is judgement, not measurement. You can see exactly how long each
 road is. What you cannot see is how fast it runs, and across this map **the
-shortest route is the fastest route only 21% of the time**. A 250 km motorway
+shortest route is the fastest route only 27% of the time**. A 250 km motorway
 beats a 210 km road over a pass, every time — and the road's own shape, drawn as
 it actually runs, is the tell.
 
@@ -90,7 +90,7 @@ two-lane runs at 45. Same measurement, different currency:
 
 So the game switched currency, drew the actual roads on the map — you can judge
 distance now, which is exactly the trap — and set the budget below what taking
-the shortest road costs. On the 2,538 shipped puzzles at a 1.08× budget:
+the shortest road costs. On the 2,147 shipped puzzles at a 1.08× budget:
 
 | player | wins |
 | --- | --- |
