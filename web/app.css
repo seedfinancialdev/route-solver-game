@@ -8,7 +8,7 @@
      and cold, land is neutral. Coastlines then read without needing an outline. */
   --bg: #071119;
   --land: #232b35;
-  --land-edge: #4b5468;
+  --land-edge: #97a5bb;
   --water: #12283a;
   --water-line: #47738c;
   --ink: #e9ecf0;
@@ -68,11 +68,19 @@ html, body {
 #terrainDetail { opacity: 0; }
 #terrainDetail.is-ready { opacity: var(--terrain-opacity, .95); transition: opacity .8s ease; }
 
+.country { fill: var(--land); stroke: none; }
+
 /* Borders are dashed, as they are on every paper map, because otherwise they
-   are the same thin grey line as a road and the eye cannot separate them. */
-.country {
-  fill: var(--land); stroke: var(--land-edge); stroke-width: 1.1;
-  stroke-dasharray: 7 4; vector-effect: non-scaling-stroke;
+   are the same thin grey line as a road and the eye cannot separate them. The
+   casing underneath is what makes them hold over a relief that is itself full
+   of ridge lines. */
+.border-casing {
+  fill: none; stroke: var(--bg); stroke-width: 4; opacity: .55;
+  vector-effect: non-scaling-stroke;
+}
+.border {
+  fill: none; stroke: var(--land-edge); stroke-width: 1.6;
+  stroke-dasharray: 10 5; vector-effect: non-scaling-stroke;
 }
 
 /* Water reads as the sea does, because that is what it is. Rivers matter less

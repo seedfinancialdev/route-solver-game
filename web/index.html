@@ -45,6 +45,9 @@
       <image id="terrainDetail" clip-path="url(#landClip)" preserveAspectRatio="none"></image>
       <g id="rivers"></g>
       <g id="lakes"></g>
+      <!-- Borders go above the relief. Underneath it they were being washed out
+           by the hillshade's overlay blend, which is why they disappeared. -->
+      <g id="borders"></g>
       <g id="optimalRoute"></g>
       <g id="travelled"></g>
       <g id="race"></g>

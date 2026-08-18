@@ -86,7 +86,11 @@ for (const d of g.rivers) $('rivers').append(el('path', { d, class: 'river' }));
 for (const d of g.lakes) $('lakes').append(el('path', { d, class: 'lake' }));
 
 for (const d of g.countries) {
+  // Fill below the relief, border above it: a country's colour should be
+  // modelled by the terrain, its frontier should not be.
   $('countries').append(el('path', { d, class: 'country' }));
+  $('borders').append(el('path', { d, class: 'border-casing' }));
+  $('borders').append(el('path', { d, class: 'border' }));
   // Straight into the clipPath: a <g> in there is ignored and the terrain
   // silently never appears.
   $('landClip').append(el('path', { d }));
