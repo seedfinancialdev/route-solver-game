@@ -1,19 +1,31 @@
-"""Phase 4, step 2: the reveal layer.
+"""The relief layer, built from real elevation data.
 
-Natural Earth's shaded relief, reprojected into the same Lambert conformal
-conic the boundaries and the adjacency graph use, cropped to the game's view
-box. Emitted as a plain grayscale PNG: the page clips it to the country
-outlines and tints it in CSS, so one file serves both themes.
+Natural Earth's shaded relief is about 1.8 km per pixel, which is fine at
+continental scale and mush the moment anyone zooms. This builds the shading
+ourselves from AWS Terrain Tiles (the old Mapzen elevation pyramid, metres above
+sea level, ~390 m per pixel at these latitudes) reprojected into the game's
+conic, so the map holds up when you go looking at how a road crosses a range.
 
   python3 scripts/04-terrain.py
+
+Downloaded tiles are cached under data/raw/dem/, so a rebuild is free.
 """
-import json, math, pathlib
+import concurrent.futures as futures
+import json, math, pathlib, urllib.request
 import numpy as np
 from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = None
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-OUT_W = 2400
+CACHE = ROOT / 'data' / 'raw' / 'dem'
+CACHE.mkdir(parents=True, exist_ok=True)
+
+ZOOM = 7                       # 512 px tiles => ~390 m/px at 50N
+TILE = 512
+SOURCE = 'https://s3.amazonaws.com/elevation-tiles-prod/geotiff/{z}/{x}/{y}.tif'
+# Two renders: an overview that loads instantly and a detail pass swapped in
+# behind it once it arrives.
+OUTPUTS = [('terrain.webp', 2400, 80), ('terrain-detail.webp', 6000, 68)]
 
 # Must match scripts/lib/proj.mjs.
 LAT1, LAT2, LAT0, LON0, R = 43.0, 62.0, 52.0, 15.0, 6371.0088
@@ -32,47 +44,108 @@ def inverse(x, y):
     return lon, lat
 
 
+def merc_xy(lon, lat):
+    """lon/lat -> global pixel coordinates in the tile pyramid."""
+    span = TILE * 2 ** ZOOM
+    lat = np.clip(lat, -85.05, 85.05)
+    sin = np.sin(np.radians(lat))
+    return ((lon + 180.0) / 360.0 * span,
+            (0.5 - np.log((1 + sin) / (1 - sin)) / (4 * math.pi)) * span)
+
+
+def fetch(tile):
+    x, y = tile
+    path = CACHE / f'{ZOOM}_{x}_{y}.tif'
+    if path.exists():
+        return path
+    url = SOURCE.format(z=ZOOM, x=x, y=y)
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(url, timeout=90) as r:
+                path.write_bytes(r.read())
+            return path
+        except Exception:
+            if attempt == 3:
+                return None
+    return None
+
+
 view = json.loads((ROOT / 'data' / 'map.json').read_text())['view']
-out_h = round(OUT_W * view['h'] / view['w'])
 
-# Pixel centres of the output image, in projected km.
-xs = view['x'] + (np.arange(OUT_W) + 0.5) * view['w'] / OUT_W
-ys = view['y'] + (np.arange(out_h) + 0.5) * view['h'] / out_h
-lon, lat = inverse(*np.meshgrid(xs, ys))
+# Which tiles the view needs. Sample the frame's edge and interior, because a
+# conic projection's bounding box in lon/lat is not a rectangle.
+gx, gy = np.meshgrid(np.linspace(view['x'], view['x'] + view['w'], 80),
+                     np.linspace(view['y'], view['y'] + view['h'], 80))
+lon_s, lat_s = inverse(gx, gy)
+px_s, py_s = merc_xy(lon_s, lat_s)
+x0, x1 = int(px_s.min() // TILE), int(px_s.max() // TILE) + 1
+y0, y1 = int(py_s.min() // TILE), int(py_s.max() // TILE) + 1
+tiles = [(x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)]
+print(f'view needs {len(tiles)} elevation tiles at zoom {ZOOM} '
+      f'(x {x0}-{x1}, y {y0}-{y1})')
 
-# Source georeferencing, from SR_HR.tfw.
-PX = 1 / 60.0
-src_left, src_top = -180.0, 90.0
-col = (lon - src_left) / PX - 0.5
-row = (src_top - lat) / PX - 0.5
+missing = [t for t in tiles if not (CACHE / f'{ZOOM}_{t[0]}_{t[1]}.tif').exists()]
+if missing:
+    print(f'  fetching {len(missing)}...')
+    with futures.ThreadPoolExecutor(max_workers=8) as pool:
+        for i, _ in enumerate(pool.map(fetch, missing), 1):
+            if i % 100 == 0:
+                print(f'    {i}/{len(missing)}')
 
-c0, c1 = int(np.floor(col.min())) - 1, int(np.ceil(col.max())) + 2
-r0, r1 = int(np.floor(row.min())) - 1, int(np.ceil(row.max())) + 2
-print(f'output {OUT_W}x{out_h}, sampling source rows {r0}:{r1} cols {c0}:{c1}')
+# --- mosaic -----------------------------------------------------------------
+width, height = (x1 - x0 + 1) * TILE, (y1 - y0 + 1) * TILE
+print(f'mosaic {width} x {height} px')
+dem = np.zeros((height, width), dtype=np.int16)
+for (x, y) in tiles:
+    path = CACHE / f'{ZOOM}_{x}_{y}.tif'
+    if not path.exists():
+        continue
+    with Image.open(path) as im:
+        dem[(y - y0) * TILE:(y - y0 + 1) * TILE, (x - x0) * TILE:(x - x0 + 1) * TILE] = \
+            np.asarray(im, dtype=np.int32).astype(np.int16)
 
-with Image.open(ROOT / 'data' / 'raw' / 'SR_HR.tif') as im:
-    src = np.asarray(im.crop((c0, r0, c1, r1)), dtype=np.float32)
+for name, out_w, quality in OUTPUTS:
+    out_h = round(out_w * view['h'] / view['w'])
+    xs = view['x'] + (np.arange(out_w) + 0.5) * view['w'] / out_w
+    ys = view['y'] + (np.arange(out_h) + 0.5) * view['h'] / out_h
 
-col -= c0
-row -= r0
-x0 = np.clip(np.floor(col).astype(np.int32), 0, src.shape[1] - 2)
-y0 = np.clip(np.floor(row).astype(np.int32), 0, src.shape[0] - 2)
-fx = (col - x0).astype(np.float32)
-fy = (row - y0).astype(np.float32)
-sample = (src[y0, x0] * (1 - fx) * (1 - fy) + src[y0, x0 + 1] * fx * (1 - fy)
-          + src[y0 + 1, x0] * (1 - fx) * fy + src[y0 + 1, x0 + 1] * fx * fy)
+    # Reproject in horizontal strips so the intermediate float arrays stay small.
+    elev = np.empty((out_h, out_w), dtype=np.float32)
+    STRIP = 512
+    for top in range(0, out_h, STRIP):
+        bottom = min(top + STRIP, out_h)
+        lon, lat = inverse(*np.meshgrid(xs, ys[top:bottom]))
+        px, py = merc_xy(lon, lat)
+        px -= x0 * TILE
+        py -= y0 * TILE
+        ix = np.clip(px.astype(np.int32), 0, width - 2)
+        iy = np.clip(py.astype(np.int32), 0, height - 2)
+        fx = (px - ix).astype(np.float32)
+        fy = (py - iy).astype(np.float32)
+        elev[top:bottom] = (dem[iy, ix] * (1 - fx) * (1 - fy) + dem[iy, ix + 1] * fx * (1 - fy)
+                            + dem[iy + 1, ix] * (1 - fx) * fy + dem[iy + 1, ix + 1] * fx * fy)
 
-# The page composites this with `mix-blend-mode: overlay`, where mid grey is
-# the do-nothing value. So flat ground has to land on exactly 128: plains then
-# keep the land colour untouched and only real relief modulates it, in both
-# directions, the way a hillshade should. Natural Earth's own flat value sits
-# well above mid grey, which is why this is a recentre and not a stretch.
-land = sample[sample < 250]
-flat = np.median(land)
-GAIN = 2.3
-print(f'relief range {sample.min():.0f}-{sample.max():.0f}, flat ground at {flat:.0f} -> 128')
-norm = np.clip(0.5 + (sample - flat) * GAIN / 255.0, 0, 1)
+    land = np.maximum(elev, 0)
 
-out = ROOT / 'web' / 'terrain.webp'
-Image.fromarray((norm * 255).astype(np.uint8), mode='L').save(out, 'WEBP', quality=84, method=6)
-print(f'wrote {out.relative_to(ROOT)} ({out.stat().st_size / 1024:.0f} KB)')
+    # Hillshade, lit from the north-west as every relief map since the 19th
+    # century has been, because the eye reads it as raised rather than sunken.
+    km_per_px = view['w'] / out_w
+    dzdx, dzdy = np.gradient(land, km_per_px * 1000.0)
+    azimuth, altitude = math.radians(315.0), math.radians(45.0)
+    slope = np.arctan(3.4 * np.hypot(dzdx, dzdy))     # vertical exaggeration
+    aspect = np.arctan2(-dzdx, dzdy)
+    shade = (math.sin(altitude) * np.cos(slope)
+             + math.cos(altitude) * np.sin(slope) * np.cos(azimuth - aspect))
+
+    # The page composites this with `mix-blend-mode: overlay`, where mid grey is
+    # the do-nothing value: flat ground keeps the land colour and only real
+    # relief moves it. A little elevation tint on top so high country reads as
+    # high even where it is not steep.
+    tint = np.clip(land / 2000.0, 0, 1) ** 0.75
+    value = 0.5 + (shade - math.sin(altitude)) * 1.25 + tint * 0.17
+    img = (np.clip(value, 0, 1) * 255).astype(np.uint8)
+
+    out = ROOT / 'web' / name
+    Image.fromarray(img, mode='L').save(out, 'WEBP', quality=quality, method=5)
+    print(f'wrote {out.relative_to(ROOT)}  {out_w}x{out_h}  '
+          f'{km_per_px * 1000:.0f} m/px  {out.stat().st_size / 1024:.0f} KB')

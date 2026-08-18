@@ -57,7 +57,13 @@ html, body {
 /* Opacity is driven from JS: Natural Earth's relief is about 1.8 km per pixel,
    so past a certain zoom it has no more detail to give and only muddies the
    roads, which by then are the thing worth looking at. */
-#terrain { opacity: .95; mix-blend-mode: overlay; transition: opacity .3s linear; }
+#terrain, #terrainDetail {
+  opacity: var(--terrain-opacity, .95); mix-blend-mode: overlay;
+  transition: opacity .3s linear;
+}
+/* The detail layer is transparent until it has actually arrived. */
+#terrainDetail { opacity: 0; }
+#terrainDetail.is-ready { opacity: var(--terrain-opacity, .95); transition: opacity .8s ease; }
 
 .country {
   fill: var(--land); stroke: var(--land-edge); stroke-width: 1.4;
@@ -93,9 +99,11 @@ html, body {
   fill: none; stroke: var(--reachable);
   stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
 }
-.reach-line.pace-2 { stroke-width: 3; opacity: .95; }
-.reach-line.pace-1 { stroke-width: 1.8; opacity: .6; }
-.reach-line.pace-0 { stroke-width: 1; opacity: .38; }
+/* Weight carries the hierarchy; opacity only supports it. A slow road still has
+   to be clearly visible — it is a choice you might well want to make. */
+.reach-line.pace-2 { stroke-width: 3.4; opacity: .95; }
+.reach-line.pace-1 { stroke-width: 2; opacity: .74; }
+.reach-line.pace-0 { stroke-width: 1.2; opacity: .56; }
 .reach-line--hot { stroke: var(--ink); opacity: 1; }
 
 .leg.pace-2 { stroke-width: 3.6; }
@@ -319,9 +327,9 @@ html, body {
   font-family: var(--mono); font-size: 11px; padding: 2px 0;
 }
 .roadkey__line { display: block; width: 26px; border-top-style: solid; border-top-color: var(--reachable); }
-.roadkey__line--2 { border-top-width: 3px; opacity: .95; }
-.roadkey__line--1 { border-top-width: 1.8px; opacity: .6; }
-.roadkey__line--0 { border-top-width: 1px; opacity: .38; }
+.roadkey__line--2 { border-top-width: 3.4px; opacity: .95; }
+.roadkey__line--1 { border-top-width: 2px; opacity: .74; }
+.roadkey__line--0 { border-top-width: 1.2px; opacity: .56; }
 .reset-view {
   position: absolute; z-index: 3; right: 26px; top: 22px;
   font: inherit; font-size: 12px; padding: 7px 12px; cursor: pointer;

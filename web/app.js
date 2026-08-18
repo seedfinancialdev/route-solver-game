@@ -71,9 +71,17 @@ function computeFrame() {
   const y = clamp((a.y + b.y) / 2 - h / 2, view.y - SLACK, view.y + view.h + SLACK - h);
   return { x, y, w, h };
 }
-for (const attr of [['x', view.x], ['y', view.y], ['width', view.w], ['height', view.h]]) {
-  $('terrain').setAttribute(attr[0], attr[1]);
+// Two relief layers, both positioned over the whole map. The overview paints
+// immediately; the detailed one is a couple of megabytes and fades in over the
+// top once it has arrived, so the first frame never waits on it. Two elements
+// rather than swapping one href, which would fetch the same image twice.
+for (const id of ['terrain', 'terrainDetail']) {
+  for (const [k, v] of [['x', view.x], ['y', view.y], ['width', view.w], ['height', view.h]]) {
+    $(id).setAttribute(k, v);
+  }
 }
+$('terrainDetail').addEventListener('load', () => $('terrainDetail').classList.add('is-ready'));
+$('terrainDetail').setAttribute('href', 'terrain-detail.webp');
 for (const d of g.rivers) $('rivers').append(el('path', { d, class: 'river' }));
 for (const d of g.lakes) $('lakes').append(el('path', { d, class: 'lake' }));
 
@@ -155,8 +163,11 @@ function resizeMarks() {
   // kilometre per pixel it stops being terrain and starts being blur, so it
   // hands the map over to the roads.
   if (camera) {
-    const fade = Math.max(0, Math.min(1, (camera.w - 380) / 520));
-    $('terrain').style.opacity = (0.95 * fade).toFixed(3);
+    // The relief is 705 m per pixel at best, so past roughly a third of that
+    // it stops being terrain and starts being blur. Below 200 km of view it
+    // hands the map over to the roads.
+    const fade = Math.max(0, Math.min(1, (camera.w - 200) / 400));
+    app.style.setProperty('--terrain-opacity', (0.95 * fade).toFixed(3));
   }
 }
 

@@ -115,8 +115,12 @@ the shortest road costs. On the 2,147 shipped puzzles at a 1.08× budget:
 ## Data and routing
 
 - Cities: [GeoNames](https://www.geonames.org/) `cities15000` (CC BY 4.0).
-- Boundaries and shaded relief: [Natural Earth](https://www.naturalearthdata.com/)
+- Boundaries, rivers and lakes: [Natural Earth](https://www.naturalearthdata.com/)
   (public domain).
+- Elevation: [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) —
+  a compilation of SRTM, USGS 3DEP, GMTED2010, ETOPO1 and national datasets. The
+  hillshade is computed from it by `scripts/04-terrain.py` rather than taken
+  pre-rendered, which is what lets the map hold up when you zoom.
 - Road distances and durations: OSRM over OpenStreetMap data
   (ODbL — © OpenStreetMap contributors).
 

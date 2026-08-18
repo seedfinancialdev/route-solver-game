@@ -36,7 +36,7 @@ then filtered:
 | the map itself | pan and zoom freely; the frame follows you as you move | framed on both routes |
 | how long a road takes | only after you commit to it | every hop, with its average speed |
 | city names | start, target, and everywhere you can move to | all |
-| terrain | yes, from the first move | yes |
+| terrain | yes, from the first move — hillshade computed from ~390 m elevation data, at 705 m per pixel | yes |
 | the fastest route, and the shortest one | never | both, drawn against yours |
 
 Road pace is shown **only for the roads you can move to**, never for the network

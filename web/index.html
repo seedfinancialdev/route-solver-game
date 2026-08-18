@@ -40,6 +40,9 @@
       <!-- Above the country fills, not below them: it blends onto the land it
            is modelling, and the clip keeps it off the sea. -->
       <image id="terrain" href="terrain.webp" clip-path="url(#landClip)" preserveAspectRatio="none"></image>
+      <!-- href is set from JS, so the load handler is attached before the
+           request starts and the image is fetched exactly once. -->
+      <image id="terrainDetail" clip-path="url(#landClip)" preserveAspectRatio="none"></image>
       <g id="rivers"></g>
       <g id="lakes"></g>
       <g id="optimalRoute"></g>

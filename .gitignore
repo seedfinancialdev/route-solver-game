@@ -2,3 +2,5 @@ node_modules/
 # Build inputs and the routing cache. Re-created by `npm run data:*`;
 # data/graph.json is the artifact that matters and that one is committed.
 data/raw/
+# Elevation tiles: ~825 of them, re-fetched by scripts/04-terrain.py on demand.
+data/raw/dem/
