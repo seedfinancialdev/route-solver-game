@@ -220,7 +220,7 @@ html, body {
 /* --- reveal ------------------------------------------------------------- */
 .reveal {
   position: absolute; z-index: 3; right: 26px; top: 50%; transform: translateY(-50%);
-  width: min(340px, calc(100vw - 52px));
+  width: min(380px, calc(100vw - 52px));
   padding: 26px; border: 1px solid var(--land-edge); border-radius: 3px;
   background: var(--panel); backdrop-filter: blur(10px);
   animation: rise .6s cubic-bezier(.2,.7,.3,1) both;
@@ -231,8 +231,19 @@ html, body {
   font-size: 1.55rem; letter-spacing: -.01em; color: var(--accent);
 }
 .reveal__rows { margin: 0; font-family: var(--mono); font-size: 12.5px; }
-.reveal__rows > div { display: flex; justify-content: space-between; padding: 5px 0; }
-.reveal__rows dt { color: var(--dim); }
+.reveal__rows > div { display: flex; justify-content: space-between; gap: 14px; padding: 5px 0; }
+.reveal__rows dd { white-space: nowrap; }
+.reveal__rows dt { color: var(--dim); display: flex; align-items: center; white-space: nowrap; }
+
+/* Which line on the map is which. Three routes and no key was one question too
+   many to leave to the reader. */
+.key {
+  display: inline-block; width: 16px; height: 0; margin-right: 8px;
+  border-top-width: 2px; flex: none;
+}
+.key--you { border-top-style: solid; border-top-color: var(--accent); }
+.key--best { border-top-style: dashed; border-top-color: var(--ink); opacity: .6; }
+.key--trap { border-top-style: dotted; border-top-color: var(--amber); opacity: .6; }
 .reveal__rows dd { margin: 0; color: var(--ink); }
 .reveal__rows em { font-style: normal; color: var(--dimmer); margin-left: 10px; }
 .reveal__glyphs {
