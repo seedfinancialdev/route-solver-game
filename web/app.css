@@ -36,7 +36,7 @@ html, body {
 #app { position: relative; height: 100%; overflow: hidden; }
 
 /* --- map ---------------------------------------------------------------- */
-.board { position: absolute; inset: 0; }
+.board { position: absolute; inset: 0; transition: bottom .5s cubic-bezier(.2,.7,.3,1); }
 #map { width: 100%; height: 100%; display: block; touch-action: manipulation; }
 
 /* Overlay leaves mid-grey alone and pushes everything else, which is exactly
@@ -111,14 +111,41 @@ html, body {
 }
 .gauge__unit { font-size: 1rem; color: var(--dim); letter-spacing: .06em; }
 .gauge__track {
-  margin-top: 12px; height: 3px; border-radius: 2px;
+  position: relative; margin-top: 12px; height: 3px; border-radius: 2px;
   background: var(--dimmer); overflow: hidden;
 }
 .gauge__fill {
   height: 100%; width: 100%; background: var(--accent);
   transform-origin: left; transition: transform .6s cubic-bezier(.2,.7,.3,1), background .5s;
 }
+/* Past zero the drained bar has nothing left to say, so the overrun grows back
+   in from the right — you can see how deep the hole is, not just that there is
+   one. */
+.gauge__over {
+  position: absolute; inset: 0; background: var(--red);
+  transform: scaleX(0); transform-origin: right;
+  transition: transform .6s cubic-bezier(.2,.7,.3,1);
+}
 .gauge__caption { margin: 10px 0 0; font-size: 12px; color: var(--dim); font-family: var(--mono); }
+
+/* The teaching moment: what the map suggested, against what the road charged.
+   Aggregating this until the end is too late to learn anything from. */
+.paid {
+  /* Two lines are reserved whether or not they're used: this sits directly
+     under the gauge, and a line appearing must not shove the HUD around. */
+  margin: 8px 0 0; min-height: 2.8em; font-family: var(--mono); font-size: 12px;
+  line-height: 1.4;
+  color: var(--dim); opacity: 0; transform: translateY(-3px);
+  transition: opacity .35s ease, transform .35s ease;
+}
+.paid--on { opacity: 1; transform: none; }
+.paid strong { font-weight: 500; color: var(--ink); }
+.paid--mid strong { color: var(--amber); }
+.paid--hard strong { color: var(--red); }
+.paid__verdict { display: block; color: var(--dimmer); }
+
+.leg--new { animation: legIn .45s ease-out both; }
+@keyframes legIn { from { stroke-width: 6; opacity: .35; } }
 
 /* --- hop log ------------------------------------------------------------ */
 .log {
@@ -182,6 +209,9 @@ html, body {
   /* The panel fills the lower half on a phone, so the hop log would only ever
      show through it. */
   [data-stage="reveal"] .log { display: none; }
+  /* And the map gives up the same space rather than drawing the route behind
+     it — the resize observer refits the frame into whatever is left. */
+  [data-stage="reveal"] .board { bottom: 52%; }
   @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
   .hint { display: none; }
 }

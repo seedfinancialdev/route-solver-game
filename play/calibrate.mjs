@@ -3,11 +3,28 @@
 // the number by feel; this is how you find which number to check.
 
 import { readFileSync } from 'node:fs';
-import { buildGraph } from '../scripts/lib/graph.mjs';
-import { naive, estimator, planner, humanish, oracle } from './bots.mjs';
+import { buildGraph, dijkstra, pathFrom } from '../scripts/lib/graph.mjs';
+import { naive, estimator, planner, humanish } from './bots.mjs';
 
 const g = buildGraph(JSON.parse(readFileSync(new URL('../data/graph.json', import.meta.url), 'utf8')));
-const pool = JSON.parse(readFileSync(new URL('../data/puzzles.json', import.meta.url), 'utf8')).puzzles;
+
+// Sweep the shortlist — every pair where the naive move is measurably wrong —
+// rather than data/puzzles.json. The shipped puzzles were *selected* for
+// tension at 1.15, so measuring the multiplier against them would be circular.
+const MIN_OPTIMAL_KM = 900, MAX_OPTIMAL_KM = 3200, MIN_HOPS = 7, MAX_HOPS = 16;
+const sp = Array.from({ length: g.n }, (_, i) => dijkstra(g, i));
+const pool = [];
+for (let a = 0; a < g.n; a++) {
+  for (let b = a + 1; b < g.n; b++) {
+    const optimal = sp[a].dist[b];
+    if (optimal < MIN_OPTIMAL_KM || optimal > MAX_OPTIMAL_KM) continue;
+    const hops = pathFrom(sp[a].prev, a, b).length - 1;
+    if (hops < MIN_HOPS || hops > MAX_HOPS) continue;
+    const naiveCost = Math.min(naive(g, a, b).cost, naive(g, b, a).cost);
+    if (!Number.isFinite(naiveCost) || naiveCost / optimal < 1.15) continue;
+    pool.push({ a, b, optimal });
+  }
+}
 
 const TRIALS = 8;
 const MULTIPLIERS = [1.05, 1.08, 1.10, 1.12, 1.15, 1.18, 1.20, 1.25, 1.30];
@@ -26,7 +43,7 @@ const runs = pool.map((p) => {
 
 const pct = (x) => `${(x * 100).toFixed(0)}%`;
 
-console.log(`sweep over ${pool.length} puzzles, ${TRIALS} human trials each\n`);
+console.log(`sweep over ${pool.length} candidate pairs, ${TRIALS} human trials each\n`);
 console.log('mult   naive  estim  human  plan | human margin when won (km)   bust by (km)');
 for (const m of MULTIPLIERS) {
   const rate = (pick) => {

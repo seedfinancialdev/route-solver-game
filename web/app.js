@@ -39,22 +39,37 @@ const { view } = g;
 // Frame the puzzle, not the continent. A wide margin round the two endpoints
 // keeps the whole plausible corridor on screen — including the detours — while
 // giving the dots enough room to be told apart.
-const frame = (() => {
+//
+// The frame has to be grown to the container's aspect ratio here. SVG scales a
+// viewBox to *fit*, so any axis we under-ask for gets filled with more map:
+// a north-south puzzle in a landscape window was showing 2.2x the width it
+// asked for, which is what made the playable area feel like a thumbnail.
+let frame = { ...view };
+function computeFrame() {
+  const box = map.getBoundingClientRect();
   const a = g.cities[START], b = g.cities[TARGET];
-  const pad = Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) * 0.45 + 260;
-  const box = {
-    x: Math.min(a.x, b.x) - pad,
-    y: Math.min(a.y, b.y) - pad,
-    w: Math.abs(a.x - b.x) + pad * 2,
-    h: Math.abs(a.y - b.y) + pad * 2,
-  };
-  // Never show more than the map we have.
-  box.x = Math.max(box.x, view.x); box.y = Math.max(box.y, view.y);
-  box.w = Math.min(box.w, view.x + view.w - box.x);
-  box.h = Math.min(box.h, view.y + view.h - box.y);
-  return box;
-})();
-map.setAttribute('viewBox', `${frame.x} ${frame.y} ${frame.w} ${frame.h}`);
+  // Enough margin for the detours that are actually worth taking, and no more.
+  // Generous padding leaves a portrait screen no room to centre the action:
+  // the frame hits the edge of the map and the puzzle slides into a corner.
+  const pad = Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) * 0.25 + 200;
+  let w = Math.abs(a.x - b.x) + pad * 2;
+  let h = Math.abs(a.y - b.y) + pad * 2;
+
+  const aspect = box.width && box.height ? box.width / box.height : w / h;
+  if (w / h < aspect) w = h * aspect; else h = w / aspect;
+
+  // Never ask for more map than exists, but do allow the frame to overhang the
+  // edge of it. Pinning the frame inside the data pushes a puzzle near the coast
+  // into the corner of the screen; the overhang costs nothing, because empty
+  // space beyond the map looks exactly like the sea inside it.
+  const SLACK = 600;
+  w = Math.min(w, view.w);
+  h = Math.min(h, view.h);
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+  const x = clamp((a.x + b.x) / 2 - w / 2, view.x - SLACK, view.x + view.w + SLACK - w);
+  const y = clamp((a.y + b.y) / 2 - h / 2, view.y - SLACK, view.y + view.h + SLACK - h);
+  return { x, y, w, h };
+}
 for (const attr of [['x', view.x], ['y', view.y], ['width', view.w], ['height', view.h]]) {
   $('terrain').setAttribute(attr[0], attr[1]);
 }
@@ -82,9 +97,11 @@ $('budget').textContent = BUDGET.toLocaleString();
 
 // Dots and labels should hold their size on screen, not in map kilometres.
 let unit = 1;
-function rescale() {
+function layout() {
   const box = map.getBoundingClientRect();
   if (!box.width) return;
+  frame = computeFrame();
+  map.setAttribute('viewBox', `${frame.x} ${frame.y} ${frame.w} ${frame.h}`);
   unit = Math.max(frame.w / box.width, frame.h / box.height);
   for (const [i, node] of dots.entries()) {
     node.setAttribute('r', (node.classList.contains('dot--current') ? 5
@@ -98,19 +115,26 @@ function rescale() {
   hereRing.setAttribute('cy', g.cities[round.at].y);
   for (const label of $('labels').children) label.setAttribute('font-size', 12.5 * unit);
 }
-new ResizeObserver(rescale).observe(map);
+new ResizeObserver(layout).observe(map);
 
 // --- painting the round ----------------------------------------------------
 function accentFor(fraction) {
   return fraction < 0.15 ? 'var(--red)' : fraction < 0.38 ? 'var(--amber)' : 'var(--neutral)';
 }
 
-function paint() {
+function paint({ animate = false } = {}) {
   const left = remaining(round);
   const frac = Math.max(0, left / round.budget);
   app.style.setProperty('--accent', accentFor(frac));
-  $('remaining').textContent = Math.round(left).toLocaleString();
   $('gaugeFill').style.transform = `scaleX(${frac})`;
+  $('gaugeOver').style.transform = `scaleX(${left < 0 ? Math.min(1, -left / round.budget) : 0})`;
+  $('caption').textContent = round.deadEnd ? 'nowhere left to go'
+    : left >= 0 ? `${round.finished ? 'unspent' : 'remaining'} of ${round.budget.toLocaleString()} km`
+      : `over your ${round.budget.toLocaleString()} km budget`;
+
+  const shown = Number($('remaining').textContent.replace(/[^\d-]/g, ''));
+  if (animate && Number.isFinite(shown)) animateNumber($('remaining'), shown, Math.round(left), 520);
+  else $('remaining').textContent = Math.round(left).toLocaleString();
 
   const reachable = new Set(options(g, round).map((e) => e.to));
   dots.forEach((node, i) => {
@@ -135,9 +159,10 @@ function paint() {
     x2: g.cities[i].x, y2: g.cities[i].y, class: 'reach-line',
   })));
 
-  $('travelled').replaceChildren(...round.hops.map((h) => el('line', {
+  $('travelled').replaceChildren(...round.hops.map((h, i) => el('line', {
     x1: g.cities[h.from].x, y1: g.cities[h.from].y,
-    x2: g.cities[h.to].x, y2: g.cities[h.to].y, class: 'leg',
+    x2: g.cities[h.to].x, y2: g.cities[h.to].y,
+    class: `leg${animate && i === round.hops.length - 1 ? ' leg--new' : ''}`,
   })));
 
   $('hops').replaceChildren(...round.hops.map((h, i) => {
@@ -155,7 +180,7 @@ function paint() {
   $('logTotal').textContent = round.hops.length
     ? `${Math.round(round.spent).toLocaleString()} km · ${Math.round(round.minutes / 60)}h on the road`
     : '';
-  rescale();
+  layout();
 }
 
 function bearingIndex(from, to) {
@@ -165,10 +190,31 @@ function bearingIndex(from, to) {
 }
 
 // --- interaction -----------------------------------------------------------
+let paidTimer;
+/** What the map suggested, against what the road charged — said out loud, now. */
+function showPaid(h) {
+  const ratio = h.km / Math.max(h.crow, 1);
+  const verdict = ratio > 1.35 ? 'the terrain took its time'
+    : ratio > 1.15 ? 'a bit of a detour'
+      : 'near enough a straight line';
+  const node = $('paid');
+  node.className = `paid paid--on ${ratio > 1.35 ? 'paid--hard' : ratio > 1.15 ? 'paid--mid' : 'paid--easy'}`;
+  node.innerHTML = '';
+  const cost = document.createElement('strong');
+  cost.textContent = `${h.km} km`;
+  const second = document.createElement('span');
+  second.className = 'paid__verdict';
+  second.textContent = `${Math.floor(h.min / 60)}h${String(h.min % 60).padStart(2, '0')} · ${verdict}`;
+  node.append(cost, document.createTextNode(` for ${h.crow} km of map`), second);
+  clearTimeout(paidTimer);
+  paidTimer = setTimeout(() => node.classList.remove('paid--on'), 4000);
+}
+
 function choose(i) {
   if (round.finished || !options(g, round).some((e) => e.to === i)) return;
   hop(g, round, i);
-  paint();
+  showPaid(round.hops[round.hops.length - 1]);
+  paint({ animate: true });
   if (round.finished) finish();
 }
 
@@ -198,8 +244,8 @@ function label(cityIndex, className = '') {
   return node;
 }
 
-function countUp(node, to, ms = 900) {
-  const from = 0, started = performance.now();
+function animateNumber(node, from, to, ms = 900) {
+  const started = performance.now();
   const step = (now) => {
     const t = Math.min(1, (now - started) / ms);
     const eased = 1 - (1 - t) ** 3;
@@ -208,6 +254,7 @@ function countUp(node, to, ms = 900) {
   };
   requestAnimationFrame(step);
 }
+const countUp = (node, to, ms) => animateNumber(node, 0, to, ms);
 
 function finish() {
   if (storeKey) {
@@ -251,7 +298,7 @@ function finish() {
 
   $('reveal').hidden = false;
   countUp($('remaining'), Math.round(left));
-  $('caption').textContent = over ? 'over budget' : `unspent of ${BUDGET.toLocaleString()} km`;
+  $('paid').classList.remove('paid--on');
 
   $('share').addEventListener('click', async () => {
     const text = shareString(g, round, day);
@@ -265,13 +312,29 @@ function finish() {
 }
 
 // --- restore a finished day ------------------------------------------------
-const saved = storeKey && localStorage.getItem(storeKey);
-if (saved) {
+// A saved result only restores if it still describes a legal round. Regenerating
+// the puzzle set repoints a day at a different pair, and replaying yesterday's
+// hops onto it would silently produce a finished round that never happened.
+function restore(saved) {
   const state = JSON.parse(saved);
+  if (!Array.isArray(state.hops) || !state.hops.length) return false;
   for (const h of state.hops) hop(g, round, h.to);
+  if (!round.finished) return false;
+  return true;
+}
+
+const saved = storeKey && localStorage.getItem(storeKey);
+let restored = false;
+try {
+  restored = saved ? restore(saved) : false;
+} catch { restored = false; }
+
+if (restored) {
   paint();
   finish();
 } else {
+  if (saved) localStorage.removeItem(storeKey);
+  round = newRound(g, { a: START, b: TARGET, budget: BUDGET });
   app.dataset.stage = 'playing';
   paint();
 }

@@ -26,7 +26,7 @@ if (!existsSync(CLIPPED) || process.env.REBUILD_BOUNDARIES) {
   execFileSync('npx', ['mapshaper', SOURCE.pathname,
     '-clip', 'bbox=-33,25,55,68',
     '-filter-islands', 'min-area=1200km2', 'remove-empty',
-    '-simplify', '14%', 'keep-shapes',
+    '-simplify', '40%', 'keep-shapes',
     '-filter-fields', 'ISO_A2,NAME',
     '-o', 'format=geojson', 'precision=0.001', CLIPPED.pathname,
   ], { stdio: 'inherit' });

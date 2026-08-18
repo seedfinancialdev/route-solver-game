@@ -24,7 +24,7 @@ const MIN_NAIVE_RATIO = 1.15;
 const MAX_WORST_RATIO = 1.6;
 const MIN_OPTIMAL_KM = 900;
 const MAX_OPTIMAL_KM = 3200;
-const MIN_HOPS = 5;
+const MIN_HOPS = 7;
 const MAX_HOPS = 16;
 const TRIALS = 6;
 

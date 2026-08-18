@@ -20,8 +20,12 @@
 
     <div class="gauge">
       <div class="gauge__readout"><span id="remaining">0</span><span class="gauge__unit">km</span></div>
-      <div class="gauge__track"><div class="gauge__fill" id="gaugeFill"></div></div>
+      <div class="gauge__track">
+        <div class="gauge__fill" id="gaugeFill"></div>
+        <div class="gauge__over" id="gaugeOver"></div>
+      </div>
       <p class="gauge__caption" id="caption">remaining of <span id="budget">0</span> km</p>
+      <p class="paid" id="paid" aria-live="polite"></p>
     </div>
   </header>
 

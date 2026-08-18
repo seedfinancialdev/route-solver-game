@@ -10,6 +10,11 @@ available; what you can't see is what's between them. A hop across the Po
 Valley costs roughly its straight-line distance. A hop over the Alps costs 1.5×
 and takes twice as long. Reading that from a blank map is the skill.
 
+Every time you commit to a hop the game tells you what it cost against what the
+map suggested — *397 km for 214 km of map · 5h14 · the terrain took its time* —
+because that gap is the whole lesson and it is no use to anyone if it only
+arrives at the end.
+
 When the route is locked, the terrain appears along with the real distance and
 travel time for every hop you took, and your route is drawn against the optimal
 one.
@@ -57,18 +62,19 @@ Two findings changed the shape of the thing:
   no map can show the player. Finland's only land link avoiding Russia is the
   Tornio corridor, longer than the 420 km hop cap. Both return with world mode.
 
-**Phase 1 — the go/no-go gate.** 874 of 11,224 candidate pairs punish the naive
+**Phase 1 — the go/no-go gate.** 731 of 8,538 candidate pairs punish the naive
 "hop toward the target" move by 15% or more. The bar was 200. Comfortably a go.
 
 **Phase 2 — the playtest.** The multiplier landed at **1.15**, below the brief's
-1.2–1.3 guess. At 1.25 the naive player wins 43% of the time, which means the
-puzzle has stopped asking anything. On the 278 shipped puzzles at 1.15:
+1.2–1.3 guess. At 1.25 the naive player wins 42% of the time, which means the
+puzzle has stopped asking anything. On the 216 shipped puzzles at 1.15:
 
-| player | wins |
-| --- | --- |
-| naive — always hop toward the target | 6 of 278 |
-| a plausible human — three hops of lookahead, misjudges distances | 62% |
-| exact planning on straight-line distances | 276 of 278 |
+| player | wins | dead ends |
+| --- | --- | --- |
+| naive — always hop toward the target | 4 of 216 | 23 |
+| one hop of sight — weighs the hop against the ground it gains | 48% | 61 |
+| a plausible human — three hops of lookahead, misjudges distances | 61% | 2 |
+| exact planning on straight-line distances | 216 of 216 | 0 |
 
 The number came from simulation (`npm run calibrate`), not from thirty rounds
 of human play — that part is still worth doing, and `npm run play` is how.
@@ -77,18 +83,20 @@ budget, disagree with that bot first.
 
 ## The open questions, answered
 
-1. **Faint distant cities, not strict one-hop visibility.** A player restricted
-   to one hop of sight is the `estimator` bot: it wins 35% and busts by walking
-   into dead ends it had no way to foresee. With the corridor visible the same
-   player wins 62%. Faint visibility is the difference between a puzzle and a
-   trap.
+1. **Faint distant cities, not strict one-hop visibility.** The deciding number
+   isn't the win rate, it's the dead ends. A player restricted to one hop of
+   sight wins 48% but dead-ends on 61 of 216 puzzles, walking into corners it
+   had no way to see. Give the same player a visible corridor and it wins 61%
+   and dead-ends twice. Faint visibility is the difference between a puzzle and
+   a trap.
 2. **No backtracking.** Visited cities aren't selectable. Irreversibility is
    where the tension lives.
-3. **A bust doesn't end the round.** The gauge goes red and negative and you
-   keep going until you arrive, scoring the overspend. Hard-failing at the
-   moment of overspend hides how close you were, and the near miss is what
-   brings a player back. Dead ends are the only DNF, and they're rare — 14 in
-   1,112 simulated runs.
+3. **A bust doesn't end the round.** The gauge drains to zero and then an
+   overrun bar grows back the other way in red, so you can see how deep the hole
+   is; you keep going until you arrive, scoring the overspend. Hard-failing at
+   the moment of overspend hides how close you were, and the near miss is what
+   brings a player back. Dead ends are the only DNF, and they're rare — 2 in 216
+   for a player who looks a few hops ahead.
 
 ## Data and routing
 
