@@ -85,6 +85,8 @@ html, body {
   pointer-events: none; opacity: 0; transition: opacity .6s ease;
 }
 .label--on { opacity: .92; }
+/* Visited and current cities read brighter than the choices ahead of you. */
+.label--far { opacity: .45; }
 .label--best { fill: var(--dim); }
 
 /* --- hud ---------------------------------------------------------------- */

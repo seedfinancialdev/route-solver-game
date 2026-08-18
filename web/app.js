@@ -154,6 +154,8 @@ function paint({ animate = false } = {}) {
     }
   });
 
+  labelPlayable(reachable);
+
   $('reach').replaceChildren(...[...reachable].map((i) => el('line', {
     x1: g.cities[round.at].x, y1: g.cities[round.at].y,
     x2: g.cities[i].x, y2: g.cities[i].y, class: 'reach-line',
@@ -244,6 +246,21 @@ function label(cityIndex, className = '') {
   return node;
 }
 
+/**
+ * Name the cities you can act on, and only those.
+ *
+ * The brief called for distant cities as unlabelled specks; I had extended that
+ * to the selectable ones too, which left the player with nothing but geometry —
+ * no way to know that the hop they are considering crosses the Brenner. Knowing
+ * a dot is Innsbruck is the whole difference between reading a map and
+ * measuring one.
+ */
+function labelPlayable(reachable) {
+  if (round.finished) return;
+  $('labels').replaceChildren();
+  for (const i of [round.at, TARGET, ...reachable]) label(i, 'label--on');
+}
+
 function animateNumber(node, from, to, ms = 900) {
   const started = performance.now();
   const step = (now) => {
@@ -271,6 +288,7 @@ function finish() {
 
   // Fog lifts: terrain, then the names of everywhere either route went.
   app.dataset.stage = 'reveal';
+  $('labels').replaceChildren();
   const named = new Set([...best.path, ...round.hops.map((h) => h.to), START]);
   const mine = new Set([START, ...round.hops.map((h) => h.to)]);
   [...named].forEach((i, k) => {
