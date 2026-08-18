@@ -26,7 +26,12 @@ createServer(async (req, res) => {
   if (!file.startsWith(ROOT)) { res.writeHead(403).end('forbidden'); return; }
   try {
     const body = await readFile(file);
-    res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'content-type': TYPES[extname(file)] || 'application/octet-stream',
+      // Never cache during development. Pulling new code and then being served
+      // the old game out of the browser cache is a confusing five minutes.
+      'cache-control': 'no-store',
+    });
     res.end(body);
   } catch {
     res.writeHead(404).end('not found');
