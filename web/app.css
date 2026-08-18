@@ -18,7 +18,7 @@
   --reachable: #97a2b1;
   /* A third hue, warm where land is neutral and water is cold, so a metro's
      built-up footprint reads as human rather than as more terrain. */
-  --urban: #8a7a5c;
+  --urban: #a2895c;
   /* Roads read as roads the way a paper atlas draws them: red. Distinct from
      --red below, which is the budget gauge's alarm colour — the two shouldn't
      mean the same thing, so they're not the same hue. */
@@ -98,7 +98,7 @@ html, body {
 /* Built-up footprints. Warm against the cool land/sea split so a metro's
    sprawl reads as "lived in" without being mistaken for the relief itself. */
 .urban {
-  fill: var(--urban); opacity: .22; stroke: none; pointer-events: none;
+  fill: var(--urban); opacity: .4; stroke: none; pointer-events: none;
 }
 
 /* Borders are dashed, as they are on every paper map, because otherwise they

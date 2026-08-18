@@ -338,18 +338,20 @@ function resizeMarks() {
   for (const label of physicalLabels) label.setAttribute('font-size', physicalPx * unit);
   // Background towns hold a constant dot size too, and fade out once the
   // player is zoomed out far enough that they'd just be noise between the
-  // cities that matter. They also go quiet in a ring around wherever the
-  // player is actually standing: parked right next to the current city, at
-  // the exact zoom where a player is scanning for candidates, a background
-  // town reads as a missed connection rather than as texture. Nowhere else
-  // does that ambiguity matter — the decision only happens here.
+  // cities that matter. They also shrink well below click-target size in a
+  // ring around wherever the player is actually standing — a full-size
+  // background town parked next to the current city, at the exact zoom a
+  // player is scanning for candidates, reads as a missed connection. Shrunk
+  // rather than hidden outright: killing them completely was trading away
+  // exactly the "lived-in" texture right where the player is looking most.
   const townR = camera && camera.w > 2600 ? 0 : 1;
   const TOWN_KEEPOUT_KM = 120;
   const at = g.cities[round.at];
   towns.forEach((node, i) => {
     const t = g.towns[i];
     const near = Math.hypot(t.x - at.x, t.y - at.y) < TOWN_KEEPOUT_KM;
-    const r = near ? 0 : (node.classList.contains('town--big') ? townR * 1.7 : townR);
+    const base = node.classList.contains('town--big') ? townR * 1.7 : townR;
+    const r = near ? base * 0.4 : base;
     node.setAttribute('r', r * unit);
   });
   for (const chip of $('pacePreview').children) chip.setAttribute('font-size', 11 * unit);
@@ -579,11 +581,23 @@ function paint({ animate = false } = {}) {
     return node;
   }));
 
-  $('travelled').replaceChildren(...round.hops.flatMap((h, i) =>
-    paceRuns(h.from, h.to).map((r) => el('path', {
-      d: r.d,
-      class: `leg pace-${r.tier}${animate && i === round.hops.length - 1 ? ' leg--new' : ''}`,
-    }))));
+  // Older hops step back rather than staying at full strength: the whole
+  // travelled path can zigzag once several hops of real, locally-sound
+  // choices are laid end to end, and that history shouldn't out-compete the
+  // decision actually in front of you. The most recent hop — how you got to
+  // where you're standing — stays fully lit.
+  $('travelled').replaceChildren(...round.hops.flatMap((h, i) => {
+    const age = round.hops.length - 1 - i;
+    const opacity = Math.max(0.35, 1 - age * 0.18);
+    return paceRuns(h.from, h.to).map((r) => {
+      const node = el('path', {
+        d: r.d,
+        class: `leg pace-${r.tier}${animate && i === round.hops.length - 1 ? ' leg--new' : ''}`,
+      });
+      node.style.opacity = opacity;
+      return node;
+    });
+  }));
 
   $('hops').replaceChildren(...round.hops.map((h, i) => {
     const li = document.createElement('li');
