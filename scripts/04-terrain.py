@@ -25,7 +25,13 @@ TILE = 512
 SOURCE = 'https://s3.amazonaws.com/elevation-tiles-prod/geotiff/{z}/{x}/{y}.tif'
 # Two renders: an overview that loads instantly and a detail pass swapped in
 # behind it once it arrives.
+# Three levels. The overview paints instantly, the detail pass covers ordinary
+# zooms, and a grid of tiles carries the close work — only the two or three a
+# player is actually looking at ever get fetched.
 OUTPUTS = [('terrain.webp', 2400, 80), ('terrain-detail.webp', 6000, 68)]
+TILE_COLS, TILE_ROWS = 4, 4
+TILE_M_PER_PX = 353          # the elevation data's own resolution at these latitudes
+TILE_QUALITY = 62
 
 # Must match scripts/lib/proj.mjs.
 LAT1, LAT2, LAT0, LON0, R = 43.0, 62.0, 52.0, 15.0, 6371.0088
@@ -104,10 +110,10 @@ for (x, y) in tiles:
         dem[(y - y0) * TILE:(y - y0 + 1) * TILE, (x - x0) * TILE:(x - x0 + 1) * TILE] = \
             np.asarray(im, dtype=np.int32).astype(np.int16)
 
-for name, out_w, quality in OUTPUTS:
-    out_h = round(out_w * view['h'] / view['w'])
-    xs = view['x'] + (np.arange(out_w) + 0.5) * view['w'] / out_w
-    ys = view['y'] + (np.arange(out_h) + 0.5) * view['h'] / out_h
+def render(box, out_w, out_h):
+    """Shade one rectangle of the map. Returns a uint8 image."""
+    xs = box['x'] + (np.arange(out_w) + 0.5) * box['w'] / out_w
+    ys = box['y'] + (np.arange(out_h) + 0.5) * box['h'] / out_h
 
     # Reproject in horizontal strips so the intermediate float arrays stay small.
     elev = np.empty((out_h, out_w), dtype=np.float32)
@@ -129,7 +135,7 @@ for name, out_w, quality in OUTPUTS:
 
     # Hillshade, lit from the north-west as every relief map since the 19th
     # century has been, because the eye reads it as raised rather than sunken.
-    km_per_px = view['w'] / out_w
+    km_per_px = box['w'] / out_w
     dzdx, dzdy = np.gradient(land, km_per_px * 1000.0)
     azimuth, altitude = math.radians(315.0), math.radians(45.0)
     slope = np.arctan(3.4 * np.hypot(dzdx, dzdy))     # vertical exaggeration
@@ -143,9 +149,33 @@ for name, out_w, quality in OUTPUTS:
     # high even where it is not steep.
     tint = np.clip(land / 2000.0, 0, 1) ** 0.75
     value = 0.5 + (shade - math.sin(altitude)) * 1.25 + tint * 0.17
-    img = (np.clip(value, 0, 1) * 255).astype(np.uint8)
+    return (np.clip(value, 0, 1) * 255).astype(np.uint8)
 
+
+for name, out_w, quality in OUTPUTS:
+    out_h = round(out_w * view['h'] / view['w'])
+    img = render(view, out_w, out_h)
     out = ROOT / 'web' / name
     Image.fromarray(img, mode='L').save(out, 'WEBP', quality=quality, method=5)
     print(f'wrote {out.relative_to(ROOT)}  {out_w}x{out_h}  '
-          f'{km_per_px * 1000:.0f} m/px  {out.stat().st_size / 1024:.0f} KB')
+          f'{view["w"] / out_w * 1000:.0f} m/px  {out.stat().st_size / 1024:.0f} KB')
+
+# --- close-work tiles -------------------------------------------------------
+tile_dir = ROOT / 'web' / 'terrain'
+tile_dir.mkdir(exist_ok=True)
+tw, th = view['w'] / TILE_COLS, view['h'] / TILE_ROWS
+px_w, px_h = round(tw * 1000 / TILE_M_PER_PX), round(th * 1000 / TILE_M_PER_PX)
+manifest, total = [], 0
+for row in range(TILE_ROWS):
+    for col in range(TILE_COLS):
+        box = {'x': view['x'] + col * tw, 'y': view['y'] + row * th, 'w': tw, 'h': th}
+        img = render(box, px_w, px_h)
+        name = f'{row}_{col}.webp'
+        path = tile_dir / name
+        Image.fromarray(img, mode='L').save(path, 'WEBP', quality=TILE_QUALITY, method=5)
+        total += path.stat().st_size
+        manifest.append({'file': f'terrain/{name}', **{k: round(v, 1) for k, v in box.items()}})
+(ROOT / 'web' / 'terrain-tiles.json').write_text(json.dumps({
+    'metresPerPixel': TILE_M_PER_PX, 'tiles': manifest}))
+print(f'wrote {len(manifest)} tiles at {px_w}x{px_h} each, {TILE_M_PER_PX} m/px, '
+      f'{total / 1048576:.1f} MB total')

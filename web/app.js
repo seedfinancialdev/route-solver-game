@@ -80,8 +80,67 @@ for (const id of ['terrain', 'terrainDetail']) {
     $(id).setAttribute(k, v);
   }
 }
-$('terrainDetail').addEventListener('load', () => $('terrainDetail').classList.add('is-ready'));
+$('terrainDetail').addEventListener('load', () => {
+  $('terrainDetail').classList.add('is-ready');
+  updateTerrainLayers();
+});
 $('terrainDetail').setAttribute('href', 'terrain-detail.webp');
+
+// Close work is carried by a grid of tiles at the elevation data's own
+// resolution. Only the two or three under the viewport are ever fetched, so
+// zooming in gains detail instead of losing it.
+const TILE_ZOOM_KM = 1500;
+let tileManifest = null;
+const tilesShown = new Set();
+
+async function ensureTerrainTiles() {
+  if (!camera || camera.w > TILE_ZOOM_KM) return;
+  if (!tileManifest) {
+    tileManifest = 'loading';
+    try {
+      tileManifest = (await (await fetch('terrain-tiles.json')).json()).tiles;
+    } catch { tileManifest = []; }
+  }
+  if (!Array.isArray(tileManifest)) return;
+  for (const t of tileManifest) {
+    if (tilesShown.has(t.file)) continue;
+    const overlaps = t.x < camera.x + camera.w && t.x + t.w > camera.x
+      && t.y < camera.y + camera.h && t.y + t.h > camera.y;
+    if (!overlaps) continue;
+    tilesShown.add(t.file);
+    const node = el('image', {
+      x: t.x, y: t.y, width: t.w, height: t.h, class: 'terrain-tile', preserveAspectRatio: 'none',
+    });
+    node.dataset.box = [t.x, t.y, t.w, t.h].join(',');
+    node.addEventListener('load', () => { node.classList.add('is-ready'); updateTerrainLayers(); });
+    $('terrainTiles').append(node);
+    node.setAttribute('href', t.file);
+  }
+  updateTerrainLayers();
+}
+
+/**
+ * Exactly one level of relief paints at a time. All three are `overlay`
+ * blended, so leaving a coarse layer under a fine one applies the shading
+ * twice and the map blows out.
+ */
+function updateTerrainLayers() {
+  if (!camera) return;
+  const covered = [...$('terrainTiles').children].filter((node) => {
+    if (!node.classList.contains('is-ready')) return false;
+    const [x, y, w, h] = node.dataset.box.split(',').map(Number);
+    return x < camera.x + camera.w && x + w > camera.x
+      && y < camera.y + camera.h && y + h > camera.y;
+  });
+  const needed = Array.isArray(tileManifest)
+    ? tileManifest.filter((t) => t.x < camera.x + camera.w && t.x + t.w > camera.x
+      && t.y < camera.y + camera.h && t.y + t.h > camera.y).length
+    : 0;
+  const tilesActive = camera.w <= TILE_ZOOM_KM && needed > 0 && covered.length === needed;
+  const detailReady = $('terrainDetail').classList.contains('is-ready');
+
+  app.dataset.relief = tilesActive ? 'tiles' : detailReady ? 'detail' : 'overview';
+}
 for (const d of g.rivers) $('rivers').append(el('path', { d, class: 'river' }));
 for (const d of g.lakes) $('lakes').append(el('path', { d, class: 'lake' }));
 
@@ -170,8 +229,14 @@ function resizeMarks() {
     // The relief is 705 m per pixel at best, so past roughly a third of that
     // it stops being terrain and starts being blur. Below 200 km of view it
     // hands the map over to the roads.
-    const fade = Math.max(0, Math.min(1, (camera.w - 200) / 400));
-    app.style.setProperty('--terrain-opacity', (0.95 * fade).toFixed(3));
+    // With tiles down to 353 m per pixel the relief stays useful much deeper
+    // than it used to. It never leaves entirely — even stretched, knowing
+    // whether you are in a valley or on a plain is worth something — it just
+    // steps back so the roads sit clearly on top.
+    const fade = Math.max(0, Math.min(1, (camera.w - 90) / 200));
+    app.style.setProperty('--terrain-opacity', (0.45 + 0.5 * fade).toFixed(3));
+    ensureTerrainTiles();
+    updateTerrainLayers();
   }
 }
 

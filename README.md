@@ -120,7 +120,9 @@ the shortest road costs. On the 2,147 shipped puzzles at a 1.08× budget:
 - Elevation: [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) —
   a compilation of SRTM, USGS 3DEP, GMTED2010, ETOPO1 and national datasets. The
   hillshade is computed from it by `scripts/04-terrain.py` rather than taken
-  pre-rendered, which is what lets the map hold up when you zoom.
+  pre-rendered, which is what lets the map hold up when you zoom. It renders
+  three levels — an overview, a detail pass, and a grid of tiles at the
+  elevation data's own resolution — of which the page paints exactly one.
 - Road distances and durations: OSRM over OpenStreetMap data
   (ODbL — © OpenStreetMap contributors).
 

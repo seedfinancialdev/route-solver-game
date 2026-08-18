@@ -66,7 +66,16 @@ html, body {
 }
 /* The detail layer is transparent until it has actually arrived. */
 #terrainDetail { opacity: 0; }
-#terrainDetail.is-ready { opacity: var(--terrain-opacity, .95); transition: opacity .8s ease; }
+#terrainTiles { mix-blend-mode: overlay; }
+.terrain-tile { opacity: 0; transition: opacity .5s ease; }
+
+/* Exactly one level paints, chosen in JS by what has loaded and how far the
+   player has zoomed. Two overlay blends stacked would double the shading. */
+[data-relief="detail"] #terrain { opacity: 0; }
+[data-relief="detail"] #terrainDetail.is-ready { opacity: var(--terrain-opacity, .95); transition: opacity .8s ease; }
+[data-relief="tiles"] #terrain,
+[data-relief="tiles"] #terrainDetail { opacity: 0; }
+[data-relief="tiles"] .terrain-tile.is-ready { opacity: var(--terrain-opacity, .95); }
 
 .country { fill: var(--land); stroke: none; }
 
