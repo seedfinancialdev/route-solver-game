@@ -65,19 +65,33 @@ html, body {
 }
 .dot--reachable { stroke: var(--bg); stroke-width: 2; vector-effect: non-scaling-stroke; }
 
-.reach-line { stroke: var(--dimmer); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.reach-line--hot { stroke: var(--reachable); stroke-dasharray: 3 4; }
+/* The roads you could take, drawn as they actually run. */
+.reach-line {
+  fill: none; stroke: var(--reachable); stroke-width: 1.4; opacity: .55;
+  stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
+}
+.reach-line--hot { stroke: var(--ink); opacity: 1; stroke-width: 2; }
 
 .leg {
-  fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
+  fill: none; stroke: var(--accent); stroke-width: 2.5;
+  stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
 }
 .best {
-  fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round;
+  fill: none; stroke: var(--ink); stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
   stroke-dasharray: 5 6; opacity: 0; vector-effect: non-scaling-stroke;
   transition: opacity .8s ease .5s;
 }
-[data-stage="reveal"] .best { opacity: .55; }
+[data-stage="reveal"] .best { opacity: .6; }
+
+/* The route you get by trusting the map and taking the short way. */
+.trap {
+  fill: none; stroke: var(--amber); stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 2 5; opacity: 0; vector-effect: non-scaling-stroke;
+  transition: opacity .8s ease .7s;
+}
+[data-stage="reveal"] .trap { opacity: .45; }
 
 .label {
   fill: var(--ink); font: 500 11px/1 var(--sans); paint-order: stroke;
@@ -111,7 +125,6 @@ html, body {
   font-size: clamp(2.3rem, 6.4vw, 3.1rem); line-height: 1;
   color: var(--accent); transition: color .5s ease;
 }
-.gauge__unit { font-size: 1rem; color: var(--dim); letter-spacing: .06em; }
 .gauge__track {
   position: relative; margin-top: 12px; height: 3px; border-radius: 2px;
   background: var(--dimmer); overflow: hidden;

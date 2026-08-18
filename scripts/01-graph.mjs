@@ -68,7 +68,7 @@ pairs.forEach(([a, b], idx) => {
   if (r.ferryKm > MAX_FERRY_KM) { rejected.ferry.push(`${label} (${r.ferryKm} km afloat)`); return; }
   if (r.km > MAX_EDGE_KM) { rejected.long.push(`${label} ${r.km.toFixed(0)} km`); return; }
   if (ratio > MAX_DETOUR_RATIO) { rejected.detour.push(`${label} ${ratio.toFixed(2)}x`); return; }
-  edges.push({ a, b, km: Math.round(r.km), min: Math.round(r.min) });
+  edges.push({ a, b, km: Math.round(r.km), min: Math.round(r.min), geometry: r.geometry });
 });
 
 // --- connectivity ----------------------------------------------------------
@@ -95,7 +95,7 @@ const remap = new Map(keep.map((c, i) => [c.i, i]));
 const outCities = keep.map((c, i) => ({ ...c, i }));
 const outEdges = edges
   .filter((e) => comp[e.a] === main)
-  .map((e) => ({ a: remap.get(e.a), b: remap.get(e.b), km: e.km, min: e.min }))
+  .map((e) => ({ a: remap.get(e.a), b: remap.get(e.b), km: e.km, min: e.min, geometry: e.geometry }))
   .sort((x, y) => x.a - y.a || x.b - y.b);
 
 writeFileSync(

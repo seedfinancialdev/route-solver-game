@@ -24,8 +24,12 @@ async function routePair(a, b, cacheKey) {
   const cacheFile = new URL(`${cacheKey}.json`, CACHE_DIR);
   if (existsSync(cacheFile)) return JSON.parse(readFileSync(cacheFile, 'utf8'));
 
+  // `overview=simplified` gets the road's actual shape, which the game draws:
+  // a hop is shown as the road you would drive, not a straight line between
+  // dots. Judging a switchbacking line is a different exercise from measuring
+  // a straight one.
   const url = `${HOST}/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}`
-    + '?overview=false&steps=true&alternatives=false';
+    + '?overview=simplified&geometries=geojson&steps=true&alternatives=false';
 
   let out;
   for (let attempt = 0; attempt < 5 && out === undefined; attempt++) {
@@ -45,6 +49,8 @@ async function routePair(a, b, cacheKey) {
         km: Math.round(route.distance / 100) / 10,
         min: Math.round(route.duration / 6) / 10,
         ferryKm: Math.round(ferryM / 100) / 10,
+        geometry: (route.geometry?.coordinates || []).map(
+          ([lon, lat]) => [Math.round(lon * 1e4) / 1e4, Math.round(lat * 1e4) / 1e4]),
       };
     } catch { /* network hiccup, retry */ }
   }

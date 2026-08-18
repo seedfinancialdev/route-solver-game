@@ -1,6 +1,6 @@
 import {
-  buildGraph, crow, optimalRoute, newRound, options, hop, remaining,
-  hopGlyph, shareString, dayNumber,
+  buildGraph, crow, roadPath, fastestRoute, shortestRoute, newRound, options, hop,
+  remaining, hopGlyph, speedOf, hhmm, shareString, dayNumber,
 } from './engine.js';
 
 const $ = (id) => document.getElementById(id);
@@ -27,7 +27,8 @@ if (params.has('random')) {
   puzzle = data.puzzles[((day - 1) % data.puzzles.length + data.puzzles.length) % data.puzzles.length];
 }
 const [START, TARGET, BUDGET] = puzzle;
-const best = optimalRoute(g, START, TARGET);
+const best = fastestRoute(g, START, TARGET);
+const trap = shortestRoute(g, START, TARGET);
 const storeKey = day === null ? null : `route:day:${day}`;
 
 let round = newRound(g, { a: START, b: TARGET, budget: BUDGET });
@@ -93,7 +94,7 @@ $('dots').append(targetRing, hereRing);
 
 $('origin').textContent = g.cities[START].name;
 $('destination').textContent = g.cities[TARGET].name;
-$('budget').textContent = BUDGET.toLocaleString();
+$('budget').textContent = hhmm(BUDGET);
 
 // Dots and labels should hold their size on screen, not in map kilometres.
 let unit = 1;
@@ -129,12 +130,10 @@ function paint({ animate = false } = {}) {
   $('gaugeFill').style.transform = `scaleX(${frac})`;
   $('gaugeOver').style.transform = `scaleX(${left < 0 ? Math.min(1, -left / round.budget) : 0})`;
   $('caption').textContent = round.deadEnd ? 'nowhere left to go'
-    : left >= 0 ? `${round.finished ? 'unspent' : 'remaining'} of ${round.budget.toLocaleString()} km`
-      : `over your ${round.budget.toLocaleString()} km budget`;
+    : left >= 0 ? `${round.finished ? 'left' : 'remaining'} of ${hhmm(round.budget)} driving`
+      : `over your ${hhmm(round.budget)} budget`;
 
-  const shown = Number($('remaining').textContent.replace(/[^\d-]/g, ''));
-  if (animate && Number.isFinite(shown)) animateNumber($('remaining'), shown, Math.round(left), 520);
-  else $('remaining').textContent = Math.round(left).toLocaleString();
+  $('remaining').textContent = hhmm(left);
 
   const reachable = new Set(options(g, round).map((e) => e.to));
   dots.forEach((node, i) => {
@@ -156,14 +155,14 @@ function paint({ animate = false } = {}) {
 
   labelPlayable(reachable);
 
-  $('reach').replaceChildren(...[...reachable].map((i) => el('line', {
-    x1: g.cities[round.at].x, y1: g.cities[round.at].y,
-    x2: g.cities[i].x, y2: g.cities[i].y, class: 'reach-line',
+  // The roads themselves, not straight lines between dots. A switchbacking
+  // road and a motorway can be the same length; only the shape says which.
+  $('reach').replaceChildren(...[...reachable].map((i) => el('path', {
+    d: edgePath(round.at, i), class: 'reach-line',
   })));
 
-  $('travelled').replaceChildren(...round.hops.map((h, i) => el('line', {
-    x1: g.cities[h.from].x, y1: g.cities[h.from].y,
-    x2: g.cities[h.to].x, y2: g.cities[h.to].y,
+  $('travelled').replaceChildren(...round.hops.map((h, i) => el('path', {
+    d: edgePath(h.from, h.to),
     class: `leg${animate && i === round.hops.length - 1 ? ' leg--new' : ''}`,
   })));
 
@@ -172,17 +171,24 @@ function paint({ animate = false } = {}) {
     const name = document.createElement('span');
     name.textContent = `${i + 1}. ${g.cities[h.to].name}`;
     const cost = document.createElement('span');
-    cost.textContent = `${h.km} km`;
-    const time = document.createElement('em');
-    time.textContent = `${Math.floor(h.min / 60)}h${String(h.min % 60).padStart(2, '0')}`;
-    cost.append(time);
+    cost.textContent = hhmm(h.min);
+    const dist = document.createElement('em');
+    dist.textContent = `${h.km} km`;
+    cost.append(dist);
     li.append(name, cost);
     return li;
   }));
   $('logTotal').textContent = round.hops.length
-    ? `${Math.round(round.spent).toLocaleString()} km · ${Math.round(round.minutes / 60)}h on the road`
+    ? `${hhmm(round.spent)} driving · ${round.km.toLocaleString()} km`
     : '';
   layout();
+}
+
+/** The drawn road between two adjacent cities, falling back to a straight line. */
+function edgePath(from, to) {
+  const edge = g.adj[from].find((e) => e.to === to);
+  const road = edge && roadPath(edge, g.cities[from], g.cities[to]);
+  return road || `M${g.cities[from].x} ${g.cities[from].y}L${g.cities[to].x} ${g.cities[to].y}`;
 }
 
 function bearingIndex(from, to) {
@@ -195,19 +201,17 @@ function bearingIndex(from, to) {
 let paidTimer;
 /** What the map suggested, against what the road charged — said out loud, now. */
 function showPaid(h) {
-  const ratio = h.km / Math.max(h.crow, 1);
-  const verdict = ratio > 1.35 ? 'the terrain took its time'
-    : ratio > 1.15 ? 'a bit of a detour'
-      : 'near enough a straight line';
+  const kmh = speedOf(h);
+  const verdict = kmh < 65 ? 'slow road' : kmh < 85 ? 'ordinary going' : 'motorway pace';
   const node = $('paid');
-  node.className = `paid paid--on ${ratio > 1.35 ? 'paid--hard' : ratio > 1.15 ? 'paid--mid' : 'paid--easy'}`;
+  node.className = `paid paid--on ${kmh < 65 ? 'paid--hard' : kmh < 85 ? 'paid--mid' : 'paid--easy'}`;
   node.innerHTML = '';
   const cost = document.createElement('strong');
-  cost.textContent = `${h.km} km`;
+  cost.textContent = hhmm(h.min);
   const second = document.createElement('span');
   second.className = 'paid__verdict';
-  second.textContent = `${Math.floor(h.min / 60)}h${String(h.min % 60).padStart(2, '0')} · ${verdict}`;
-  node.append(cost, document.createTextNode(` for ${h.crow} km of map`), second);
+  second.textContent = `${Math.round(kmh)} km/h · ${verdict}`;
+  node.append(cost, document.createTextNode(` for ${h.km} km`), second);
   clearTimeout(paidTimer);
   paidTimer = setTimeout(() => node.classList.remove('paid--on'), 4000);
 }
@@ -261,35 +265,30 @@ function labelPlayable(reachable) {
   for (const i of [round.at, TARGET, ...reachable]) label(i, 'label--on');
 }
 
-function animateNumber(node, from, to, ms = 900) {
-  const started = performance.now();
-  const step = (now) => {
-    const t = Math.min(1, (now - started) / ms);
-    const eased = 1 - (1 - t) ** 3;
-    node.textContent = Math.round(from + (to - from) * eased).toLocaleString();
-    if (t < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-}
-const countUp = (node, to, ms) => animateNumber(node, 0, to, ms);
 
 function finish() {
   if (storeKey) {
     localStorage.setItem(storeKey, JSON.stringify({
-      hops: round.hops, spent: round.spent, minutes: round.minutes, deadEnd: round.deadEnd,
+      hops: round.hops, spent: round.spent, km: round.km, deadEnd: round.deadEnd,
     }));
   }
 
   $('reach').replaceChildren();
-  $('optimalRoute').replaceChildren(...best.path.slice(1).map((to, i) => el('line', {
-    x1: g.cities[best.path[i]].x, y1: g.cities[best.path[i]].y,
-    x2: g.cities[to].x, y2: g.cities[to].y, class: 'best',
-  })));
+  // Both the fastest way and the short way, because the whole lesson is that
+  // they are different roads.
+  $('optimalRoute').replaceChildren(
+    ...trap.path.slice(1).map((to, i) => el('path', {
+      d: edgePath(trap.path[i], to), class: 'trap',
+    })),
+    ...best.path.slice(1).map((to, i) => el('path', {
+      d: edgePath(best.path[i], to), class: 'best',
+    })),
+  );
 
-  // Fog lifts: terrain, then the names of everywhere either route went.
+  // Fog lifts: terrain, then the names of everywhere any of the routes went.
   app.dataset.stage = 'reveal';
   $('labels').replaceChildren();
-  const named = new Set([...best.path, ...round.hops.map((h) => h.to), START]);
+  const named = new Set([...best.path, ...trap.path, ...round.hops.map((h) => h.to), START]);
   const mine = new Set([START, ...round.hops.map((h) => h.to)]);
   [...named].forEach((i, k) => {
     const node = label(i, mine.has(i) ? '' : 'label--best');
@@ -297,25 +296,24 @@ function finish() {
   });
 
   const left = remaining(round);
-  const over = left < 0;
   $('revealVerdict').textContent = round.deadEnd ? 'Dead end.'
-    : over ? `Over by ${Math.abs(Math.round(left)).toLocaleString()} km`
-      : `${Math.round(left).toLocaleString()} km to spare`;
-  $('yourKm').textContent = Math.round(round.spent).toLocaleString();
-  $('yourMeta').textContent = `${round.hops.length} hops · ${Math.round(round.minutes / 60)}h`;
-  $('bestKm').textContent = best.km.toLocaleString();
-  $('bestMeta').textContent = `${best.path.length - 1} hops · ${Math.round(best.minutes / 60)}h`;
-  $('budgetKm').textContent = BUDGET.toLocaleString();
+    : left < 0 ? `Over by ${hhmm(-left)}` : `${hhmm(left)} to spare`;
+  $('yourKm').textContent = hhmm(round.spent);
+  $('yourMeta').textContent = `${round.km.toLocaleString()} km · ${round.hops.length} hops`;
+  $('bestKm').textContent = hhmm(best.minutes);
+  $('bestMeta').textContent = `${best.km.toLocaleString()} km · ${best.path.length - 1} hops`;
+  $('trapKm').textContent = hhmm(trap.minutes);
+  $('trapMeta').textContent = `${trap.km.toLocaleString()} km`;
+  $('budgetKm').textContent = hhmm(BUDGET);
   $('glyphs').textContent = round.hops.map(hopGlyph).join('');
 
-  const worst = round.hops.slice().sort((a, b) => (b.km / b.crow) - (a.km / a.crow))[0];
-  $('revealNote').textContent = worst && worst.km / worst.crow > 1.25
-    ? `The hop that cost you: ${g.cities[worst.from].name} to ${g.cities[worst.to].name} — `
-      + `${worst.km} km of road for ${worst.crow} km of map.`
-    : 'Your hops all ran close to the straight line. The terrain was on your side.';
+  const slowest = round.hops.slice().sort((a, b) => speedOf(a) - speedOf(b))[0];
+  $('revealNote').textContent = slowest && speedOf(slowest) < 70
+    ? `Your slowest stretch: ${g.cities[slowest.from].name} to ${g.cities[slowest.to].name} — `
+      + `${slowest.km} km at ${Math.round(speedOf(slowest))} km/h, ${hhmm(slowest.min)} of driving.`
+    : 'You kept to fast roads the whole way.';
 
   $('reveal').hidden = false;
-  countUp($('remaining'), Math.round(left));
   $('paid').classList.remove('paid--on');
 
   $('share').addEventListener('click', async () => {
@@ -324,7 +322,7 @@ function finish() {
       await navigator.clipboard.writeText(text);
       $('share').textContent = 'Copied';
     } catch {
-      $('share').textContent = 'Press ⌘C';
+      $('share').textContent = 'Press \u2318C';
     }
   });
 }

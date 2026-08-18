@@ -1,23 +1,20 @@
 # Route
 
-A daily route-budgeting puzzle. You are shown a sparse map — country outlines
-and city dots, nothing else — and a budget in kilometres. From your current
-city a handful of neighbours are selectable. Pick one, pay the real road
-distance, repeat. Land on the target with kilometres to spare.
+A daily route puzzle. You are given a sparse map — country outlines, city dots,
+and the roads leading out of wherever you are standing — and a budget of
+**driving hours**. Pick a neighbouring city, pay the hours that road takes,
+repeat. Reach the target with hours to spare.
 
-The core loop is estimation, not recall. You can see which cities are
-available; what you can't see is what's between them. A hop across the Po
-Valley costs roughly its straight-line distance. A hop over the Alps costs 1.5×
-and takes twice as long. Reading that from a blank map is the skill.
+The core loop is judgement, not measurement. You can see exactly how long each
+road is. What you cannot see is how fast it runs, and across this map **the
+shortest route is the fastest route only 37% of the time**. A 250 km motorway
+beats a 210 km road over a pass, every time — and the road's own shape, drawn as
+it actually runs, is the tell.
 
-Every time you commit to a hop the game tells you what it cost against what the
-map suggested — *397 km for 214 km of map · 5h14 · the terrain took its time* —
-because that gap is the whole lesson and it is no use to anyone if it only
-arrives at the end.
-
-When the route is locked, the terrain appears along with the real distance and
-travel time for every hop you took, and your route is drawn against the optimal
-one.
+Every time you commit, the game says what it cost: *3h09 for 249 km · 79 km/h ·
+ordinary going*. When the route is locked, the terrain appears and your route is
+drawn against two others — the fastest way, and the short way you were tempted
+into.
 
 ## What's here
 
@@ -62,41 +59,48 @@ Two findings changed the shape of the thing:
   no map can show the player. Finland's only land link avoiding Russia is the
   Tornio corridor, longer than the 420 km hop cap. Both return with world mode.
 
-**Phase 1 — the go/no-go gate.** 731 of 8,538 candidate pairs punish the naive
-"hop toward the target" move by 15% or more. The bar was 200. Comfortably a go.
+**Phase 1 — the go/no-go gate.** Comfortably a go: thousands of pairs punish the
+naive "hop toward the target" move. The bar was 200.
 
-**Phase 2 — the playtest.** The multiplier landed at **1.15**, below the brief's
-1.2–1.3 guess. At 1.25 the naive player wins 42% of the time, which means the
-puzzle has stopped asking anything. On the 216 shipped puzzles at 1.15:
+**Phase 2 — the playtest, and the finding that reshaped the game.** A distance
+budget was built, calibrated to 1.15× optimal, and played. It was too easy, in a
+specific and fatal way: European road distance is close to Euclidean, so perfect
+straight-line planning finds the distance-optimal route at a median cost of
+**1.004× optimal**. Across 8,538 candidate pairs there were exactly **20** where
+straight-line reasoning was even 10% off. The player was holding a ruler, not
+making a decision, and no amount of puzzle selection could change that — the
+ceiling was structural.
 
-| player | wins | dead ends |
+Time behaves completely differently, because speed is not Euclidean. A motorway
+across the North German Plain runs at 90+ km/h; an Alpine pass or a Balkan
+two-lane runs at 45. Same measurement, different currency:
+
+| the player pays in | straight-line planning costs | pairs where geometry is ≥10% off |
 | --- | --- | --- |
-| naive — always hop toward the target | 4 of 216 | 23 |
-| one hop of sight — weighs the hop against the ground it gains | 48% | 61 |
-| a plausible human — three hops of lookahead, misjudges distances | 61% | 2 |
-| exact planning on straight-line distances | 216 of 216 | 0 |
+| kilometres | 1.004× optimal | 20 |
+| **hours** | 1.047× optimal | **1,958** |
 
-The number came from simulation (`npm run calibrate`), not from thirty rounds
-of human play — that part is still worth doing, and `npm run play` is how.
-The simulated player is `humanish` in `play/bots.mjs`; if you disagree with the
-budget, disagree with that bot first.
+So the game switched currency, drew the actual roads on the map — you can judge
+distance now, which is exactly the trap — and set the budget below what taking
+the shortest road costs. On the 478 shipped puzzles at a 1.08× budget:
+
+| player | wins |
+| --- | --- |
+| takes the shortest road, every time | **0 of 478** |
+| reads the roads, misjudges their speed, looks three hops ahead | 51% |
 
 ## The open questions, answered
 
 1. **Faint distant cities, not strict one-hop visibility.** The deciding number
-   isn't the win rate, it's the dead ends. A player restricted to one hop of
-   sight wins 48% but dead-ends on 61 of 216 puzzles, walking into corners it
-   had no way to see. Give the same player a visible corridor and it wins 61%
-   and dead-ends twice. Faint visibility is the difference between a puzzle and
-   a trap.
+   isn't the win rate, it's the dead ends: one hop of sight strands a player on
+   more than a quarter of puzzles, in corners they had no way to see coming.
 2. **No backtracking.** Visited cities aren't selectable. Irreversibility is
    where the tension lives.
 3. **A bust doesn't end the round.** The gauge drains to zero and then an
    overrun bar grows back the other way in red, so you can see how deep the hole
    is; you keep going until you arrive, scoring the overspend. Hard-failing at
    the moment of overspend hides how close you were, and the near miss is what
-   brings a player back. Dead ends are the only DNF, and they're rare — 2 in 216
-   for a player who looks a few hops ahead.
+   brings a player back. Dead ends are the only DNF, and they're rare.
 
 ## Data and routing
 
@@ -113,5 +117,6 @@ are cached under `data/raw/osrm-cache/`, so a rebuild costs nothing.
 
 ## Deferred
 
-World mode, time budgets instead of distance, fog of war on the city list,
-streaks and accounts. Nothing here needs a backend.
+World mode, fog of war on the city list, streaks and accounts. Nothing here
+needs a backend. A distance budget is deferred too — it was built, measured, and
+replaced; `docs/SPEC.md` records why.

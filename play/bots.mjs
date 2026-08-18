@@ -158,3 +158,77 @@ export function humanish(g, src, dst, { seed = 1, sigma = 0.12, horizon = 3 } = 
   }
   return { cost, minutes, path, stuck: false };
 }
+
+// --- players for a time budget ---------------------------------------------
+// The regime changed: the roads are drawn now, so a player can judge distance
+// well. What they cannot judge is speed. These models get distance for free and
+// have to guess how fast each road runs.
+
+const shortestPath = (g, src, dst, weight) => {
+  const { prev } = dijkstra(g, src, weight);
+  return pathFrom(prev, src, dst);
+};
+
+const timeOf = (g, path) => {
+  let m = 0;
+  for (let i = 1; i < path.length; i++) m += g.adj[path[i - 1]].find((e) => e.to === path[i]).min;
+  return m;
+};
+
+/** Takes the shortest road, every time. The trap the drawn map sets. */
+export function shortestRouter(g, src, dst) {
+  const path = shortestPath(g, src, dst, (e) => e.km);
+  return { minutes: timeOf(g, path), km: path.reduce((t, v, i) => (
+    i ? t + g.adj[path[i - 1]].find((e) => e.to === v).km : 0), 0), path, stuck: false };
+}
+
+/** The engine's answer: the genuinely fastest way. */
+export function fastest(g, src, dst) {
+  const path = shortestPath(g, src, dst, (e) => e.min);
+  return { minutes: timeOf(g, path), path, stuck: false };
+}
+
+/**
+ * Someone reading the roads: they see each hop's length exactly, and they form
+ * a view on how fast it runs — from how the road is drawn, from knowing the
+ * country — but that view is off by a consistent amount per road. They look a
+ * few hops ahead and estimate the rest of the trip at a plain average speed.
+ */
+export function roadReader(g, src, dst, { seed = 1, sigma = 0.18, horizon = 3, assumedKmh = 80 } = {}) {
+  const rng = mulberry32(seed);
+  const bias = new Map();
+  const guessMin = (from, to, e) => {
+    const k = from < to ? `${from},${to}` : `${to},${from}`;
+    if (!bias.has(k)) bias.set(k, Math.exp(gaussian(rng) * sigma));
+    return e.min * bias.get(k);
+  };
+  const restOfTrip = (node) => (haversineKm(g.cities[node], g.cities[dst]) / assumedKmh) * 60;
+
+  const visited = new Set([src]);
+  const path = [src];
+  let minutes = 0, km = 0, at = src;
+
+  while (at !== dst) {
+    let bestFirst = null, bestScore = Infinity;
+    const search = (node, depth, spent, first) => {
+      const score = spent + restOfTrip(node);
+      if (node === dst || depth === 0) {
+        if (score < bestScore) { bestScore = score; bestFirst = first; }
+        return;
+      }
+      for (const e of g.adj[node]) {
+        if (visited.has(e.to)) continue;
+        search(e.to, depth - 1, spent + guessMin(node, e.to, e), first ?? e.to);
+      }
+    };
+    for (const e of g.adj[at]) {
+      if (visited.has(e.to)) continue;
+      search(e.to, horizon - 1, guessMin(at, e.to, e), e.to);
+    }
+    if (bestFirst === null) return { minutes: Infinity, km, path, stuck: true };
+    const edge = g.adj[at].find((e) => e.to === bestFirst);
+    minutes += edge.min; km += edge.km;
+    at = edge.to; visited.add(at); path.push(at);
+  }
+  return { minutes, km, path, stuck: false };
+}

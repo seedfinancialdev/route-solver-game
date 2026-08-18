@@ -1,77 +1,89 @@
-// Phase 1 + 2 combined: find the pairs worth playing, and schedule them.
+// The puzzle finder.
 //
-// Four things have to be true of a puzzle, and only the first came free:
+// The game's currency is TIME, and the trap is distance. The roads are drawn on
+// the map, so a player can judge how long each hop is — what they cannot judge
+// is how fast it runs. Across this graph the shortest route is the fastest one
+// only 37% of the time; a motorway detour routinely beats a direct mountain
+// road. A puzzle is a pair where that gap is wide enough to decide the round.
 //
-//   1. The naive move is measurably wrong  (greedy >= 1.15x optimal).
-//   2. It is winnable                      (a good run comes in under budget).
-//   3. It is not free                      (a sloppy run does not).
-//   4. Losing is a near miss               (the worst realistic run is <= 1.6x
-//                                           optimal, so you bust by 100 km,
-//                                           not by walking into the Adriatic).
+// Four things have to be true:
 //
-// Criteria 2-4 are measured by simulating the `humanish` player from play/bots.mjs
-// several times per pair. See docs/SPEC.md for why the multiplier is 1.15.
+//   1. The shortest road is measurably slower  (>= 1.12x the best time).
+//   2. It is winnable                          (a good read comes in under budget).
+//   3. It is not free                          (a sloppy one does not).
+//   4. Losing is a near miss                   (the worst realistic run is <= 1.45x).
+//
+// Criteria 2-4 are measured by simulating `roadReader` from play/bots.mjs, which
+// sees every road's length exactly and misjudges its speed.
 //
 // Output: data/puzzles.json
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { haversineKm } from './lib/geo.mjs';
-import { buildGraph, dijkstra, pathFrom, countRoutesUnderBudget } from './lib/graph.mjs';
-import { naive, planner, humanish } from '../play/bots.mjs';
+import { buildGraph, dijkstra, pathFrom } from './lib/graph.mjs';
+import { shortestRouter, roadReader } from '../play/bots.mjs';
 
-const BUDGET_MULTIPLIER = Number(process.env.BUDGET_MULTIPLIER || 1.15);
-const MIN_NAIVE_RATIO = 1.15;
-const MAX_WORST_RATIO = 1.6;
-const MIN_OPTIMAL_KM = 900;
-const MAX_OPTIMAL_KM = 3200;
+const BUDGET_MULTIPLIER = Number(process.env.BUDGET_MULTIPLIER || 1.08);
+const MIN_SHORTEST_PENALTY = 1.12;
+const MAX_WORST_RATIO = 1.45;
+const MIN_HOURS = 12;
+const MAX_HOURS = 40;
 const MIN_HOPS = 7;
 const MAX_HOPS = 16;
 const TRIALS = 6;
 
 const g = buildGraph(JSON.parse(readFileSync(new URL('../data/graph.json', import.meta.url), 'utf8')));
-const sp = Array.from({ length: g.n }, (_, i) => dijkstra(g, i));
+const byMin = Array.from({ length: g.n }, (_, i) => dijkstra(g, i, (e) => e.min));
 const nm = (i) => g.cities[i].name;
+
+const legTime = (path) => {
+  let m = 0;
+  for (let i = 1; i < path.length; i++) m += g.adj[path[i - 1]].find((e) => e.to === path[i]).min;
+  return m;
+};
+const legKm = (path) => {
+  let k = 0;
+  for (let i = 1; i < path.length; i++) k += g.adj[path[i - 1]].find((e) => e.to === path[i]).km;
+  return k;
+};
 
 // --- stage 1: cheap filters ------------------------------------------------
 const shortlist = [];
 for (let a = 0; a < g.n; a++) {
   for (let b = a + 1; b < g.n; b++) {
-    const optimal = sp[a].dist[b];
-    if (optimal < MIN_OPTIMAL_KM || optimal > MAX_OPTIMAL_KM) continue;
-    const hops = pathFrom(sp[a].prev, a, b).length - 1;
+    const optMin = byMin[a].dist[b];
+    if (optMin < MIN_HOURS * 60 || optMin > MAX_HOURS * 60) continue;
+    const fastPath = pathFrom(byMin[a].prev, a, b);
+    const hops = fastPath.length - 1;
     if (hops < MIN_HOPS || hops > MAX_HOPS) continue;
-    // Greedy runs both directions; keep the kinder one so a puzzle is fair
-    // whichever end it is played from.
-    const naiveCost = Math.min(naive(g, a, b).cost, naive(g, b, a).cost);
-    if (!Number.isFinite(naiveCost) || naiveCost / optimal < MIN_NAIVE_RATIO) continue;
-    shortlist.push({ a, b, optimal, hops, naiveCost });
+    const short = shortestRouter(g, a, b);
+    const penalty = short.minutes / optMin;
+    if (penalty < MIN_SHORTEST_PENALTY) continue;
+    shortlist.push({ a, b, optMin, hops, fastPath, shortMin: short.minutes, penalty });
   }
 }
-console.log(`${shortlist.length} pairs where the obvious move is wrong by >= ${MIN_NAIVE_RATIO}x`);
+console.log(`${shortlist.length} pairs where the shortest road is >= ${MIN_SHORTEST_PENALTY}x the best time`);
 
 // --- stage 2: simulate ------------------------------------------------------
-const graded = [];
-for (const s of shortlist) {
+const graded = shortlist.map((s) => {
   const runs = [];
   for (let t = 0; t < TRIALS; t++) {
-    runs.push(humanish(g, s.a, s.b, { seed: s.a * 977 + s.b * 13 + t }).cost);
-    runs.push(humanish(g, s.b, s.a, { seed: s.b * 977 + s.a * 13 + t }).cost);
+    runs.push(roadReader(g, s.a, s.b, { seed: s.a * 977 + s.b * 13 + t }).minutes);
+    runs.push(roadReader(g, s.b, s.a, { seed: s.b * 977 + s.a * 13 + t }).minutes);
   }
   runs.sort((x, y) => x - y);
-  const at = (p) => runs[Math.floor(runs.length * p)] / s.optimal;
-  graded.push({ ...s, best: at(0.1), typical: at(0.5), worst: at(0.9) });
-}
+  const at = (p) => runs[Math.floor(runs.length * p)] / s.optMin;
+  return { ...s, best: at(0.1), typical: at(0.5), worst: at(0.9) };
+});
 
 const chosen = graded.filter((r) =>
-  r.best <= BUDGET_MULTIPLIER      // a good run gets there
-  && r.worst >= BUDGET_MULTIPLIER  // a sloppy one doesn't
-  && r.worst <= MAX_WORST_RATIO);  // and losing is a near miss
+  r.best <= BUDGET_MULTIPLIER
+  && r.worst >= BUDGET_MULTIPLIER
+  && r.worst <= MAX_WORST_RATIO);
 
 console.log(`${chosen.length} survive the tension filters at a ${BUDGET_MULTIPLIER}x budget`);
 
 // --- stage 3: schedule ------------------------------------------------------
-// One puzzle a day, in a fixed order everyone shares. The only scheduling rule
-// is that a city shouldn't headline twice inside a fortnight.
 const RECENT = 14;
 const pool = chosen
   .map((r) => ({ ...r, key: (r.a * 7919 + r.b * 104729) % 100003 }))
@@ -88,41 +100,36 @@ while (pool.length) {
   while (recent.length > RECENT) recent.shift();
 }
 
-const puzzles = schedule.map((r) => {
-  const budget = Math.round((r.optimal * BUDGET_MULTIPLIER) / 10) * 10;
-  const path = pathFrom(sp[r.a].prev, r.a, r.b);
-  let minutes = 0;
-  for (let i = 1; i < path.length; i++) minutes += g.adj[path[i - 1]].find((e) => e.to === path[i]).min;
-  return {
-    a: r.a, b: r.b,
-    optimal: Math.round(r.optimal),
-    optimalMin: Math.round(minutes),
-    budget,
-    hops: r.hops,
-    crow: Math.round(haversineKm(g.cities[r.a], g.cities[r.b])),
-    naive: Math.round(r.naiveCost),
-    routes: countRoutesUnderBudget(g, r.a, r.b, budget, sp[r.b].dist, 200),
-  };
-});
+const puzzles = schedule.map((r) => ({
+  a: r.a, b: r.b,
+  optimalMin: Math.round(r.optMin),
+  optimalKm: Math.round(legKm(r.fastPath)),
+  // The trap, kept so the reveal can show what taking the short way would have cost.
+  shortestMin: Math.round(r.shortMin),
+  budgetMin: Math.round((r.optMin * BUDGET_MULTIPLIER) / 15) * 15,
+  hops: r.hops,
+  crow: Math.round(haversineKm(g.cities[r.a], g.cities[r.b])),
+}));
 
 writeFileSync(
   new URL('../data/puzzles.json', import.meta.url),
   JSON.stringify({
     generated: new Date().toISOString().slice(0, 10),
+    currency: 'minutes',
     budgetMultiplier: BUDGET_MULTIPLIER,
-    criteria: { MIN_NAIVE_RATIO, MAX_WORST_RATIO, MIN_OPTIMAL_KM, MAX_OPTIMAL_KM, MIN_HOPS, MAX_HOPS },
+    criteria: { MIN_SHORTEST_PENALTY, MAX_WORST_RATIO, MIN_HOURS, MAX_HOURS, MIN_HOPS, MAX_HOPS },
     puzzles,
   }) + '\n',
 );
 
-// --- report ----------------------------------------------------------------
 const q = (arr, p) => arr.slice().sort((x, y) => x - y)[Math.floor(arr.length * p)];
+const hrs = (m) => (m / 60).toFixed(1);
 console.log(`\n${puzzles.length} puzzles = ${(puzzles.length / 365).toFixed(1)} years of daily play`);
-console.log(`optimal km p10/p50/p90: ${[0.1, 0.5, 0.9].map((p) => q(puzzles.map((x) => x.optimal), p)).join('/')}`);
+console.log(`optimal drive p10/p50/p90: ${[0.1, 0.5, 0.9].map((p) => hrs(q(puzzles.map((x) => x.optimalMin), p))).join('/')} hours`);
 console.log(`hops       p10/p50/p90: ${[0.1, 0.5, 0.9].map((p) => q(puzzles.map((x) => x.hops), p)).join('/')}`);
-console.log(`routes under budget p10/p50/p90: ${[0.1, 0.5, 0.9].map((p) => q(puzzles.map((x) => x.routes), p)).join('/')}`);
+console.log(`the short way costs p50/p90: +${[0.5, 0.9].map((p) => hrs(q(puzzles.map((x) => x.shortestMin - x.optimalMin), p))).join('/+')} hours`);
 console.log(`distinct cities used as endpoints: ${new Set(puzzles.flatMap((p) => [p.a, p.b])).size} of ${g.n}`);
-console.log('\nfirst ten days:');
-puzzles.slice(0, 10).forEach((p, i) => console.log(
-  `  day ${String(i + 1).padStart(2)}  ${nm(p.a)} -> ${nm(p.b)}`.padEnd(46)
-  + `budget ${p.budget} km (optimal ${p.optimal}, naive ${p.naive}, ${p.hops} hops)`));
+console.log('\nfirst eight days:');
+puzzles.slice(0, 8).forEach((p, i) => console.log(
+  `  day ${String(i + 1).padStart(2)}  ${nm(p.a)} -> ${nm(p.b)}`.padEnd(44)
+  + `budget ${hrs(p.budgetMin)}h (fastest ${hrs(p.optimalMin)}h, shortest road ${hrs(p.shortestMin)}h, ${p.hops} hops)`));

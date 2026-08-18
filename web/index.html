@@ -19,7 +19,7 @@
     </div>
 
     <div class="gauge">
-      <div class="gauge__readout"><span id="remaining">0</span><span class="gauge__unit">km</span></div>
+      <div class="gauge__readout"><span id="remaining">0h00</span></div>
       <div class="gauge__track">
         <div class="gauge__fill" id="gaugeFill"></div>
         <div class="gauge__over" id="gaugeOver"></div>
@@ -54,9 +54,10 @@
   <section class="reveal" id="reveal" hidden>
     <h2 id="revealVerdict">—</h2>
     <dl class="reveal__rows">
-      <div><dt>your route</dt><dd><span id="yourKm">0</span> km<em id="yourMeta"></em></dd></div>
-      <div><dt>optimal</dt><dd><span id="bestKm">0</span> km<em id="bestMeta"></em></dd></div>
-      <div><dt>budget</dt><dd><span id="budgetKm">0</span> km</dd></div>
+      <div><dt>your route</dt><dd><span id="yourKm">0</span><em id="yourMeta"></em></dd></div>
+      <div><dt>fastest</dt><dd><span id="bestKm">0</span><em id="bestMeta"></em></dd></div>
+      <div><dt>shortest road</dt><dd><span id="trapKm">0</span><em id="trapMeta"></em></dd></div>
+      <div><dt>budget</dt><dd><span id="budgetKm">0</span></dd></div>
     </dl>
     <p class="reveal__glyphs" id="glyphs"></p>
     <p class="reveal__note" id="revealNote"></p>
@@ -66,7 +67,7 @@
     </div>
   </section>
 
-  <p class="hint" id="hint">Pick a neighbouring city. You pay what the road costs, not what the map suggests.</p>
+  <p class="hint" id="hint">Pick a neighbouring city. You pay the hours the road takes — and the shortest road is rarely the fastest.</p>
 </main>
 <script type="module" src="app.js"></script>
 </body>

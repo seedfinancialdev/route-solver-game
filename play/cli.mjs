@@ -5,6 +5,10 @@
 // the dots are relative to each other, and where the target is. Road distance
 // stays hidden until you commit to a hop, because guessing it is the game.
 //
+// The currency is hours. Road distance is visible — the browser draws the roads
+// themselves — so the list shows how long each hop is. What it will not tell you
+// is how fast that road runs.
+//
 //   node play/cli.mjs                 today's puzzle
 //   node play/cli.mjs --day 12        a specific day
 //   node play/cli.mjs --random
@@ -38,8 +42,11 @@ let puzzle;
 if (flag('from') && flag('to')) {
   const a = findCity(flag('from')), b = findCity(flag('to'));
   if (a < 0 || b < 0) { console.error('unknown city'); process.exit(1); }
-  const optimal = dijkstra(g, a).dist[b];
-  puzzle = { a, b, optimal: Math.round(optimal), budget: Math.round(optimal * pack.budgetMultiplier / 10) * 10 };
+  const optimalMin = dijkstra(g, a, (e) => e.min).dist[b];
+  puzzle = {
+    a, b, optimalMin: Math.round(optimalMin),
+    budgetMin: Math.round((optimalMin * pack.budgetMultiplier) / 15) * 15,
+  };
 } else if (argv.includes('--random')) {
   puzzle = pack.puzzles[Math.floor(Math.random() * pack.puzzles.length)];
 } else {
@@ -51,7 +58,7 @@ if (flag('from') && flag('to')) {
 }
 
 const { a: START, b: TARGET } = puzzle;
-const sp = dijkstra(g, TARGET);          // cost from anywhere to the target
+const hhmm = (m) => `${m < 0 ? '-' : ''}${Math.floor(Math.abs(m) / 60)}h${String(Math.round(Math.abs(m)) % 60).padStart(2, '0')}`;
 const nm = (i) => g.cities[i].name;
 const crow = (i, j) => haversineKm(g.cities[i], g.cities[j]);
 
@@ -64,8 +71,8 @@ function bearing(from, to) {
   return COMPASS[Math.round(deg / 45) % 8];
 }
 
-const budget = puzzle.budget;
-let spent = 0, minutes = 0, at = START;
+const budget = puzzle.budgetMin;
+let spent = 0, km = 0, at = START;
 const visited = new Set([START]);
 const log = [];
 
@@ -74,11 +81,12 @@ const gauge = (remaining) => {
   const filled = Math.round(frac * 28);
   const bar = '█'.repeat(filled) + C.dim('─'.repeat(28 - filled));
   const paint = remaining < 0 ? C.red : frac < 0.15 ? C.red : frac < 0.35 ? C.amber : (s) => s;
-  return `${paint(String(Math.round(remaining)).padStart(5))} km  ${paint(bar)}`;
+  return `${paint(hhmm(remaining).padStart(6))}  ${paint(bar)}`;
 };
 
 console.log(`\n  ${C.bold(`${nm(START)} → ${nm(TARGET)}`)}   ${C.dim(`${Math.round(crow(START, TARGET))} km as the crow flies`)}`);
-console.log(`  ${C.dim(`budget ${budget} km · you cannot revisit a city · road distances are hidden until you commit`)}\n`);
+console.log(`  ${C.dim(`budget ${hhmm(budget)} of driving · you cannot revisit a city`)}`);
+console.log(`  ${C.dim('you can see how long each road is; you cannot see how fast it runs')}\n`);
 
 // A queue rather than readline/promises: piped input arrives in one chunk, and
 // `question` only ever captures the line after it was called, so scripted
@@ -99,7 +107,7 @@ const ask = (prompt) => {
 while (at !== TARGET) {
   const options = g.adj[at]
     .filter((e) => !visited.has(e.to))
-    .map((e) => ({ to: e.to, km: e.km, min: e.min, hop: crow(at, e.to), left: crow(e.to, TARGET) }))
+    .map((e) => ({ to: e.to, km: e.km, min: e.min, left: crow(e.to, TARGET) }))
     .sort((x, y) => x.left - y.left);
 
   console.log(`  ${C.bold(nm(at))}  ${gauge(budget - spent)}`);
@@ -110,7 +118,8 @@ while (at !== TARGET) {
   console.log();
   options.forEach((o, i) => {
     console.log(`   ${String(i + 1).padStart(2)}. ${nm(o.to).padEnd(22)} ${C.dim(
-      `${bearing(at, o.to)}  ~${String(Math.round(o.hop)).padStart(3)} km away   ${String(Math.round(o.left)).padStart(4)} km left to target (crow)`)}`);
+      `${bearing(at, o.to).padEnd(2)}  ${String(o.km).padStart(3)} km of road   `
+      + `${String(Math.round(o.left)).padStart(4)} km left to target (crow)`)}`);
   });
 
   const answer = await ask('\n  > ');
@@ -118,38 +127,52 @@ while (at !== TARGET) {
   const pick = options[Number(answer.trim()) - 1];
   if (!pick) { console.log(C.dim('  pick a number from the list\n')); continue; }
 
-  spent += pick.km; minutes += pick.min;
+  spent += pick.min; km += pick.km;
   visited.add(pick.to);
-  log.push({ from: at, to: pick.to, km: pick.km, min: pick.min, guess: Math.round(pick.hop) });
+  log.push({ from: at, to: pick.to, km: pick.km, min: pick.min });
   at = pick.to;
 
-  const over = pick.km - pick.hop;
-  const verdict = over / pick.hop > 0.35 ? C.red('the road took its time')
-    : over / pick.hop > 0.18 ? C.amber('a bit of a detour')
-    : C.green('near enough a straight line');
-  console.log(`\n  paid ${C.bold(`${pick.km} km`)} (${Math.floor(pick.min / 60)}h${String(pick.min % 60).padStart(2, '0')}) — ${verdict}\n`);
+  const kmh = pick.km / (pick.min / 60);
+  const verdict = kmh < 65 ? C.red('slow road')
+    : kmh < 85 ? C.amber('ordinary going')
+      : C.green('motorway pace');
+  console.log(`\n  paid ${C.bold(hhmm(pick.min))} for ${pick.km} km — ${Math.round(kmh)} km/h, ${verdict}\n`);
 }
 
 rl.close();
 
 // --- the reveal ------------------------------------------------------------
 const left = budget - spent;
-const optimalPath = pathFrom(dijkstra(g, START).prev, START, TARGET);
+const timeOf = (path) => {
+  let m = 0;
+  for (let i = 1; i < path.length; i++) m += g.adj[path[i - 1]].find((e) => e.to === path[i]).min;
+  return m;
+};
+const kmOf = (path) => {
+  let d = 0;
+  for (let i = 1; i < path.length; i++) d += g.adj[path[i - 1]].find((e) => e.to === path[i]).km;
+  return d;
+};
+const fastPath = pathFrom(dijkstra(g, START, (e) => e.min).prev, START, TARGET);
+const shortPath = pathFrom(dijkstra(g, START).prev, START, TARGET);
 
 console.log(`  ${C.bold('arrived.')}\n`);
-console.log(`  your route    ${String(Math.round(spent)).padStart(5)} km  ${log.length} hops  ${Math.round(minutes / 60)}h`);
-console.log(`  optimal       ${String(puzzle.optimal).padStart(5)} km  ${optimalPath.length - 1} hops`);
-console.log(`  budget        ${String(budget).padStart(5)} km`);
+console.log(`  your route       ${hhmm(spent).padStart(6)}   ${String(km).padStart(5)} km  ${log.length} hops`);
+console.log(`  the fastest way  ${hhmm(timeOf(fastPath)).padStart(6)}   ${String(kmOf(fastPath)).padStart(5)} km  ${fastPath.length - 1} hops`);
+console.log(`  the short way    ${hhmm(timeOf(shortPath)).padStart(6)}   ${String(kmOf(shortPath)).padStart(5)} km  ${C.dim('<- what the map tempts you into')}`);
+console.log(`  budget           ${hhmm(budget).padStart(6)}`);
 console.log(`  ${left >= 0
-  ? C.green(`${C.bold(`${Math.round(left)} km`)} to spare`)
-  : C.red(`over budget by ${C.bold(`${Math.round(-left)} km`)}`)}\n`);
+  ? C.green(`${C.bold(hhmm(left))} to spare`)
+  : C.red(`over budget by ${C.bold(hhmm(-left))}`)}\n`);
 
-console.log(`  ${C.dim('you went')}    ${log.map((h) => nm(h.from)).concat(nm(TARGET)).join(' › ')}`);
-console.log(`  ${C.dim('optimal')}     ${optimalPath.map(nm).join(' › ')}\n`);
+console.log(`  ${C.dim('you went')}    ${log.map((h) => nm(h.from)).concat(nm(TARGET)).join(' \u203a ')}`);
+console.log(`  ${C.dim('fastest')}     ${fastPath.map(nm).join(' \u203a ')}\n`);
 
-const worst = log.slice().sort((x, y) => (y.km / y.guess) - (x.km / x.guess))[0];
-if (worst && worst.km / worst.guess > 1.25) {
-  console.log(`  ${C.dim(`the hop that cost you: ${nm(worst.from)} → ${nm(worst.to)}, `
-    + `${worst.km} km of road for ${worst.guess} km of map (${(worst.km / worst.guess).toFixed(2)}x)`)}\n`);
+const kmh = (h) => h.km / (h.min / 60);
+const slowest = log.slice().sort((x, y) => kmh(x) - kmh(y))[0];
+if (slowest && kmh(slowest) < 70) {
+  console.log(`  ${C.dim(`your slowest stretch: ${nm(slowest.from)} \u2192 ${nm(slowest.to)}, `
+    + `${slowest.km} km at ${Math.round(kmh(slowest))} km/h`)}\n`);
 }
-console.log(`  ${log.map((h) => (h.km / h.guess > 1.35 ? '▲' : h.km / h.guess > 1.15 ? '◆' : '·')).join('')}  ${left >= 0 ? `+${Math.round(left)}` : Math.round(left)} km\n`);
+console.log(`  ${log.map((h) => (kmh(h) < 65 ? '\u25b2' : kmh(h) < 85 ? '\u25c6' : '\u00b7')).join('')}  `
+  + `${left >= 0 ? '+' : '\u2212'}${hhmm(Math.abs(left))}\n`);
