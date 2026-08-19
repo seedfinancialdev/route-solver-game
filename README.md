@@ -19,7 +19,7 @@ hop in front of you, but not the corridor beyond it, which is where the puzzle
 lives. Everything else on the map — named mountain ranges and seas, the built-up
 footprint of a city, the background towns filling in the space between the ones
 you can act on — is scenery. It's there so the map feels like a real, lived-in
-place rather than 472 dots and lines; none of it is wired to a road, so none of
+place rather than 479 dots and lines; none of it is wired to a road, so none of
 it can tell you which one is fast.
 
 When the route is locked, both routes drive it again side by side at their real
@@ -96,7 +96,7 @@ two-lane runs at 45. Same measurement, different currency:
 
 So the game switched currency, drew the actual roads on the map — you can judge
 distance now, which is exactly the trap — and set the budget below what taking
-the shortest road costs. On the 2,165 shipped puzzles at a 1.08× budget:
+the shortest road costs. On the 2,538 shipped puzzles at a 1.11× budget:
 
 | player | wins |
 | --- | --- |

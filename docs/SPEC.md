@@ -11,7 +11,7 @@ graph **the shortest route is the fastest route only 27% of the time**.
 
 ## The board
 
-472 European cities, 1,226 roads, one connected component (`data/graph.json`).
+479 European cities, 1,233 roads, one connected component (`data/graph.json`).
 Cities are GeoNames `cities15000` filtered to continental Europe, top-by-
 population with a 75 km minimum spacing — without a spacing rule the Ruhr, the
 Randstad and Upper Silesia eat the budget and Iberia goes uncovered. Roads are Delaunay + kNN candidates
@@ -23,8 +23,25 @@ then filtered:
 | more than 3 km on a ferry → not a road | a sea hop is a cost no map can show the player. OSRM's ferry step mode separates the Messina crossing (6.5 km afloat) from the Øresund bridge (0 km) with no hand-curated list |
 | road > 420 km → not a road | one hop shouldn't eat a fifth of a budget |
 | road / straight-line > 2.0 → not a road | past this it isn't a link, it's a detour around something |
-| anything outside the largest component → not in the game | islands and the sparse far north leave on their own terms |
 | a road passing within 12 km of a third city → not a road | the A4 from Rzeszów to Radom goes through Lublin, and Lublin is a city here. Keeping it draws a road across a dot it does not stop at, and offers a hop that is really two hops glued together. Only dropped when both halves exist, so nothing is cut off |
+| anything still outside the main component after that → one rescue attempt, then out | see "Rescue" below |
+
+**Rescue.** The two caps above (420 km, 2.0× detour) are tuned for typical
+Central European distances, and they silently strand real cities in fjord and
+mountain terrain rather than routing around it — measured directly: Bergen
+(Norway's 2nd-largest city) has *zero* surviving candidates under the normal
+caps, because every real road out of it is a 1.5–1.8× detour around a fjord,
+a touch over 420 km, or both. A city the normal pass leaves disconnected gets
+one attempt at its single cheapest real, non-ferry connection to the main
+component, cap loosened to 700 km and the detour ratio dropped entirely (a
+long detour is exactly the failure mode being rescued from). The ferry rule
+is not loosened — a city genuinely only reachable by boat fails the rescue
+for the same reason it failed the first time, and correctly stays out. Of 28
+cities the normal pass stranded, 7 were real (Bergen, Bodø, Harstad,
+Kristiansund, Mo i Rana, Tromsø, Skadovsk — all fjord/coastal Norway plus one
+Ukrainian coastal city) and are back on the map; the other 21 are every
+Corsican, Sardinian, Sicilian, Balearic, Cretan, and Aegean city in the
+roster, which stay out for the reason they always would have.
 
 ## Visibility
 
@@ -83,7 +100,7 @@ two-lane and the road north is a main road; you cannot see what the corridor
 beyond looks like. That is the whole balance. Simulating a player who reads the
 next hop well (σ 0.08) and still guesses beyond it (σ 0.25) moves the win rate
 from 54% to 56% — because the difficulty was never in judging one hop, it is in
-choosing the corridor. The shortest-road player still wins 0 of 2,494.
+choosing the corridor. The shortest-road player still wins 0 of 2,538.
 
 Terrain is on from the start rather than held back for the reveal. It does not
 hand over the answer: any European mountain range has several roads through it
@@ -111,17 +128,39 @@ them has already been seen.
 
 ## Puzzle selection
 
-A pair qualifies when all four hold. **2,494 pairs do** — 6.8 years of daily
+A pair qualifies when all four hold. **2,538 pairs do** — 7.0 years of daily
 puzzles.
 
 1. **The short way is measurably slower.** The distance-optimal route costs
-   ≥ 1.12× the fastest *legal* route's time (see "Driving hours" below — this
-   is the fastest route that obeys the mandatory-break rule, not the fastest
-   route ignoring it). 3,177 pairs clear this — a median of three and a half
-   hours thrown away.
+   ≥ 1.12× the fastest *legal* route's time (see "Driving hours" below — the
+   fastest route that obeys the mandatory-break rule, not the fastest route
+   ignoring it). This is not a heuristic proxy standing in for a better test —
+   it's a hard requirement of the rules as written. The shortest road is a
+   free, deterministic, always-available strategy; nothing about taking it
+   requires reading a single pace tier. For it to fail, its time has to
+   exceed the budget, which means its ratio to the optimal has to clear the
+   budget multiplier (1.11) with enough margin to survive 15-minute rounding.
+   Below that ratio a player wins with zero risk and zero judgement, every
+   time — a version of this criterion was briefly dropped on the theory that
+   pace-misjudgment tension alone was enough difficulty without a directional
+   trap; measured after the fact, that let the shortest road win outright on
+   66% of the puzzles it produced, because the thing it was actually testing
+   (a simulated player's noisy performance) is a different question from
+   whether the deterministic shortest-road strategy itself survives. It
+   doesn't, below this ratio, ever.
 2. **It is winnable.** A good run by the simulated player comes in under budget.
 3. **It is not free.** A sloppy run by the same player does not.
-4. **Losing is a near miss.** The worst realistic run is ≤ 1.45× the best time.
+4. **Losing is a near miss, and a realistic one.** The worst run that actually
+   *finishes* is ≤ 1.45× the best time — and the simulated player has to
+   finish: a pair where it dead-ends itself (no unvisited neighbour left,
+   same rule a real player plays under) more than 15% of the time is cut on
+   that alone, before the time-ratio math ever sees it. Dead-end rate used to
+   be folded into the time-ratio math itself (a dead-end run scored as an
+   infinite time), which conflated two different failure modes — a puzzle
+   with no real time-management difficulty at all could still fail criterion
+   4 purely from how often the bot happened to wall itself in. Split out
+   explicitly now: the time-ratio criteria are computed only over runs that
+   actually finished.
 
 Criteria 2–4 are measured by running `roadReader` (`play/bots.mjs`, with its
 `hos` option on — see "Driving hours") twelve times per pair. That bot is the
@@ -130,6 +169,17 @@ on how fast each runs that is off by a consistent amount, looks three hops
 ahead, and estimates the rest of the trip at a flat average.
 
 Bounds: fastest legal route 12–40 hours, 7–16 hops.
+
+**A city with only one way in or out can't host a puzzle at all**, even if it
+clears every bound — measured directly on Bergen (see "Rescue" under The
+board): 98 candidate destinations sit in bounds, and *zero* clear the trap
+ratio, provably, not by chance. A forced single access road is shared by both
+the fastest route and the shortest one to anywhere from that city, and adding
+an identical cost to both sides of a ratio always pulls it toward 1.0 — the
+larger that shared, unavoidable hop is relative to the trip, the more it
+dilutes whatever real trap exists on the far side of it. Rescued cities exist
+on the map and are real, but they're a fit for a forced-waypoint mechanic
+(deferred), not an endpoint, under this criterion.
 
 ## Budget
 
@@ -150,11 +200,13 @@ getting away with it. Past 1.12 the trap stops being a trap — one road's worth
 of margin below the cliff, the same shape as the original (pre-driving-hours)
 calibration, whose own 1.08 sat 0.04 below its own 1.12 cliff.
 
-Reselecting mattered here, not just recomputing: the driving-hours rule's
-overhead isn't uniform (measured 11–17% depending on the route), so patching
-the old, pre-driving-hours puzzle set's budgets in place — same 2,165 pairs,
-new numbers — left 8.5% of them with the shortest road outright winning. The
-current 2,494 were chosen fresh, with every criterion above measuring the
+Reselecting matters whenever the underlying cost model or graph changes —
+patching an old set's budgets in place, without reselecting, is how a puzzle
+quietly stops being a puzzle. Measured directly: patching the pre-driving-
+hours set's budgets in place (same 2,165 pairs, new numbers, no reselection)
+left 8.5% of it with the shortest road outright winning. The current set was
+chosen fresh against the current graph (see "Rescue" under The board) and the
+current criteria (see "Puzzle selection" above), every number measuring the
 fastest *legal* route from the start.
 
 ## Driving hours
@@ -213,10 +265,15 @@ were chosen.
 
 ## Deferred
 
-World mode; fog of war on the city list; streaks and accounts. Also deferred and
-specific to this build: **Britain, Ireland and the islands**, excluded because
-every route onto them runs through a ferry or the Chunnel, and **Finland and the
-far north**, whose only land links are longer than the 420 km hop cap.
+World mode; fog of war on the city list; streaks and accounts; a mandatory
+forced-waypoint puzzle variant (start → via → target, no revisits across the
+whole path) — the natural home for rescued, single-access cities like Bergen,
+which can't host a puzzle on their own (see "Puzzle selection"). Also deferred and
+specific to this build: **Britain, Ireland, and the Mediterranean islands**
+(Corsica, Sardinia, Sicily, the Balearics, Crete, the Aegean), excluded because
+every route onto them runs through a ferry or the Chunnel — genuinely no land
+road exists, not a threshold that could be loosened. Coastal Norway and the
+far north are no longer in this category: see "Rescue" under The board.
 
 A **distance budget** is now deferred too, having been built and measured: it
 made a game that geometry solves outright, and the switch to time is what this

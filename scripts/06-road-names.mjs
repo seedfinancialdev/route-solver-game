@@ -1,5 +1,5 @@
 // Phase 5: real road names and route numbers, for narration — never for
-// gameplay. Re-queries the exact 1,226 edges already in data/graph.json
+// gameplay. Re-queries the exact edges already in data/graph.json
 // against the same public OSRM instance the whole graph was built from
 // (scripts/lib/osrm.mjs), asking this time for what routePair() already
 // throws away: each step's `name` and `ref`.
