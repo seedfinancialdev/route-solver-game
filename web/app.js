@@ -492,12 +492,37 @@ function resizeMarks() {
     // than it used to. It never leaves entirely — even stretched, knowing
     // whether you are in a valley or on a plain is worth something — it just
     // steps back so the roads sit clearly on top.
-    const fade = Math.max(0, Math.min(1, (camera.w - 90) / 200));
-    app.style.setProperty('--terrain-opacity', (0.45 + 0.5 * fade).toFixed(3));
+    //
+    // 0.45 was the floor for 90 km, tuned back when 90 km was as close as the
+    // camera could ever get. The pit stop now parks it at MIN_SPAN_KM (3 km)
+    // on every hop but the last — 30x closer than that floor was ever judged
+    // against — and at that magnification a single real elevation pixel
+    // blown up reads as a flat, hard-edged blob more often than it reads as
+    // texture (measured directly: 2 of a 4-hop run's stops showed it).
+    // Continue the same fade a second, closer stretch down to a much fainter
+    // floor instead of holding 0.45 all the way in.
+    const farFade = Math.max(0, Math.min(1, (camera.w - 90) / 200));
+    const MIN_TERRAIN_OPACITY = 0.12;
+    const opacity = camera.w >= 90
+      ? 0.45 + 0.5 * farFade
+      : MIN_TERRAIN_OPACITY + (0.45 - MIN_TERRAIN_OPACITY)
+        * Math.max(0, Math.min(1, (camera.w - MIN_SPAN_KM) / (90 - MIN_SPAN_KM)));
+    app.style.setProperty('--terrain-opacity', opacity.toFixed(3));
     ensureTerrainTiles();
     updateTerrainLayers();
     ensureStreets();
     $('streets').classList.toggle('streets--visible', camera.w <= STREET_ZOOM_KM);
+
+    // Urban footprints are a flat 40% tint (.urban in app.css) — a fair hint
+    // at continental scale, where a city's real built-up extent is a speck.
+    // At the pit stop's 3 km frame that same extent is most or all of the
+    // visible circle, so the same flat tint stops being a hint and becomes a
+    // solid block sitting over the real street grid it's meant to support.
+    // Fades the group's own opacity — compounding with the 40% already on
+    // each path — down toward near-invisible over the same close range the
+    // street grid becomes the thing actually worth reading.
+    const urbanFade = Math.max(0, Math.min(1, (camera.w - MIN_SPAN_KM) / (STREET_ZOOM_KM - MIN_SPAN_KM)));
+    $('urban').style.opacity = (0.15 + 0.85 * urbanFade).toFixed(3);
   }
 }
 
