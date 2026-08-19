@@ -66,6 +66,7 @@ roster, which stay out for the reason they always would have.
 | how fast a named region's roads run against the network average | yes, in the pre-game brief, for regions the route actually passes near | n/a |
 | the country you're in, and its real legal speed limits | yes, live, updates on every stop | n/a |
 | the road and terrain a candidate hop actually crosses | yes, on hover/focus of a reachable dot, before you commit | n/a |
+| pushing a candidate hop's exact gain and risk | yes, once **Push it** is armed, before you commit | n/a |
 
 The pace figure is arithmetic on numbers already on screen — remaining budget
 and crow-flies distance to the target — not a new fact about any road. It's a
@@ -235,6 +236,49 @@ depending on how much continuous driving is already banked on arrival
 (`hosDijkstra`, `scripts/lib/graph.mjs`; mirrored as `hosRoute` in
 `web/engine.js` since browser code can't import the Node build scripts).
 
+## Push
+
+A second lever, independent of which road you pick: not just the corridor
+choice, but how you drive the hop you're already on. **Push it**, armed
+fresh before each hop (it drops back to **Hold the limit** the instant you
+commit — a stance chosen every time, never a setting left on), trades a real
+chance of losing time for a real chance of saving it.
+
+Both the gain and the risk key off `paceMix` — the same real tier
+composition already setting the reach-line weight — rather than a second,
+unrelated fact:
+
+- **The gain is worth more on the roads that already read fast.** A mostly-
+  motorway hop has real headroom to push; a mostly-slow, tight one barely
+  does. Pushing can't turn a bad road good, only take more of what a good
+  road already offers.
+- **The risk is worth less on the same roads.** An open motorway stretch is
+  the safe place to push; a tight two-lane is the risky one. Risk also scales
+  with the hop's length — more distance pushed is more exposure to get
+  caught, the same way it would be for real.
+- **Getting caught forfeits the gain, not just taxes it.** A caught hop costs
+  a flat 30 minutes *and* drives at the road's plain pace, not the pushed
+  one — otherwise a big enough gain on a long hop could still net ahead of
+  not pushing at all, which would make the risk cosmetic. The stop counts
+  toward the driving-hours clock like any other time on the road (it can
+  even tip a hop into a mandatory break) but never counts as the break
+  itself — being pulled over is pure downside, never rest in disguise.
+
+Shown on the reachable dot's recon (see below) only once armed — the exact
+gain and risk for *this* hop, live, since it's the input to a decision being
+made right now, not a fact worth surfacing on every hover. A caught stop
+reuses the pit-stop panel below rather than inventing a second one: same
+beat (arrived, here's what it cost), a worse reason for it.
+
+These multipliers (`PUSH_GAIN`, `PUSH_RISK_WEIGHT`, `PUSH_CAUGHT_MIN`,
+`web/engine.js`) are a designed mechanic, not a sourced fact — there's no
+real-world table for how much a driver can safely push past a limit. They're
+a first pass, not a finished one: `roadReader` (`play/bots.mjs`) doesn't yet
+have a push-or-hold policy, so the puzzle-selection numbers elsewhere in this
+document (the 52% win rate, the 1.11× budget) haven't been re-measured
+against a player who pushes. Until that calibration pass runs, Push should
+be read as playable, not as balanced.
+
 ## Recon
 
 Real rally prep is knowing the country, the terrain, and the road before you
@@ -264,6 +308,12 @@ weight: you can read the option in front of you, not the network at large.
 None of it is the thing that's still genuinely hidden (how fast a road
 actually runs) — it's the context a real rally crew would have going in,
 not the answer.
+
+A fourth line joins these three, but only once **Push it** is armed (see
+"Push" above): the exact gain and risk pushing this specific hop would mean.
+Unlike the other three, this isn't a hidden real-world fact being surfaced —
+it's the live odds on a decision the player is making right now, so showing
+the number outright doesn't spoil anything the game is actually testing.
 
 ## Street-level detail
 
@@ -306,6 +356,8 @@ cost" beat at two different scales, not two different mechanics.
 
 - Start on the origin city. Each turn, pick any adjacent city you have not
   already visited. Pay the hours that road takes.
+- **Push it, or hold the limit.** Arm Push before you commit for a real
+  chance at a faster hop and a real chance at a slower one. See "Push" above.
 - **No backtracking.** Visited cities are not selectable. Irreversibility is
   where the tension comes from.
 - **4.5 continuous hours forces a 45-minute break.** See "Driving hours" above.

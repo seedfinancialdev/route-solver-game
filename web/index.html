@@ -32,6 +32,10 @@
       <p class="gauge__caption" id="caption">remaining of <span id="budget">0</span> km</p>
       <p class="gauge__pace" id="gaugePace"></p>
       <p class="gauge__fatigue" id="gaugeFatigue"></p>
+      <!-- A stance, not a status: armed for exactly one hop, so pushing past
+           the country's real legal limit (hud__country, above) is a choice
+           made fresh each time, never a setting left on. -->
+      <button type="button" class="push-toggle" id="pushToggle" aria-pressed="false">Hold the limit</button>
       <p class="paid" id="paid" aria-live="polite">
         <span class="paid__story" id="paidStory"></span>
         <span class="paid__stat" id="paidStat"></span>
@@ -102,6 +106,10 @@
   <aside class="recon" id="recon" hidden>
     <p class="recon__road" id="reconRoad"></p>
     <p class="recon__terrain" id="reconTerrain"></p>
+    <!-- Only shown once "Push it" is armed — what pushing this specific hop
+         would actually cost and risk, live, not a fact worth surfacing on
+         every hover. -->
+    <p class="recon__push" id="reconPush" hidden></p>
   </aside>
 
   <!-- The turn boundary made explicit: arriving at a city is a stop, not an
@@ -110,7 +118,7 @@
        into; the next hop's candidates stay on screen but inert until you
        actually choose to pull back out. -->
   <section class="stop" id="stop" hidden>
-    <p class="stop__eyebrow">Pit stop</p>
+    <p class="stop__eyebrow" id="stopEyebrow">Pit stop</p>
     <h2 id="stopCity">—</h2>
     <p class="stop__stat" id="stopStat"></p>
     <button id="stopContinue" type="button">Continue driving</button>

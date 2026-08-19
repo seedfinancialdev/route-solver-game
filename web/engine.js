@@ -269,15 +269,59 @@ export function options(g, round) {
   return round.finished ? [] : g.adj[round.at].filter((e) => !round.visited.has(e.to));
 }
 
-export function hop(g, round, to) {
+// --- push: hold the limit, or don't -----------------------------------
+// A second lever, independent of the road-reading judgement above: not
+// which road you take, but how you drive the one you're on. Real country
+// speed limits are already on the HUD (country-facts.mjs); pushing is the
+// choice to run past them. The gain and the risk both key off paceMix —
+// the same real tier composition already setting the reach-line weight —
+// so pushing is naturally worth the most on an open motorway stretch and
+// barely worth anything on a tight, slow road, the way it actually would
+// be. These multipliers are a designed mechanic, not a sourced fact —
+// there's no real-world table for "how much can a driver safely push" —
+// and they're a first pass: worth the same calibration discipline as the
+// budget multiplier (play/calibrate.mjs) once a push-aware bot model
+// exists to measure against, not treated as finished.
+const PUSH_GAIN = [1.03, 1.12, 1.22];     // slow, ordinary, fast tier — speed multiplier while pushing
+const PUSH_RISK_WEIGHT = [3, 1.5, 0.5];   // relative exposure per km, same tier order — tight roads are the risky place to push, not the motorway
+const PUSH_RISK_PER_KM = 0.00085;         // scaled so a typical ~150 km mixed-tier hop lands near an 18% catch chance
+const PUSH_RISK_CAP = 0.6;
+export const PUSH_CAUGHT_MIN = 30;        // flat time lost to a stop — never counts as rest, see hop() below
+
+export function pushGainFactor(edge) {
+  const mix = paceMix(edge);
+  return mix[0] * PUSH_GAIN[0] + mix[1] * PUSH_GAIN[1] + mix[2] * PUSH_GAIN[2];
+}
+
+export function pushRiskChance(edge) {
+  const mix = paceMix(edge);
+  const weight = mix[0] * PUSH_RISK_WEIGHT[0] + mix[1] * PUSH_RISK_WEIGHT[1] + mix[2] * PUSH_RISK_WEIGHT[2];
+  return Math.min(PUSH_RISK_CAP, edge.km * weight * PUSH_RISK_PER_KM);
+}
+
+/**
+ * `push` drives the hop past the limit: driveMin drops by pushGainFactor,
+ * and pushRiskChance is rolled for a stop. `forceCaught` overrides that roll
+ * — restore() needs it, to replay a saved run's exact outcome instead of
+ * re-rolling a new one against the same odds.
+ */
+export function hop(g, round, to, { push = false, forceCaught } = {}) {
   const edge = options(g, round).find((e) => e.to === to);
   if (!edge) return round;
-  const cost = hosCost(round.sinceRest, edge.min);
-  // driveMin is the road's own time — what speedOf/narration read, so a
-  // forced break never makes a fast road look slow. min is what the budget
-  // actually pays: driving plus whatever break it triggered.
+  const caught = push && (forceCaught ?? Math.random() < pushRiskChance(edge));
+  // Caught forfeits the gain, not just adds a tax on top of it — otherwise a
+  // big enough gain on a long hop lets a ticket still net ahead of not
+  // pushing at all, which isn't a real risk, just a smaller reward.
+  const driveMin = push && !caught ? edge.min / pushGainFactor(edge) : edge.min;
+  const caughtMin = caught ? PUSH_CAUGHT_MIN : 0;
+  // Whatever a stop costs counts toward the clock like any other driving
+  // time — it can even tip you into a mandatory break — but it never resets
+  // sinceRest the way an actual rest does. Being pulled over is pure
+  // downside, never a break in disguise.
+  const cost = hosCost(round.sinceRest, driveMin + caughtMin);
   round.hops.push({
-    from: round.at, to, km: edge.km, driveMin: edge.min, breakMin: cost.charged - edge.min, min: cost.charged,
+    from: round.at, to, km: edge.km, driveMin, pushed: push, caught, caughtMin,
+    breakMin: cost.charged - driveMin - caughtMin, min: cost.charged,
   });
   round.spent += cost.charged;
   round.km += edge.km;

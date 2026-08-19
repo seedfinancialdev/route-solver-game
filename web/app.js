@@ -2,6 +2,7 @@ import {
   buildGraph, crow, roadPath, roadRuns, paceMix, shortestRoute, hosRoute, hosCost,
   newRound, options, hop, remaining, hopGlyph, speedOf, hhmm, shareString, dayNumber,
   bearingWord, narrateHop, requiredPace, previewPace, paceRisk,
+  pushGainFactor, pushRiskChance, PUSH_CAUGHT_MIN,
   HOS_CONTINUOUS_LIMIT, HOS_BREAK_MIN,
 } from './engine.js';
 
@@ -796,6 +797,12 @@ function paint({ animate = false } = {}) {
       brk.textContent = `+ ${hhmm(h.breakMin)} break`;
       cost.append(brk);
     }
+    if (h.pushed) {
+      const push = document.createElement('em');
+      push.className = `log__push${h.caught ? ' log__push--caught' : ''}`;
+      push.textContent = h.caught ? `pulled over, +${hhmm(h.caughtMin)}` : 'pushed it';
+      cost.append(push);
+    }
     li.append(name, cost);
     return li;
   }));
@@ -919,11 +926,26 @@ function animateHop(from, to) {
   });
 }
 
+// --- push: hold the limit, or don't -----------------------------------
+// A stance, not a setting: armed for exactly one hop, then it drops back to
+// holding the limit, so pushing is a choice made fresh each time rather than
+// a toggle a player forgets is on.
+let pushArmed = false;
+function setPushArmed(v) {
+  pushArmed = v;
+  $('pushToggle').setAttribute('aria-pressed', String(v));
+  $('pushToggle').textContent = v ? 'Push it' : 'Hold the limit';
+  app.classList.toggle('push-armed', v);
+}
+$('pushToggle').addEventListener('click', () => setPushArmed(!pushArmed));
+
 let hopBusy = false;
 let stopped = false;
 async function choose(i) {
   if (hopBusy || stopped || round.finished || !options(g, round).some((e) => e.to === i)) return;
   hopBusy = true;
+  const push = pushArmed;
+  setPushArmed(false);
 
   // Acknowledge the click before anything else happens: a pulse on the dot
   // you picked, and the road you didn't pick stepping back, so there's no
@@ -944,7 +966,7 @@ async function choose(i) {
     hopBusy = false;
     map.classList.remove('map--travelling');
   }
-  hop(g, round, i);
+  hop(g, round, i, { push });
   neededAtHop.push(neededKmh);
   const h = round.hops[round.hops.length - 1];
   showPaid(h);
@@ -971,8 +993,18 @@ async function pitStop(h) {
   clearTimeout(arrivalTimer);
   $('arrivalCallout').replaceChildren();
   const c = g.cities[round.at];
-  $('stopCity').textContent = `${c.name}, ${c.countryName}`;
-  $('stopStat').textContent = `${hhmm(h.min)} for ${h.km} km · ${Math.round(speedOf(h))} km/h`;
+  // A stop from getting caught pushing reuses this same panel rather than
+  // inventing a second one — it's the same beat (arrived, here's the cost),
+  // just a worse reason for it.
+  $('stop').classList.toggle('stop--caught', !!h.caught);
+  $('stopEyebrow').textContent = h.caught ? 'Pulled over' : 'Pit stop';
+  $('stopCity').textContent = h.caught
+    ? `outside ${c.name}, ${c.countryName}`
+    : `${c.name}, ${c.countryName}`;
+  const stat = `${hhmm(h.min)} for ${h.km} km · ${Math.round(speedOf(h))} km/h`;
+  $('stopStat').textContent = h.caught
+    ? `${stat} — lost ${hhmm(PUSH_CAUGHT_MIN)} to the stop`
+    : h.pushed ? `${stat} — pushed it, clean` : stat;
   $('stop').hidden = false;
 
   await animateCamera(preStop, stopFrame(round.at));
@@ -1009,6 +1041,19 @@ function showRecon(to) {
     .map((f) => (f.pacePct != null ? `${f.name} (${f.pacePct > 0 ? '+' : ''}${f.pacePct}%)` : f.name))
     .join(' · ');
   terrain.hidden = !features.length;
+
+  // What pushing this specific hop would actually mean — shown only once
+  // armed, since it's the input to a live decision, not a fact worth
+  // surfacing on every hover.
+  const push = $('reconPush');
+  if (pushArmed) {
+    const gain = Math.round((pushGainFactor(edge) - 1) * 100);
+    const risk = Math.round(pushRiskChance(edge) * 100);
+    push.textContent = `Push: ~${gain}% faster · ~${risk}% chance of a stop`;
+    push.hidden = false;
+  } else {
+    push.hidden = true;
+  }
 
   $('recon').hidden = false;
 }
@@ -1287,7 +1332,9 @@ async function finish() {
 function restore(saved) {
   const state = JSON.parse(saved);
   if (!Array.isArray(state.hops) || !state.hops.length) return false;
-  for (const h of state.hops) hop(g, round, h.to);
+  // push/caught replay exactly, rather than re-rolling the catch chance
+  // against a saved run that already happened one specific way.
+  for (const h of state.hops) hop(g, round, h.to, { push: h.pushed, forceCaught: h.caught });
   if (!round.finished) return false;
   return true;
 }
