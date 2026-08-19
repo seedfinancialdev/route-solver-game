@@ -73,6 +73,10 @@
       <!-- Background towns: unlabelled, inert, below the playable roster's own
            dots so they never compete with something you can actually click. -->
       <g id="towns" aria-hidden="true"></g>
+      <!-- PROTOTYPE: real, country-scale road network (one region only),
+           tiered and revealed by zoom the same way terrain tiles and street
+           detail already are. Not the shipping data yet. -->
+      <g id="roadNetwork" aria-hidden="true"></g>
       <!-- Real OSM street grids, close-up detail for whichever playable city
            you're actually zoomed in on — fetched on demand per city
            (scripts/07-streets.mjs output), the same lazy-load pattern as the

@@ -192,6 +192,45 @@ function decodeStreetRuns(data) {
   });
 }
 
+// --- PROTOTYPE: country-wide road network, revealed by zoom -----------
+// Demo only — one region's worth of real OSM roads (motorway/trunk/primary),
+// tiled on the same 6x6 grid the terrain tiles already use, revealed the
+// same way terrain and street detail already are: more detail as you get
+// closer. Not the real pipeline — see the road-network scoping discussion.
+const ROAD_GRID = 6;
+const ROAD_TIER_ZOOM = [Infinity, 850, 200]; // motorway always, trunk <= 850km, primary <= 200km
+const roadTilesShown = new Set();
+async function ensureRoadNetwork() {
+  if (!camera) return;
+  const tw = g.view.w / ROAD_GRID, th = g.view.h / ROAD_GRID;
+  const c0 = Math.max(0, Math.floor((camera.x - g.view.x) / tw));
+  const c1 = Math.min(ROAD_GRID - 1, Math.floor((camera.x + camera.w - g.view.x) / tw));
+  const r0 = Math.max(0, Math.floor((camera.y - g.view.y) / th));
+  const r1 = Math.min(ROAD_GRID - 1, Math.floor((camera.y + camera.h - g.view.y) / th));
+  for (let row = r0; row <= r1; row++) {
+    for (let col = c0; col <= c1; col++) {
+      const key = `${col}_${row}`;
+      if (roadTilesShown.has(key)) continue;
+      roadTilesShown.add(key);
+      fetch(`road-network-proto/${key}.json`).then((r) => (r.ok ? r.json() : null)).then((data) => {
+        if (!data) return;
+        const group = el('g', { class: 'road-network-tile' });
+        for (const tierStr of Object.keys(data.tiers)) {
+          const tier = Number(tierStr);
+          for (const pts of data.tiers[tierStr]) {
+            const dAttr = `M${pts.map(([x, y]) => `${x} ${y}`).join('L')}`;
+            group.append(el('path', { d: dAttr, class: `road-network road-network--${tier}` }));
+          }
+        }
+        $('roadNetwork').append(group);
+      }).catch(() => {});
+    }
+  }
+  for (let tier = 0; tier < ROAD_TIER_ZOOM.length; tier++) {
+    $('roadNetwork').classList.toggle(`road-network--show-${tier}`, camera.w <= ROAD_TIER_ZOOM[tier]);
+  }
+}
+
 async function ensureStreets() {
   if (!camera || camera.w > STREET_ZOOM_KM) return;
   if (!streetManifest) {
@@ -510,6 +549,7 @@ function resizeMarks() {
     app.style.setProperty('--terrain-opacity', opacity.toFixed(3));
     ensureTerrainTiles();
     updateTerrainLayers();
+    ensureRoadNetwork();
     ensureStreets();
     $('streets').classList.toggle('streets--visible', camera.w <= STREET_ZOOM_KM);
 

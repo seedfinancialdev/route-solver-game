@@ -117,6 +117,17 @@ html, body {
 .street--1 { stroke-width: 1.3; opacity: .75; }
 .street--2 { stroke-width: 1.8; opacity: .9; }
 
+/* PROTOTYPE — country-scale road network, revealed by zoom like terrain
+   tiles and street detail already are. Tier 0 (motorway) is cheap enough to
+   stay on at any zoom; 1 (trunk) and 2 (primary) fade in as the tiles
+   holding them are worth reading. Not the shipping data yet. */
+.road-network { fill: none; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.road-network--0 { stroke: var(--road); stroke-width: 1.6; opacity: .85; }
+.road-network--1 { stroke: var(--amber); stroke-width: 1.1; opacity: 0; transition: opacity .4s ease; }
+.road-network--2 { stroke: var(--dim); stroke-width: .7; opacity: 0; transition: opacity .4s ease; }
+#roadNetwork.road-network--show-1 .road-network--1 { opacity: .7; }
+#roadNetwork.road-network--show-2 .road-network--2 { opacity: .45; }
+
 /* Borders are dashed, as they are on every paper map, because otherwise they
    are the same thin grey line as a road and the eye cannot separate them. The
    casing underneath is what makes them hold over a relief that is itself full
