@@ -1,176 +1,153 @@
 /**
- * Multi-Layered Cartography & Land-Use Canvas Renderer
- * High-performance single-pass batch rendering for land use (forests, farmland, water)
- * and road networks (motorways, trunks, primary roads, street grids).
+ * Multi-Layered Cartography Canvas Renderer
+ * Renders lakes, rivers, urban footprints, background towns, and real road geometries
+ * using HTML5 Canvas Path2D and view matrix projections for 60fps rendering.
  */
 
 export class CartographyLayer {
   constructor() {
-    this.landuseData = null;
-    this.roadNetworkData = null;
-    this.streetDetailCache = new Map(); // cityId -> street features
+    this.pathCache = new Map(); // svgStr -> Path2D instance
 
-    // Controls & Toggles
-    this.showForest = true;
-    this.showFarmland = true;
+    // Layer Visibility Toggles
     this.showWater = true;
+    this.showFarmland = true; // Urban footprints / land cover
+    this.showForest = true;    // Background towns & physical geography
     this.showRoads = true;
     this.showStreets = true;
 
-    this.forestOpacity = 0.75;
+    // Opacity Sliders
+    this.waterOpacity = 1.0;
     this.farmlandOpacity = 0.52;
-
-    this.init();
+    this.forestOpacity = 0.75;
   }
 
-  async init() {
-    // Optionally pre-fetch cartography assets if available
-    try {
-      const res = await fetch('../data.json');
-      const data = await res.json();
-      if (data.cartography) {
-        this.landuseData = data.cartography.landuse || null;
-        this.roadNetworkData = data.cartography.roads || null;
+  getPath2D(svgStr) {
+    if (!this.pathCache.has(svgStr)) {
+      this.pathCache.set(svgStr, new Path2D(svgStr));
+    }
+    return this.pathCache.get(svgStr);
+  }
+
+  render(ctx, camera, theme, g) {
+    if (!g) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const scaleX = camera.viewportWidth / camera.current.w;
+    const scaleY = camera.viewportHeight / camera.current.h;
+    const translateX = -camera.current.x * scaleX;
+    const translateY = -camera.current.y * scaleY;
+
+    // 1. Water Bodies (Lakes & Rivers)
+    if (this.showWater) {
+      ctx.save();
+      ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
+      ctx.globalAlpha = this.waterOpacity;
+
+      // Lakes (polygons)
+      if (g.lakes && g.lakes.length) {
+        ctx.fillStyle = theme.water;
+        for (const lakePath of g.lakes) {
+          const path = this.getPath2D(lakePath);
+          ctx.fill(path);
+        }
       }
-    } catch {
-      // Graceful fallback
+
+      // Rivers (strokes)
+      if (g.rivers && g.rivers.length) {
+        ctx.strokeStyle = theme.water;
+        ctx.lineWidth = 1.5 / scaleX;
+        for (const riverPath of g.rivers) {
+          const path = this.getPath2D(riverPath);
+          ctx.stroke(path);
+        }
+      }
+      ctx.restore();
+    }
+
+    // 2. Urban Footprints / Land Cover (urbanAreas)
+    if (this.showFarmland && g.urbanAreas && g.urbanAreas.length) {
+      ctx.save();
+      ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
+      ctx.fillStyle = theme.farmland;
+      ctx.globalAlpha = this.farmlandOpacity;
+
+      for (const areaPath of g.urbanAreas) {
+        const path = this.getPath2D(areaPath);
+        ctx.fill(path);
+      }
+      ctx.restore();
+    }
+
+    // 3. Background Towns & Geography
+    if (this.showForest && g.towns && g.towns.length && camera.current.w <= 1200) {
+      ctx.save();
+      ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
+      ctx.fillStyle = theme.forest;
+      ctx.globalAlpha = this.forestOpacity;
+
+      for (const town of g.towns) {
+        const r = (town.tier === 1 ? 2.5 : 1.5) / scaleX;
+        ctx.beginPath();
+        ctx.arc(town.x, town.y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // 4. Road Networks (Graph Edges with decoded shape & pace)
+    if (this.showRoads && g.adj) {
+      ctx.save();
+      ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      // Group road segments by pace tier
+      const motorways = [];
+      const trunks = [];
+      const primaries = [];
+
+      for (const cityEdges of g.adj) {
+        for (const edge of cityEdges) {
+          if (!edge.shape || edge.shape.length < 2) continue;
+          const pace = edge.pace[0] ?? 1;
+          if (pace === 0) motorways.push(edge.shape);
+          else if (pace === 1) trunks.push(edge.shape);
+          else primaries.push(edge.shape);
+        }
+      }
+
+      // Draw Motorways
+      ctx.strokeStyle = theme.roadMotorway;
+      ctx.lineWidth = Math.max(theme.roadWidthMotorway, 1.2) / scaleX;
+      this.drawShapeBatch(ctx, motorways);
+
+      // Draw Trunks
+      if (camera.current.w <= 1400) {
+        ctx.strokeStyle = theme.roadTrunk;
+        ctx.lineWidth = Math.max(theme.roadWidthTrunk, 1.0) / scaleX;
+        this.drawShapeBatch(ctx, trunks);
+      }
+
+      // Draw Primaries
+      if (camera.current.w <= 800) {
+        ctx.strokeStyle = theme.roadPrimary;
+        ctx.lineWidth = Math.max(theme.roadWidthPrimary, 0.8) / scaleX;
+        this.drawShapeBatch(ctx, primaries);
+      }
+
+      ctx.restore();
     }
   }
 
-  render(ctx, camera, theme, graphData) {
-    ctx.save();
-
-    // 1. Render Water Bodies & Coastlines / Rivers
-    if (this.showWater && graphData && graphData.water) {
-      this.renderWater(ctx, camera, theme, graphData.water);
-    }
-
-    // 2. Render Land Cover (Forests & Farmland)
-    if (this.landuseData) {
-      if (this.showFarmland && camera.current.w <= 850) {
-        this.renderPolygons(ctx, camera, this.landuseData.farmland, theme.farmland, this.farmlandOpacity);
-      }
-      if (this.showForest && camera.current.w <= 850) {
-        this.renderPolygons(ctx, camera, this.landuseData.forest, theme.forest, this.forestOpacity);
-      }
-    }
-
-    // 3. Render Road Networks (Motorway, Trunk, Primary)
-    if (this.showRoads && graphData) {
-      this.renderGraphRoads(ctx, camera, theme, graphData);
-    }
-
-    // 4. Render City Street Grids at Close Zoom (≤ 14 km)
-    if (this.showStreets && camera.current.w <= 14 && graphData) {
-      this.renderStreetGrids(ctx, camera, theme, graphData);
-    }
-
-    ctx.restore();
-  }
-
-  renderWater(ctx, camera, theme, waterFeatures) {
-    ctx.fillStyle = theme.water;
-    ctx.strokeStyle = theme.water;
-    ctx.lineWidth = 1.5;
-
-    for (const feat of waterFeatures) {
-      if (!feat.coords || !feat.coords.length) continue;
-      ctx.beginPath();
-      for (let i = 0; i < feat.coords.length; i++) {
-        const p = camera.worldToScreen(feat.coords[i][0], feat.coords[i][1]);
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      }
-      if (feat.isPolygon) ctx.fill();
-      else ctx.stroke();
-    }
-  }
-
-  renderPolygons(ctx, camera, polygonList, colorStyle, opacity) {
-    if (!polygonList || !polygonList.length) return;
-
-    ctx.fillStyle = colorStyle;
-    ctx.globalAlpha = opacity;
+  drawShapeBatch(ctx, shapeList) {
+    if (!shapeList.length) return;
     ctx.beginPath();
-
-    for (const poly of polygonList) {
-      if (!poly.points || poly.points.length < 3) continue;
-      for (let i = 0; i < poly.points.length; i++) {
-        const p = camera.worldToScreen(poly.points[i][0], poly.points[i][1]);
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      }
-      ctx.closePath();
-    }
-    ctx.fill();
-    ctx.globalAlpha = 1.0;
-  }
-
-  renderGraphRoads(ctx, camera, theme, g) {
-    if (!g.edges) return;
-
-    // Single-pass batch path grouping by pace/road classification
-    const motorways = [];
-    const trunks = [];
-    const primaries = [];
-
-    for (const e of g.edges) {
-      if (!e.path || e.path.length < 2) continue;
-
-      // Filter by classification or pace
-      if (e.pace >= 85) motorways.push(e);
-      else if (e.pace >= 65) trunks.push(e);
-      else primaries.push(e);
-    }
-
-    // Draw Motorways
-    this.drawPathBatch(ctx, camera, motorways, theme.roadMotorway, theme.roadWidthMotorway);
-
-    // Draw Trunks (visible at ≤ 1200 km)
-    if (camera.current.w <= 1200) {
-      this.drawPathBatch(ctx, camera, trunks, theme.roadTrunk, theme.roadWidthTrunk);
-    }
-
-    // Draw Primaries (visible at ≤ 600 km)
-    if (camera.current.w <= 600) {
-      this.drawPathBatch(ctx, camera, primaries, theme.roadPrimary, theme.roadWidthPrimary);
-    }
-  }
-
-  drawPathBatch(ctx, camera, edgeList, color, width) {
-    if (!edgeList.length) return;
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = Math.max(width * (1200 / camera.current.w), 1.0);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-
-    for (const e of edgeList) {
-      const path = e.path;
-      for (let i = 0; i < path.length; i++) {
-        const p = camera.worldToScreen(path[i][0], path[i][1]);
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
+    for (const shape of shapeList) {
+      for (let i = 0; i < shape.length; i++) {
+        if (i === 0) ctx.moveTo(shape[i][0], shape[i][1]);
+        else ctx.lineTo(shape[i][0], shape[i][1]);
       }
     }
     ctx.stroke();
-  }
-
-  renderStreetGrids(ctx, camera, theme, g) {
-    // Street grid rendering at close zoom
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.lineWidth = 1.0;
-
-    // Iterate cities in viewport
-    for (const city of Object.values(g.cities)) {
-      const p = camera.worldToScreen(city.x, city.y);
-      if (p.x < -100 || p.x > camera.viewportWidth + 100 || p.y < -100 || p.y > camera.viewportHeight + 100) continue;
-
-      // Draw local street grid radius indicator
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, (0.9 / camera.current.w) * camera.viewportWidth, 0, Math.PI * 2);
-      ctx.stroke();
-    }
   }
 }

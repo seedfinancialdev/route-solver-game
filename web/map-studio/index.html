@@ -10,7 +10,7 @@
   <style>
     :root {
       --bg: #0c1017;
-      --panel-bg: rgba(18, 24, 34, 0.85);
+      --panel-bg: rgba(18, 24, 34, 0.88);
       --panel-border: rgba(255, 255, 255, 0.12);
       --text: #e2e8f0;
       --text-muted: #94a3b8;
@@ -145,13 +145,8 @@
         <div class="group-label">Layer Visibility</div>
         
         <div class="toggle-row">
-          <span>Forest Coverage</span>
-          <label class="switch"><input type="checkbox" id="toggle-forest" checked><span class="slider"></span></label>
-        </div>
-
-        <div class="toggle-row">
-          <span>Farmland & Meadows</span>
-          <label class="switch"><input type="checkbox" id="toggle-farmland" checked><span class="slider"></span></label>
+          <span>Terrain Elevation Relief</span>
+          <label class="switch"><input type="checkbox" id="toggle-terrain" checked><span class="slider"></span></label>
         </div>
 
         <div class="toggle-row">
@@ -160,13 +155,18 @@
         </div>
 
         <div class="toggle-row">
-          <span>Road Networks</span>
-          <label class="switch"><input type="checkbox" id="toggle-roads" checked><span class="slider"></span></label>
+          <span>Urban Footprints</span>
+          <label class="switch"><input type="checkbox" id="toggle-farmland" checked><span class="slider"></span></label>
         </div>
 
         <div class="toggle-row">
-          <span>City Street Detail</span>
-          <label class="switch"><input type="checkbox" id="toggle-streets" checked><span class="slider"></span></label>
+          <span>Background Towns</span>
+          <label class="switch"><input type="checkbox" id="toggle-forest" checked><span class="slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <span>Road Networks</span>
+          <label class="switch"><input type="checkbox" id="toggle-roads" checked><span class="slider"></span></label>
         </div>
 
         <div class="toggle-row">
@@ -185,13 +185,18 @@
         </div>
 
         <div class="slider-row">
-          <div class="slider-header"><span>Forest Opacity</span><span id="val-forest">75%</span></div>
-          <input type="range" id="slider-forest" min="0" max="100" value="75">
+          <div class="slider-header"><span>Water Opacity</span><span id="val-water">100%</span></div>
+          <input type="range" id="slider-water" min="0" max="100" value="100">
         </div>
 
         <div class="slider-row">
-          <div class="slider-header"><span>Farmland Opacity</span><span id="val-farmland">52%</span></div>
+          <div class="slider-header"><span>Urban Opacity</span><span id="val-farmland">52%</span></div>
           <input type="range" id="slider-farmland" min="0" max="100" value="52">
+        </div>
+
+        <div class="slider-row">
+          <div class="slider-header"><span>Town Density Opacity</span><span id="val-forest">75%</span></div>
+          <input type="range" id="slider-forest" min="0" max="100" value="75">
         </div>
       </div>
 

@@ -6,6 +6,7 @@
 export class TerrainLayer {
   constructor(mapBounds) {
     this.mapBounds = mapBounds; // { x, y, w, h }
+    this.showTerrain = true;
     this.overviewImg = null;
     this.detailImg = null;
     this.tilesManifest = [];
@@ -64,7 +65,7 @@ export class TerrainLayer {
   }
 
   render(ctx, camera, theme) {
-    if (!this.overviewLoaded) return;
+    if (!this.showTerrain || !this.overviewLoaded) return;
 
     this.ensureTiles(camera);
 

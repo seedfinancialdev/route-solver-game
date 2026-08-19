@@ -8,7 +8,7 @@ export class GameplayLayer {
   constructor() {
     this.hoveredCityId = null;
     this.selectedCityId = null;
-    this.activeRoute = []; // list of city IDs
+    this.activeRoute = []; // list of city indices
 
     this.showNodes = true;
     this.showLabels = true;
@@ -30,7 +30,7 @@ export class GameplayLayer {
       this.renderCityNodes(ctx, camera, theme, g);
     }
 
-    // 3. Draw Tactical Labels (Start, Target, Hovered)
+    // 3. Draw Tactical Labels (Start, Target, Hovered, Country Labels)
     if (this.showLabels) {
       this.renderLabels(ctx, camera, theme, g);
     }
@@ -46,7 +46,8 @@ export class GameplayLayer {
     ctx.beginPath();
 
     for (let i = 0; i < this.activeRoute.length; i++) {
-      const city = g.cities[this.activeRoute[i]];
+      const cityIdx = this.activeRoute[i];
+      const city = g.cities[cityIdx];
       if (!city) continue;
       const p = camera.worldToScreen(city.x, city.y);
       if (i === 0) ctx.moveTo(p.x, p.y);
@@ -63,14 +64,14 @@ export class GameplayLayer {
   renderCityNodes(ctx, camera, theme, g) {
     const isZoomedClose = camera.current.w <= 400;
 
-    for (const [id, city] of Object.entries(g.cities)) {
+    for (const city of g.cities) {
       const p = camera.worldToScreen(city.x, city.y);
 
       // Frustum culling
       if (p.x < -20 || p.x > camera.viewportWidth + 20 || p.y < -20 || p.y > camera.viewportHeight + 20) continue;
 
-      const isHovered = id === this.hoveredCityId;
-      const isSelected = id === this.selectedCityId;
+      const isHovered = city.i === this.hoveredCityId;
+      const isSelected = city.i === this.selectedCityId;
 
       let radius = isZoomedClose ? 5.0 : 3.5;
       if (isHovered) radius += 3.0;
@@ -101,33 +102,45 @@ export class GameplayLayer {
   }
 
   renderLabels(ctx, camera, theme, g) {
-    ctx.font = '500 12px "Inter", -apple-system, system-ui, sans-serif';
-    ctx.fillStyle = theme.hudText;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.font = '600 11px "Inter", -apple-system, system-ui, sans-serif';
     ctx.textAlign = 'center';
 
-    const isClose = camera.current.w <= 600;
+    const isClose = camera.current.w <= 1200;
 
-    for (const [id, city] of Object.entries(g.cities)) {
-      if (!isClose && id !== this.hoveredCityId && id !== this.selectedCityId) continue;
+    // 1. Country Labels
+    if (g.countryLabels && camera.current.w > 600) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.font = '700 12px "Inter", sans-serif';
+      for (const country of g.countryLabels) {
+        const p = camera.worldToScreen(country.x, country.y);
+        if (p.x < 0 || p.x > camera.viewportWidth || p.y < 0 || p.y > camera.viewportHeight) continue;
+        ctx.fillText(country.name.toUpperCase(), p.x, p.y);
+      }
+    }
+
+    // 2. City Labels
+    ctx.font = '600 11px "Inter", -apple-system, system-ui, sans-serif';
+    for (const city of g.cities) {
+      if (!isClose && city.i !== this.hoveredCityId && city.i !== this.selectedCityId) continue;
 
       const p = camera.worldToScreen(city.x, city.y);
       if (p.x < 0 || p.x > camera.viewportWidth || p.y < 0 || p.y > camera.viewportHeight) continue;
 
-      const labelText = city.name || id;
-
-      // Draw subtle dark pill behind text
+      const labelText = city.name;
       const metrics = ctx.measureText(labelText);
       const textW = metrics.width + 12;
       const textH = 18;
 
+      // Dark glassmorphism pill background
       ctx.fillStyle = theme.hudGlass;
       ctx.beginPath();
-      ctx.roundRect(p.x - textW / 2, p.y - 24 - textH / 2, textW, textH, 4);
+      ctx.roundRect(p.x - textW / 2, p.y - 22 - textH / 2, textW, textH, 4);
       ctx.fill();
 
       // Text label
-      ctx.fillStyle = id === this.hoveredCityId ? theme.cityNodeActive : theme.hudText;
-      ctx.fillText(labelText, p.x, p.y - 20);
+      ctx.fillStyle = city.i === this.hoveredCityId ? theme.cityNodeActive : theme.hudText;
+      ctx.fillText(labelText, p.x, p.y - 18);
     }
   }
 }

@@ -8,6 +8,7 @@ import { TerrainLayer } from './terrain-layer.js';
 import { CartographyLayer } from './cartography-layer.js';
 import { GameplayLayer } from './gameplay-layer.js';
 import { MapTheme } from './theme-config.js';
+import { buildGraph } from '../engine.js';
 
 export class MapEngine {
   constructor(canvasContainer, dataUrl = '../data.json') {
@@ -33,6 +34,7 @@ export class MapEngine {
     this.gameplayLayer = new GameplayLayer();
 
     // Data & Graph State
+    this.rawData = null;
     this.graphData = null;
 
     // Performance Monitoring
@@ -50,7 +52,9 @@ export class MapEngine {
     // Fetch Graph Data
     try {
       const res = await fetch(this.dataUrl);
-      this.graphData = await res.json();
+      this.rawData = await res.json();
+      this.graphData = buildGraph(this.rawData);
+
       if (this.graphData.view) {
         this.worldBounds = this.graphData.view;
         this.camera.worldBounds = this.worldBounds;
@@ -60,8 +64,8 @@ export class MapEngine {
           this.worldBounds.w
         );
       }
-    } catch {
-      console.warn('MapEngine: graph data fetch failed, using fallback defaults');
+    } catch (err) {
+      console.warn('MapEngine: graph data fetch failed', err);
     }
 
     // Start Render Loop
@@ -73,7 +77,6 @@ export class MapEngine {
     const dpr = window.devicePixelRatio || 1;
     this.canvas.width = rect.width * dpr;
     this.canvas.height = rect.height * dpr;
-    this.ctx.scale(dpr, dpr);
     this.camera.resize(rect.width, rect.height);
   }
 
@@ -101,9 +104,11 @@ export class MapEngine {
   render() {
     const width = this.camera.viewportWidth;
     const height = this.camera.viewportHeight;
+    const dpr = window.devicePixelRatio || 1;
     const theme = this.themeManager.current;
 
-    // Clear Canvas with Background Color
+    // Reset Context & Clear Canvas with Background Color
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.ctx.fillStyle = theme.bg;
     this.ctx.fillRect(0, 0, width, height);
 
@@ -111,10 +116,10 @@ export class MapEngine {
     // 1. Terrain Elevation Relief
     this.terrainLayer.render(this.ctx, this.camera, theme);
 
-    // 2. Cartography (Land cover, water, roads)
+    // 2. Cartography (Lakes, rivers, urban footprints, road shapes)
     this.cartographyLayer.render(this.ctx, this.camera, theme, this.graphData);
 
-    // 3. Tactical Gameplay Overlay (Nodes, Labels, Routes)
+    // 3. Tactical Gameplay Overlay (Nodes, Labels, Active Route)
     this.gameplayLayer.render(this.ctx, this.camera, theme, this.graphData);
   }
 }

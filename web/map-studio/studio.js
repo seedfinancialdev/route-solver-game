@@ -12,20 +12,22 @@ const mapEngine = new MapEngine(viewport, '../data.json');
 const fpsCounter = document.getElementById('fps-counter');
 const presetSelect = document.getElementById('preset-select');
 
-const toggleForest = document.getElementById('toggle-forest');
-const toggleFarmland = document.getElementById('toggle-farmland');
+const toggleTerrain = document.getElementById('toggle-terrain');
 const toggleWater = document.getElementById('toggle-water');
+const toggleFarmland = document.getElementById('toggle-farmland');
+const toggleForest = document.getElementById('toggle-forest');
 const toggleRoads = document.getElementById('toggle-roads');
-const toggleStreets = document.getElementById('toggle-streets');
 const toggleNodes = document.getElementById('toggle-nodes');
 
 const sliderTerrain = document.getElementById('slider-terrain');
-const sliderForest = document.getElementById('slider-forest');
+const sliderWater = document.getElementById('slider-water');
 const sliderFarmland = document.getElementById('slider-farmland');
+const sliderForest = document.getElementById('slider-forest');
 
 const valTerrain = document.getElementById('val-terrain');
-const valForest = document.getElementById('val-forest');
+const valWater = document.getElementById('val-water');
 const valFarmland = document.getElementById('val-farmland');
+const valForest = document.getElementById('val-forest');
 
 const statZoom = document.getElementById('stat-zoom');
 const statTier = document.getElementById('stat-tier');
@@ -33,27 +35,26 @@ const statTier = document.getElementById('stat-tier');
 // Bind Theme Selector
 presetSelect.addEventListener('change', (e) => {
   mapEngine.themeManager.loadPreset(e.target.value);
-  // Sync slider UI to new preset
   const cur = mapEngine.themeManager.current;
-  sliderTerrain.value = Math.round(cur.terrainOpacity * 100);
+  sliderTerrain.value = Math.round((cur.terrainOpacity || 0.65) * 100);
   valTerrain.textContent = `${sliderTerrain.value}%`;
 });
 
 // Bind Toggles
-toggleForest.addEventListener('change', (e) => {
-  mapEngine.cartographyLayer.showForest = e.target.checked;
-});
-toggleFarmland.addEventListener('change', (e) => {
-  mapEngine.cartographyLayer.showFarmland = e.target.checked;
+toggleTerrain.addEventListener('change', (e) => {
+  mapEngine.terrainLayer.showTerrain = e.target.checked;
 });
 toggleWater.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.showWater = e.target.checked;
 });
+toggleFarmland.addEventListener('change', (e) => {
+  mapEngine.cartographyLayer.showFarmland = e.target.checked;
+});
+toggleForest.addEventListener('change', (e) => {
+  mapEngine.cartographyLayer.showForest = e.target.checked;
+});
 toggleRoads.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.showRoads = e.target.checked;
-});
-toggleStreets.addEventListener('change', (e) => {
-  mapEngine.cartographyLayer.showStreets = e.target.checked;
 });
 toggleNodes.addEventListener('change', (e) => {
   mapEngine.gameplayLayer.showNodes = e.target.checked;
@@ -66,15 +67,20 @@ sliderTerrain.addEventListener('input', (e) => {
   mapEngine.themeManager.set('terrainOpacity', val);
   valTerrain.textContent = `${e.target.value}%`;
 });
-sliderForest.addEventListener('input', (e) => {
+sliderWater.addEventListener('input', (e) => {
   const val = e.target.value / 100;
-  mapEngine.cartographyLayer.forestOpacity = val;
-  valForest.textContent = `${e.target.value}%`;
+  mapEngine.cartographyLayer.waterOpacity = val;
+  valWater.textContent = `${e.target.value}%`;
 });
 sliderFarmland.addEventListener('input', (e) => {
   const val = e.target.value / 100;
   mapEngine.cartographyLayer.farmlandOpacity = val;
   valFarmland.textContent = `${e.target.value}%`;
+});
+sliderForest.addEventListener('input', (e) => {
+  const val = e.target.value / 100;
+  mapEngine.cartographyLayer.forestOpacity = val;
+  valForest.textContent = `${e.target.value}%`;
 });
 
 // Update HUD & FPS stats loop
