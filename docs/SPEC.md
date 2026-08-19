@@ -3,11 +3,30 @@
 One page. Everything here is settled by measurement; `npm run calibrate`
 reproduces the numbers.
 
-## The game in one line
+## What this is
 
-You have a budget of **driving hours**. The roads are drawn, so you can see how
-long each one is. What you cannot see is how fast it runs — and across this
-graph **the shortest route is the fastest route only 27% of the time**.
+An endurance race on real public roads — Cannonball, not a closed rally
+stage. No marshals, no course markings, nothing stopping you from running a
+road faster than its posted limit except the real chance of losing more time
+than you saved. You have a budget of **driving hours**. Every road is drawn
+true to its real shape and real length, so you can measure it with your own
+eyes. What the map will not hand you is how fast it actually runs — and
+across this graph **the shortest route is the fastest route only 27% of the
+time**. Reading that gap, hop after hop, real EU driving-hours law ticking
+against you the whole way, is the entire game.
+
+This was written as a daily logic puzzle, and the mechanics below are still
+literally that — a fresh route once a day, the same one for everyone, solved
+by measurement, not luck. But the spirit has moved since that was written:
+real legal speed limits you can choose to run past at real risk (see
+"Push"), real driving-hours regulation forcing a stop whether you like it or
+not, a pit stop that actually stops the camera and asks something of you
+when you arrive somewhere instead of just repainting the screen. Where this
+document still says "puzzle," read it as exact and technical — the daily
+selection math genuinely is puzzle construction — not as the game's identity
+anymore. The map itself is mid-rewrite for the same reason: see
+`docs/MAP-SPEC.md` for where that's headed and why the current terrain-only
+board is a waypoint, not the destination.
 
 ## The board
 
@@ -333,6 +352,24 @@ city that genuinely can't be fetched (the public OSM mirrors this is built
 against are individually flaky under real load — measured directly, one
 mirror timed out on 3 of 4 back-to-back queries) just shows the plain map at
 close zoom instead, same graceful-fallback shape as a missing road name.
+
+## The map — what ships today, and what doesn't yet
+
+What's live: three terrain resolution tiers (real elevation data, above),
+the curated 479-city graph drawn true to shape, and real street detail
+within 900 m of each city. Between cities, at any zoom wider than a single
+stop, there is real terrain and nothing else — no forests, no farmland, no
+real road network beyond the 479 curated edges. That was the right board
+for a pure deduction puzzle. It isn't dense enough to feel like a real place
+you're racing through, which is the standard "What this is" above now sets.
+
+The fix — real OpenStreetMap forest, farmland, water, and a real (not
+curated) road network, layered under the existing terrain and gameplay
+overlay rather than replacing either — is prototyped, measured, and not yet
+shipped. Full spec, real data volumes, the mistakes already made building
+the first attempt and their fixes: `docs/MAP-SPEC.md`. Don't judge the
+current map against that document; it describes the direction, not the
+current state.
 
 ## Pit stops
 
