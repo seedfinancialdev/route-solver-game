@@ -101,6 +101,33 @@ html, body {
   fill: var(--urban); opacity: .4; stroke: none; pointer-events: none;
 }
 
+/* Real OSM streets, close-up detail fetched per city (scripts/07-streets.mjs)
+   once you're zoomed in far enough for them to mean anything. Hidden rather
+   than absent below that zoom — the fetch already happened, no reason to
+   punish a player who zooms back out and in again — and warm like the
+   built-up footprint above, same "this is a real place" register, not the
+   red a gameplay road uses. */
+.streets { opacity: 0; transition: opacity .4s ease; pointer-events: none; }
+.streets--visible { opacity: 1; }
+.street {
+  fill: none; stroke: var(--urban); stroke-linecap: round; stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.street--0 { stroke-width: .9; opacity: .55; }
+.street--1 { stroke-width: 1.3; opacity: .75; }
+.street--2 { stroke-width: 1.8; opacity: .9; }
+
+/* PROTOTYPE — country-scale road network, revealed by zoom like terrain
+   tiles and street detail already are. Tier 0 (motorway) is cheap enough to
+   stay on at any zoom; 1 (trunk) and 2 (primary) only ever get built once
+   the camera is already close enough for them (app.js) — an untouched tier
+   costs real paint time just by existing, even at opacity 0, so it's never
+   created at all rather than created-then-hidden. Not the shipping data yet. */
+.road-network { fill: none; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.road-network--0 { stroke: var(--road); stroke-width: 1.6; opacity: .85; }
+.road-network--1 { stroke: var(--amber); stroke-width: 1.1; opacity: .7; }
+.road-network--2 { stroke: var(--dim); stroke-width: .7; opacity: .45; }
+
 /* Borders are dashed, as they are on every paper map, because otherwise they
    are the same thin grey line as a road and the eye cannot separate them. The
    casing underneath is what makes them hold over a relief that is itself full
@@ -294,6 +321,17 @@ html, body {
 .hud__arrow { width: 24px; height: 8px; fill: none; stroke: var(--dimmer); stroke-width: 1.4; }
 .hud__trip span:last-child { color: var(--ink); }
 
+/* Where you actually are: real, sourced speed limits, the reason the
+   network's measured pace runs the way it does. Quiet by default — this is
+   ambient orientation, not a new stat to weigh — but flashes once on the
+   stop where the country actually changed, the way a co-driver would only
+   call it out at the border, not every mile in between. */
+.hud__country {
+  margin: 6px 0 0; font-family: var(--mono); font-size: 11.5px; color: var(--dim);
+}
+.hud__country--crossed { animation: countryFlash 1.6s ease-out; }
+@keyframes countryFlash { from { color: var(--accent); } }
+
 .gauge { margin-top: 14px; }
 .gauge__readout {
   display: flex; align-items: baseline; gap: 8px;
@@ -347,6 +385,24 @@ html, body {
 .gauge__fatigue--tight strong { color: var(--amber); }
 .gauge__fatigue--lost strong { color: var(--red); }
 .gauge__fatigue:empty { display: none; }
+
+/* A stance the player sets, not a status the game reports — same footing as
+   the gauge readouts above it, but interactive rather than read-only.
+   Armed state gets the same red the risk numbers use elsewhere, so "this is
+   live and it's on" reads at a glance. */
+.push-toggle {
+  /* .hud disables pointer-events so it never blocks dragging the map behind
+     it — the first actually-interactive thing to live inside it, so it has
+     to opt itself back in explicitly. */
+  display: block; margin: 8px 0 0; font: inherit; font-family: var(--mono);
+  font-size: 12px; padding: 6px 12px; cursor: pointer; text-align: left; pointer-events: auto;
+  color: var(--dim); background: transparent; border: 1px solid var(--land-edge); border-radius: 2px;
+  transition: color .2s, border-color .2s, background .2s;
+}
+.push-toggle:hover { color: var(--ink); }
+.push-toggle[aria-pressed="true"] {
+  color: var(--red); border-color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent);
+}
 
 /* The teaching moment: what the map suggested, against what the road charged.
    Aggregating this until the end is too late to learn anything from. */
@@ -419,8 +475,32 @@ html, body {
 .log__delta--ahead { color: var(--neutral); }
 .log__delta--behind { color: var(--red); }
 .log li em.log__break { display: block; color: var(--amber); margin-left: 0; }
+.log li em.log__push { display: block; color: var(--dimmer); margin-left: 0; }
+.log li em.log__push--caught { color: var(--red); }
 .log__total { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--dimmer); color: var(--ink); }
 .log__total:empty { display: none; }
+
+/* --- recon ---------------------------------------------------------------
+   The road you'd be on and the terrain it crosses, for whichever candidate
+   hop you're actually weighing — real, and already knowable before you
+   commit, same as the pace-tier line weight already is. Top-right so it
+   never collides with the hop log (bottom-left) or the gauge (top-left). */
+.recon {
+  position: absolute; right: 26px; top: 22px; z-index: 2;
+  max-width: min(280px, 70vw);
+  font-family: var(--mono); font-size: 12px; color: var(--dim);
+  text-align: right; pointer-events: none;
+}
+.recon__road { margin: 0; color: var(--ink); }
+.recon__terrain { margin: 3px 0 0; color: var(--dimmer); }
+.recon__terrain[hidden] { display: none; }
+.recon__push { margin: 3px 0 0; color: var(--red); }
+.recon__push[hidden] { display: none; }
+
+/* Armed for exactly one hop: every candidate reads as "this is the choice
+   that's live right now" rather than singling one dot out ahead of a click. */
+.push-armed .dot--reachable { stroke: var(--red); }
+.push-armed .reach-line { filter: saturate(1.3); }
 
 /* --- brief ---------------------------------------------------------------
    The pre-game beat: start, target, budget, and the macro-geography between
@@ -475,6 +555,61 @@ html, body {
   color: var(--bg); background: var(--accent); border: 0; border-radius: 2px;
 }
 [data-stage="brief"] .hint { opacity: 0; }
+
+/* --- pit stop --------------------------------------------------------------
+   The turn boundary, made explicit rather than left as a paint that happens
+   to land wherever you were looking. The camera settles in tight enough to
+   show real street-level detail for the city you just pulled into (that's
+   the reveal, not decoration); "Continue driving" is the one action that
+   hands control back, so the next hop's candidates read as something you
+   chose to look at, not the default. Bottom-docked rather than centred like
+   the brief: the map underneath is the point of this beat, so the panel has
+   to leave most of it visible. */
+@keyframes stopRise {
+  from { opacity: 0; transform: translate(-50%, 14px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.stop {
+  position: absolute; z-index: 4; left: 50%; bottom: 26px; transform: translateX(-50%);
+  width: min(360px, calc(100vw - 52px));
+  padding: 16px 22px; border: 1px solid var(--land-edge); border-radius: 3px;
+  background: var(--panel); backdrop-filter: blur(10px);
+  text-align: center;
+  animation: stopRise .5s cubic-bezier(.2,.7,.3,1) both;
+}
+.stop[hidden] { display: none; }
+.stop__eyebrow {
+  margin: 0 0 4px; font-family: var(--mono); font-size: 11px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--dim);
+}
+.stop h2 {
+  margin: 0 0 8px; font-family: var(--mono); font-weight: 500;
+  font-size: 1.2rem; letter-spacing: -.01em; color: var(--accent);
+}
+.stop__stat { margin: 0 0 14px; font-family: var(--mono); font-size: 12.5px; color: var(--dim); }
+/* Reuses the pit-stop panel rather than inventing a second one — same beat
+   (arrived, here's the cost), just a worse reason for it. */
+.stop--caught { border-color: var(--red); }
+.stop--caught .stop__eyebrow { color: var(--red); }
+.stop--caught h2 { color: var(--red); }
+#stopContinue {
+  font: inherit; font-size: 13px; padding: 9px 20px; cursor: pointer;
+  color: var(--bg); background: var(--accent); border: 0; border-radius: 2px;
+  transition: opacity .2s;
+}
+#stopContinue:hover { opacity: .85; }
+
+/* While stopped, the next hop's candidates stay visible but out of reach —
+   reading the stop you're actually at is the whole beat, not lining up the
+   next one early. */
+[data-stage="stopped"] .dot--reachable,
+[data-stage="stopped"] .reach-line,
+[data-stage="stopped"] .pace-chip { pointer-events: none; }
+[data-stage="stopped"] #reach,
+[data-stage="stopped"] #pacePreview { opacity: .3; transition: opacity .3s; }
+[data-stage="stopped"] .reset-view { display: none; }
+[data-stage="stopped"] .hint { opacity: 0; }
+[data-stage="stopped"] .recon { display: none; }
 
 /* --- reveal ------------------------------------------------------------- */
 .reveal {

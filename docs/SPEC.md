@@ -3,11 +3,30 @@
 One page. Everything here is settled by measurement; `npm run calibrate`
 reproduces the numbers.
 
-## The game in one line
+## What this is
 
-You have a budget of **driving hours**. The roads are drawn, so you can see how
-long each one is. What you cannot see is how fast it runs — and across this
-graph **the shortest route is the fastest route only 27% of the time**.
+An endurance race on real public roads — Cannonball, not a closed rally
+stage. No marshals, no course markings, nothing stopping you from running a
+road faster than its posted limit except the real chance of losing more time
+than you saved. You have a budget of **driving hours**. Every road is drawn
+true to its real shape and real length, so you can measure it with your own
+eyes. What the map will not hand you is how fast it actually runs — and
+across this graph **the shortest route is the fastest route only 27% of the
+time**. Reading that gap, hop after hop, real EU driving-hours law ticking
+against you the whole way, is the entire game.
+
+This was written as a daily logic puzzle, and the mechanics below are still
+literally that — a fresh route once a day, the same one for everyone, solved
+by measurement, not luck. But the spirit has moved since that was written:
+real legal speed limits you can choose to run past at real risk (see
+"Push"), real driving-hours regulation forcing a stop whether you like it or
+not, a pit stop that actually stops the camera and asks something of you
+when you arrive somewhere instead of just repainting the screen. Where this
+document still says "puzzle," read it as exact and technical — the daily
+selection math genuinely is puzzle construction — not as the game's identity
+anymore. The map itself is mid-rewrite for the same reason: see
+`docs/MAP-SPEC.md` for where that's headed and why the current terrain-only
+board is a waypoint, not the destination.
 
 ## The board
 
@@ -54,6 +73,7 @@ roster, which stay out for the reason they always would have.
 | how long a road takes | only after you commit to it | every hop, with its average speed |
 | city names | start, target, and everywhere you can move to | all |
 | terrain | yes, from the first move — hillshade computed from ~390 m elevation data, in three levels down to 195 m per pixel | yes |
+| real street-level detail near a city | yes, once zoomed in close enough — decoration, not wired to any road's speed | yes |
 | named mountain ranges, plateaus and seas | yes | yes |
 | built-up footprints and background towns | yes — decoration only, unconnected to any road | yes |
 | a lat/long grid and a scale bar | yes | grid only; the scale bar hides at the reveal |
@@ -63,6 +83,9 @@ roster, which stay out for the reason they always would have.
 | how long you've been driving, and when the next mandatory break hits | yes, live, before you commit to a hop | yes, in the hop log |
 | the fastest route, and the shortest one | never | both, drawn against yours |
 | how fast a named region's roads run against the network average | yes, in the pre-game brief, for regions the route actually passes near | n/a |
+| the country you're in, and its real legal speed limits | yes, live, updates on every stop | n/a |
+| the road and terrain a candidate hop actually crosses | yes, on hover/focus of a reachable dot, before you commit | n/a |
+| pushing a candidate hop's exact gain and risk | yes, once **Push it** is armed, before you commit | n/a |
 
 The pace figure is arithmetic on numbers already on screen — remaining budget
 and crow-flies distance to the target — not a new fact about any road. It's a
@@ -232,10 +255,146 @@ depending on how much continuous driving is already banked on arrival
 (`hosDijkstra`, `scripts/lib/graph.mjs`; mirrored as `hosRoute` in
 `web/engine.js` since browser code can't import the Node build scripts).
 
+## Push
+
+A second lever, independent of which road you pick: not just the corridor
+choice, but how you drive the hop you're already on. **Push it**, armed
+fresh before each hop (it drops back to **Hold the limit** the instant you
+commit — a stance chosen every time, never a setting left on), trades a real
+chance of losing time for a real chance of saving it.
+
+Both the gain and the risk key off `paceMix` — the same real tier
+composition already setting the reach-line weight — rather than a second,
+unrelated fact:
+
+- **The gain is worth more on the roads that already read fast.** A mostly-
+  motorway hop has real headroom to push; a mostly-slow, tight one barely
+  does. Pushing can't turn a bad road good, only take more of what a good
+  road already offers.
+- **The risk is worth less on the same roads.** An open motorway stretch is
+  the safe place to push; a tight two-lane is the risky one. Risk also scales
+  with the hop's length — more distance pushed is more exposure to get
+  caught, the same way it would be for real.
+- **Getting caught forfeits the gain, not just taxes it.** A caught hop costs
+  a flat 30 minutes *and* drives at the road's plain pace, not the pushed
+  one — otherwise a big enough gain on a long hop could still net ahead of
+  not pushing at all, which would make the risk cosmetic. The stop counts
+  toward the driving-hours clock like any other time on the road (it can
+  even tip a hop into a mandatory break) but never counts as the break
+  itself — being pulled over is pure downside, never rest in disguise.
+
+Shown on the reachable dot's recon (see below) only once armed — the exact
+gain and risk for *this* hop, live, since it's the input to a decision being
+made right now, not a fact worth surfacing on every hover. A caught stop
+reuses the pit-stop panel below rather than inventing a second one: same
+beat (arrived, here's what it cost), a worse reason for it.
+
+These multipliers (`PUSH_GAIN`, `PUSH_RISK_WEIGHT`, `PUSH_CAUGHT_MIN`,
+`web/engine.js`) are a designed mechanic, not a sourced fact — there's no
+real-world table for how much a driver can safely push past a limit. They're
+a first pass, not a finished one: `roadReader` (`play/bots.mjs`) doesn't yet
+have a push-or-hold policy, so the puzzle-selection numbers elsewhere in this
+document (the 52% win rate, the 1.11× budget) haven't been re-measured
+against a player who pushes. Until that calibration pass runs, Push should
+be read as playable, not as balanced.
+
+## Recon
+
+Real rally prep is knowing the country, the terrain, and the road before you
+commit to a stage — not just the map. Three real, already-computed facts,
+surfaced at the moment they're actually useful instead of front-loaded once
+and forgotten:
+
+- **The country you're in.** Real, sourced legal speed limits
+  (`scripts/lib/country-facts.mjs` — motorway/rural/urban, cross-checked
+  against at least two independent sources per country), shown live in the
+  HUD and updated on every stop. This is the real-world reason a country's
+  measured network pace (the pace-deviation stat) runs the way it does —
+  Germany's derestricted autobahn sections and Poland/Bulgaria's 140 km/h
+  motorways aren't flavour, they're why those networks average faster. Quiet
+  on an ordinary stop; flashes on the one where the country actually changed,
+  the way a co-driver calls out a border crossing and nothing in between.
+- **The terrain a candidate hop crosses.** The same pace-deviation stat the
+  pre-game brief uses for the whole corridor, scoped down to the single hop
+  you're actually looking at, live, before you pick it.
+- **The road a candidate hop is on.** Real OSM route refs/names
+  (`06-road-names.mjs`), already computed for narration after a hop lands,
+  now also shown before you commit to one.
+
+All three are shown on hover or keyboard focus of a reachable dot, never
+automatically for the whole board — same principle as the pace-tier line
+weight: you can read the option in front of you, not the network at large.
+None of it is the thing that's still genuinely hidden (how fast a road
+actually runs) — it's the context a real rally crew would have going in,
+not the answer.
+
+A fourth line joins these three, but only once **Push it** is armed (see
+"Push" above): the exact gain and risk pushing this specific hop would mean.
+Unlike the other three, this isn't a hidden real-world fact being surfaced —
+it's the live odds on a decision the player is making right now, so showing
+the number outright doesn't spoil anything the game is actually testing.
+
+## Street-level detail
+
+Every playable city carries its own real street grid — actual OSM ways
+within 900 m of the city, real geometry, real road classes
+(`scripts/07-streets.mjs`), fetched on demand per city the same way terrain
+tiles already are, not bundled into the main payload (a single puzzle only
+ever visits 7-16 of the 479 cities). Decoration, same footing as the urban
+footprints and background towns: none of it is wired to a road's speed, it
+exists so a stop looks like a real place instead of a dot on empty ground.
+
+Visible once zoomed in close enough (the camera's minimum zoom came down
+from 90 km to 3 km to make this reachable at all — past 90 km there used to
+be nothing left to see, since terrain tiles bottom out around 195 m/px and
+nothing else scaled any finer). All 479 cities have real data as shipped; a
+city that genuinely can't be fetched (the public OSM mirrors this is built
+against are individually flaky under real load — measured directly, one
+mirror timed out on 3 of 4 back-to-back queries) just shows the plain map at
+close zoom instead, same graceful-fallback shape as a missing road name.
+
+## The map — what ships today, and what doesn't yet
+
+What's live: three terrain resolution tiers (real elevation data, above),
+the curated 479-city graph drawn true to shape, and real street detail
+within 900 m of each city. Between cities, at any zoom wider than a single
+stop, there is real terrain and nothing else — no forests, no farmland, no
+real road network beyond the 479 curated edges. That was the right board
+for a pure deduction puzzle. It isn't dense enough to feel like a real place
+you're racing through, which is the standard "What this is" above now sets.
+
+The fix — real OpenStreetMap forest, farmland, water, and a real (not
+curated) road network, layered under the existing terrain and gameplay
+overlay rather than replacing either — is prototyped, measured, and not yet
+shipped. Full spec, real data volumes, the mistakes already made building
+the first attempt and their fixes: `docs/MAP-SPEC.md`. Don't judge the
+current map against that document; it describes the direction, not the
+current state.
+
+## Pit stops
+
+Arriving somewhere is a stop, not a repaint. On every hop but the last, the
+camera eases in on the city you just pulled into — tight enough to show its
+real street grid (see "Street-level detail" above) instead of the corridor
+around it — and shows what that hop actually cost. The next hop's candidates
+stay visible on the map but out of reach until you press **Continue
+driving**, which eases the camera back out to where you were and hands
+control back. Recon on the next candidates (the "Recon" section above) is
+unavailable while stopped for the same reason: reading the stop you're
+actually at is the beat, not lining up the next one early.
+
+The final hop skips this — arriving at the target flows straight into the
+race and reveal, which already has its own, bigger version of the same idea
+(both routes driving side by side, then the numbers). A pit stop mid-route
+and the reveal at the end are the same "you arrived, look at what that
+cost" beat at two different scales, not two different mechanics.
+
 ## Rules
 
 - Start on the origin city. Each turn, pick any adjacent city you have not
   already visited. Pay the hours that road takes.
+- **Push it, or hold the limit.** Arm Push before you commit for a real
+  chance at a faster hop and a real chance at a slower one. See "Push" above.
 - **No backtracking.** Visited cities are not selectable. Irreversibility is
   where the tension comes from.
 - **4.5 continuous hours forces a 45-minute break.** See "Driving hours" above.

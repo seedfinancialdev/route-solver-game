@@ -17,6 +17,11 @@
       <svg class="hud__arrow" viewBox="0 0 24 8" aria-hidden="true"><path d="M0 4h21M17 1l4 3-4 3"/></svg>
       <span id="destination">—</span>
     </div>
+    <!-- Where you actually are, right now — real, sourced legal speed
+         limits (scripts/lib/country-facts.mjs), the reason a country's
+         measured network pace runs the way it does. Updates on every stop;
+         flashes when the country you're in has just changed. -->
+    <p class="hud__country" id="hudCountry" aria-live="polite"></p>
 
     <div class="gauge">
       <div class="gauge__readout"><span id="remaining">0h00</span></div>
@@ -27,6 +32,10 @@
       <p class="gauge__caption" id="caption">remaining of <span id="budget">0</span> km</p>
       <p class="gauge__pace" id="gaugePace"></p>
       <p class="gauge__fatigue" id="gaugeFatigue"></p>
+      <!-- A stance, not a status: armed for exactly one hop, so pushing past
+           the country's real legal limit (hud__country, above) is a choice
+           made fresh each time, never a setting left on. -->
+      <button type="button" class="push-toggle" id="pushToggle" aria-pressed="false">Hold the limit</button>
       <p class="paid" id="paid" aria-live="polite">
         <span class="paid__story" id="paidStory"></span>
         <span class="paid__stat" id="paidStat"></span>
@@ -64,6 +73,16 @@
       <!-- Background towns: unlabelled, inert, below the playable roster's own
            dots so they never compete with something you can actually click. -->
       <g id="towns" aria-hidden="true"></g>
+      <!-- PROTOTYPE: real, country-scale road network (one region only),
+           tiered and revealed by zoom the same way terrain tiles and street
+           detail already are. Not the shipping data yet. -->
+      <g id="roadNetwork" aria-hidden="true"></g>
+      <!-- Real OSM street grids, close-up detail for whichever playable city
+           you're actually zoomed in on — fetched on demand per city
+           (scripts/07-streets.mjs output), the same lazy-load pattern as the
+           terrain tiles above. Below every gameplay layer so the roads you
+           can actually act on always stay legible on top. -->
+      <g id="streets" aria-hidden="true"></g>
       <g id="optimalRoute"></g>
       <g id="travelled"></g>
       <g id="race"></g>
@@ -83,6 +102,31 @@
     <ol id="hops"></ol>
     <div class="log__total" id="logTotal"></div>
   </aside>
+
+  <!-- Recon on the candidate hop your pointer/focus is over — the road you'd
+       actually be on and the terrain it crosses, real and computed, both
+       already known before you commit. Never the thing that's still hidden
+       (how fast the road runs); that's still the whole puzzle. -->
+  <aside class="recon" id="recon" hidden>
+    <p class="recon__road" id="reconRoad"></p>
+    <p class="recon__terrain" id="reconTerrain"></p>
+    <!-- Only shown once "Push it" is armed — what pushing this specific hop
+         would actually cost and risk, live, not a fact worth surfacing on
+         every hover. -->
+    <p class="recon__push" id="reconPush" hidden></p>
+  </aside>
+
+  <!-- The turn boundary made explicit: arriving at a city is a stop, not an
+       instant repaint. The camera pulls in tight enough to show the real
+       street grid (scripts/07-streets.mjs) for wherever you just pulled
+       into; the next hop's candidates stay on screen but inert until you
+       actually choose to pull back out. -->
+  <section class="stop" id="stop" hidden>
+    <p class="stop__eyebrow" id="stopEyebrow">Pit stop</p>
+    <h2 id="stopCity">—</h2>
+    <p class="stop__stat" id="stopStat"></p>
+    <button id="stopContinue" type="button">Continue driving</button>
+  </section>
 
   <section class="brief" id="brief" hidden>
     <p class="brief__eyebrow">Today's route</p>

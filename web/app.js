@@ -2,6 +2,7 @@ import {
   buildGraph, crow, roadPath, roadRuns, paceMix, shortestRoute, hosRoute, hosCost,
   newRound, options, hop, remaining, hopGlyph, speedOf, hhmm, shareString, dayNumber,
   bearingWord, narrateHop, requiredPace, previewPace, paceRisk,
+  pushGainFactor, pushRiskChance, PUSH_CAUGHT_MIN,
   HOS_CONTINUOUS_LIMIT, HOS_BREAK_MIN,
 } from './engine.js';
 
@@ -38,6 +39,10 @@ let round = newRound(g, { a: START, b: TARGET, budget: BUDGET });
 // a restored (already-finished) round has no history to reconstruct this
 // from, so its log simply shows no delta.
 let neededAtHop = [];
+// The country shown last, so arriving somewhere new can flash rather than
+// silently repaint — same country, quiet update; new country, a beat that
+// says "this is worth reading."
+let shownCountry = null;
 
 // --- static map ------------------------------------------------------------
 const map = $('map');
@@ -146,6 +151,151 @@ function updateTerrainLayers() {
   const detailReady = $('terrainDetail').classList.contains('is-ready');
 
   app.dataset.relief = tilesActive ? 'tiles' : detailReady ? 'detail' : 'overview';
+}
+
+// --- street-level detail -----------------------------------------------
+// Real OSM streets near each playable city (scripts/07-streets.mjs), fetched
+// on demand — same lazy-load shape as the terrain tiles above: a small
+// manifest loaded once, then only the cities actually inside the viewport,
+// only once you're zoomed in close enough for individual streets to be worth
+// drawing at all.
+const STREET_ZOOM_KM = 14;
+let streetManifest = null;
+const streetsShown = new Set();
+
+/**
+ * A tight, aspect-corrected box centred on a city — close enough that its
+ * real street grid (a 900 m radius per city, scripts/07-streets.mjs) is what
+ * fills the screen, not the blurred relief around it. MIN_SPAN_KM is already
+ * the game's own floor for "zoomed all the way into a city"; this reuses it
+ * rather than picking a second, looser number.
+ */
+function stopFrame(cityIndex) {
+  const c = g.cities[cityIndex];
+  const rect = map.getBoundingClientRect();
+  const aspect = rect.width && rect.height ? rect.width / rect.height : 1;
+  const w = MIN_SPAN_KM;
+  const h = w / aspect;
+  return { x: c.x - w / 2, y: c.y - h / 2, w, h };
+}
+
+/** Delta-encoded, city-center-relative — decode into absolute map km. */
+function decodeStreetRuns(data) {
+  return data.runs.map(([tier, ...deltas]) => {
+    let x = data.cx, y = data.cy;
+    const pts = [];
+    for (let i = 0; i < deltas.length; i += 2) {
+      x += deltas[i] / data.quant; y += deltas[i + 1] / data.quant;
+      pts.push([x, y]);
+    }
+    return { tier, d: `M${pts.map(([px, py]) => `${px} ${py}`).join('L')}` };
+  });
+}
+
+// --- PROTOTYPE: country-wide road network, revealed by zoom -----------
+// Demo only — one region's worth of real OSM roads (motorway/trunk/primary),
+// tiled on the same 6x6 grid the terrain tiles already use, revealed the
+// same way terrain and street detail already are: more detail as you get
+// closer. Not the real pipeline — see the road-network scoping discussion.
+const ROAD_GRID = 6;
+const ROAD_TIER_ZOOM = [Infinity, 850, 200]; // motorway always, trunk <= 850km, primary <= 200km
+const roadTileData = new Map();   // key -> fetched tiers, or 'loading'
+const roadTierBuilt = new Set();  // "${key}_${tier}" already turned into a <path>
+async function ensureRoadNetwork() {
+  if (!camera) return;
+  const tw = g.view.w / ROAD_GRID, th = g.view.h / ROAD_GRID;
+  const c0 = Math.max(0, Math.floor((camera.x - g.view.x) / tw));
+  const c1 = Math.min(ROAD_GRID - 1, Math.floor((camera.x + camera.w - g.view.x) / tw));
+  const r0 = Math.max(0, Math.floor((camera.y - g.view.y) / th));
+  const r1 = Math.min(ROAD_GRID - 1, Math.floor((camera.y + camera.h - g.view.y) / th));
+  for (let row = r0; row <= r1; row++) {
+    for (let col = c0; col <= c1; col++) {
+      const key = `${col}_${row}`;
+      if (!roadTileData.has(key)) {
+        roadTileData.set(key, 'loading');
+        fetch(`road-network-proto/${key}.json`).then((r) => (r.ok ? r.json() : null))
+          .then((data) => roadTileData.set(key, data && data.tiers))
+          .catch(() => roadTileData.set(key, null));
+      }
+      const tiers = roadTileData.get(key);
+      if (!tiers || tiers === 'loading') continue;
+      // A tier costs real paint time just by existing in the DOM, even fully
+      // transparent — the fix for 74k separate <path> elements (one path per
+      // tier instead of one per road) wasn't enough on its own, because an
+      // opacity:0 tier is still full geometry the browser repaints every
+      // frame. Only ever build the tiers actually visible at the current
+      // zoom, the same "nothing until it's needed" rule as everything else
+      // that's lazy-loaded here — a tier zoomed past isn't just hidden, it's
+      // never created at all.
+      for (let tier = 0; tier < ROAD_TIER_ZOOM.length; tier++) {
+        const tierKey = `${key}_${tier}`;
+        if (camera.w > ROAD_TIER_ZOOM[tier] || roadTierBuilt.has(tierKey)) continue;
+        const ways = tiers[tier];
+        if (!ways || !ways.length) continue;
+        roadTierBuilt.add(tierKey);
+        buildRoadTierChunked(ways, tier);
+      }
+    }
+  }
+  // Cheap either way — at most 3 elements per tier exist regardless of tile
+  // count — but display:none (not opacity:0) means a tier zoomed back past
+  // costs nothing to repaint while it's hidden, not just nothing to see.
+  for (let tier = 0; tier < ROAD_TIER_ZOOM.length; tier++) {
+    for (const node of document.querySelectorAll(`.road-network--${tier}`)) {
+      node.style.display = camera.w <= ROAD_TIER_ZOOM[tier] ? '' : 'none';
+    }
+  }
+}
+
+/**
+ * Building one tier's ~10-50k-way path in a single synchronous call was the
+ * real cost behind "horribly slow" — not an ongoing frame-rate problem
+ * (panning was fine once built, measured at 16ms/frame), a one-time ~900ms
+ * layout/paint spike the instant a big tier's geometry first lands. Splitting
+ * the same geometry across several smaller <path> elements, one per rAF
+ * instead of all at once, spreads that cost over several frames so nothing
+ * blocks the main thread long enough to read as a freeze. Same total work,
+ * same final picture — just handed to the browser in pieces it can keep up
+ * with, the way a real tile pyramid would only ever ask for one tile's worth
+ * at a time.
+ */
+function buildRoadTierChunked(ways, tier, chunkSize = 1500) {
+  let i = 0;
+  const step = () => {
+    const batch = ways.slice(i, i + chunkSize);
+    i += chunkSize;
+    if (batch.length) {
+      const dAttr = batch.map((pts) => `M${pts.map(([x, y]) => `${x} ${y}`).join('L')}`).join('');
+      $('roadNetwork').append(el('path', { d: dAttr, class: `road-network road-network--${tier}` }));
+    }
+    if (i < ways.length) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+async function ensureStreets() {
+  if (!camera || camera.w > STREET_ZOOM_KM) return;
+  if (!streetManifest) {
+    streetManifest = 'loading';
+    try { streetManifest = await (await fetch('streets/manifest.json')).json(); } catch { streetManifest = {}; }
+  }
+  if (streetManifest === 'loading') return;
+  for (const [idxStr, geonameid] of Object.entries(streetManifest)) {
+    const i = Number(idxStr);
+    if (streetsShown.has(i)) continue;
+    const c = g.cities[i];
+    const near = c.x > camera.x - 5 && c.x < camera.x + camera.w + 5
+      && c.y > camera.y - 5 && c.y < camera.y + camera.h + 5;
+    if (!near) continue;
+    streetsShown.add(i);
+    fetch(`streets/${geonameid}.json`).then((r) => r.json()).then((data) => {
+      const group = el('g', { class: 'street-city' });
+      for (const run of decodeStreetRuns(data)) {
+        group.append(el('path', { d: run.d, class: `street street--${run.tier}` }));
+      }
+      $('streets').append(group);
+    }).catch(() => {}); // a city with no street data just shows the plain map, same as any other decoration fallback
+  }
 }
 for (const d of g.rivers) $('rivers').append(el('path', { d, class: 'river' }));
 for (const d of g.lakes) $('lakes').append(el('path', { d, class: 'lake' }));
@@ -312,7 +462,13 @@ $('briefStart').addEventListener('click', () => {
 // stop re-framing under them, and only pan far enough to keep the city they are
 // standing in on screen.
 
-const MIN_SPAN_KM = 90;                        // how far in you may go
+// 90 km used to be the real floor — past that scale there was nothing left
+// to see, since terrain tiles bottom out around 195 m/px and nothing else
+// scaled any finer. Real street-level detail (scripts/07-streets.mjs) changes
+// that: a city's data covers roughly a 2 km circle, so the floor comes down
+// to let a player actually zoom into one instead of hitting a wall a city
+// block above where the streets start being visible at all.
+const MIN_SPAN_KM = 3;                          // how far in you may go
 const MAX_SPAN_KM = () => view.w * 1.15;       // and how far out
 
 let camera = null;
@@ -329,6 +485,39 @@ function applyCamera(box) {
   unit = Math.max(box.w / rect.width, box.h / rect.height);
   resizeMarks();
   $('resetView').hidden = !userMoved;
+}
+
+/**
+ * Ease the camera between two boxes rather than cutting to the new one — the
+ * pit-stop zoom needs to read as driving into a place and back out of it, not
+ * as a jump cut. Every other camera move in the game (drag, wheel, the
+ * puzzle's own opening frame) is still instant; this is the one place the
+ * game asks the player to sit still for a moment on purpose.
+ */
+function animateCamera(from, to, duration = 650) {
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced || !from) { applyCamera(to); return Promise.resolve(); }
+  return new Promise((resolve) => {
+    const started = performance.now();
+    const step = (now) => {
+      // Clamped on both ends: a rAF callback's timestamp is occasionally a
+      // hair earlier than a performance.now() read just before scheduling
+      // it (seen under headless/throttled rendering), which without the
+      // lower clamp produces a negative t, a negative eased cube, and a
+      // momentarily negative-width viewBox.
+      const t = Math.max(0, Math.min(1, (now - started) / duration));
+      const eased = 1 - (1 - t) ** 3;
+      applyCamera({
+        x: from.x + (to.x - from.x) * eased,
+        y: from.y + (to.y - from.y) * eased,
+        w: from.w + (to.w - from.w) * eased,
+        h: from.h + (to.h - from.h) * eased,
+      });
+      if (t < 1) requestAnimationFrame(step);
+      else resolve();
+    };
+    requestAnimationFrame(step);
+  });
 }
 
 /** Dots and labels hold their size on screen, not in map kilometres. */
@@ -384,10 +573,42 @@ function resizeMarks() {
     // than it used to. It never leaves entirely — even stretched, knowing
     // whether you are in a valley or on a plain is worth something — it just
     // steps back so the roads sit clearly on top.
-    const fade = Math.max(0, Math.min(1, (camera.w - 90) / 200));
-    app.style.setProperty('--terrain-opacity', (0.45 + 0.5 * fade).toFixed(3));
+    //
+    // 0.45 was the floor for 90 km, tuned back when 90 km was as close as the
+    // camera could ever get. The pit stop now parks it at MIN_SPAN_KM (3 km)
+    // on every hop but the last — 30x closer than that floor was ever judged
+    // against — and at that magnification a single real elevation pixel
+    // blown up reads as a flat, hard-edged blob more often than it reads as
+    // texture (measured directly: 2 of a 4-hop run's stops showed it).
+    // Continue the same fade a second, closer stretch down to a much fainter
+    // floor instead of holding 0.45 all the way in.
+    const farFade = Math.max(0, Math.min(1, (camera.w - 90) / 200));
+    const MIN_TERRAIN_OPACITY = 0.12;
+    const opacity = camera.w >= 90
+      ? 0.45 + 0.5 * farFade
+      : MIN_TERRAIN_OPACITY + (0.45 - MIN_TERRAIN_OPACITY)
+        * Math.max(0, Math.min(1, (camera.w - MIN_SPAN_KM) / (90 - MIN_SPAN_KM)));
+    app.style.setProperty('--terrain-opacity', opacity.toFixed(3));
     ensureTerrainTiles();
     updateTerrainLayers();
+    // PROTOTYPE, deliberately not wired in: real roads with nowhere for the
+    // player to actually go on them isn't a feature yet, it's decoration
+    // with a real performance cost and no payoff — see the road-network
+    // scoping discussion. Reconnect this once a mode actually routes on it.
+    // ensureRoadNetwork();
+    ensureStreets();
+    $('streets').classList.toggle('streets--visible', camera.w <= STREET_ZOOM_KM);
+
+    // Urban footprints are a flat 40% tint (.urban in app.css) — a fair hint
+    // at continental scale, where a city's real built-up extent is a speck.
+    // A real city's footprint stays visually dominant much further out than
+    // the pit stop's 3 km frame, though — measured directly at Brest
+    // (pop. ~340k): still full, undimmed opacity at 80 km, only starting to
+    // fade below 14 km, which is far too late. Starts fading at 200 km
+    // instead — the same order of magnitude as terrain's own far fade —
+    // down to the same near-invisible floor at MIN_SPAN_KM.
+    const urbanFade = Math.max(0, Math.min(1, (camera.w - MIN_SPAN_KM) / (200 - MIN_SPAN_KM)));
+    $('urban').style.opacity = (0.12 + 0.88 * urbanFade).toFixed(3);
   }
 }
 
@@ -573,6 +794,29 @@ function paint({ animate = false } = {}) {
     );
   }
 
+  // Where you actually are, right now: real, sourced legal speed limits
+  // (scripts/lib/country-facts.mjs) — the reason a country's measured
+  // network pace runs the way it does, made concrete instead of left as an
+  // unexplained percentage. Flashes on the stop where it actually changed;
+  // a rally crew reads the country you've just crossed into, not the one
+  // you've been in for six hops.
+  const country = $('hudCountry');
+  const here = g.cities[round.at];
+  const speed = g.countrySpeed[here.country];
+  const justCrossed = shownCountry !== null && shownCountry !== here.country;
+  shownCountry = here.country;
+  country.classList.toggle('hud__country--crossed', justCrossed);
+  if (!speed) {
+    country.textContent = here.countryName;
+  } else {
+    const limits = [
+      speed.motorway != null ? `motorway ${speed.motorway}` : 'no motorways',
+      `rural ${speed.rural}`, `urban ${speed.urban}`,
+    ].join(' · ');
+    country.textContent = `${here.countryName} — ${limits}`;
+    country.title = speed.note || '';
+  }
+
   const reachable = new Set(options(g, round).map((e) => e.to));
   dots.forEach((node, i) => {
     node.classList.toggle('dot--reachable', reachable.has(i));
@@ -663,6 +907,12 @@ function paint({ animate = false } = {}) {
       brk.className = 'log__break';
       brk.textContent = `+ ${hhmm(h.breakMin)} break`;
       cost.append(brk);
+    }
+    if (h.pushed) {
+      const push = document.createElement('em');
+      push.className = `log__push${h.caught ? ' log__push--caught' : ''}`;
+      push.textContent = h.caught ? `pulled over, +${hhmm(h.caughtMin)}` : 'pushed it';
+      cost.append(push);
     }
     li.append(name, cost);
     return li;
@@ -787,10 +1037,26 @@ function animateHop(from, to) {
   });
 }
 
+// --- push: hold the limit, or don't -----------------------------------
+// A stance, not a setting: armed for exactly one hop, then it drops back to
+// holding the limit, so pushing is a choice made fresh each time rather than
+// a toggle a player forgets is on.
+let pushArmed = false;
+function setPushArmed(v) {
+  pushArmed = v;
+  $('pushToggle').setAttribute('aria-pressed', String(v));
+  $('pushToggle').textContent = v ? 'Push it' : 'Hold the limit';
+  app.classList.toggle('push-armed', v);
+}
+$('pushToggle').addEventListener('click', () => setPushArmed(!pushArmed));
+
 let hopBusy = false;
+let stopped = false;
 async function choose(i) {
-  if (hopBusy || round.finished || !options(g, round).some((e) => e.to === i)) return;
+  if (hopBusy || stopped || round.finished || !options(g, round).some((e) => e.to === i)) return;
   hopBusy = true;
+  const push = pushArmed;
+  setPushArmed(false);
 
   // Acknowledge the click before anything else happens: a pulse on the dot
   // you picked, and the road you didn't pick stepping back, so there's no
@@ -811,15 +1077,98 @@ async function choose(i) {
     hopBusy = false;
     map.classList.remove('map--travelling');
   }
-  hop(g, round, i);
+  hop(g, round, i, { push });
   neededAtHop.push(neededKmh);
   const h = round.hops[round.hops.length - 1];
   showPaid(h);
   showArrival(h, neededKmh);
   paint({ animate: true });
   followPlayer();
-  if (round.finished) finish();
+  if (round.finished) { finish(); return; }
+  await pitStop(h);
 }
+
+/**
+ * The turn boundary itself: the camera settles in on the city you just
+ * pulled into, tight enough to show its real street grid, and the next hop
+ * stays inert until "Continue driving" hands control back. Skipped on the
+ * final hop — that arrival already has its own, bigger beat in finish().
+ */
+async function pitStop(h) {
+  const preStop = camera;
+  stopped = true;
+  app.dataset.stage = 'stopped';
+  // The floating arrival callout is sized and placed for the camera it was
+  // born under; the stop panel below is about to say the same thing anyway,
+  // so drop it rather than carry stale, wrongly-scaled text into the zoom.
+  clearTimeout(arrivalTimer);
+  $('arrivalCallout').replaceChildren();
+  const c = g.cities[round.at];
+  // A stop from getting caught pushing reuses this same panel rather than
+  // inventing a second one — it's the same beat (arrived, here's the cost),
+  // just a worse reason for it.
+  $('stop').classList.toggle('stop--caught', !!h.caught);
+  $('stopEyebrow').textContent = h.caught ? 'Pulled over' : 'Pit stop';
+  $('stopCity').textContent = h.caught
+    ? `outside ${c.name}, ${c.countryName}`
+    : `${c.name}, ${c.countryName}`;
+  const stat = `${hhmm(h.min)} for ${h.km} km · ${Math.round(speedOf(h))} km/h`;
+  $('stopStat').textContent = h.caught
+    ? `${stat} — lost ${hhmm(PUSH_CAUGHT_MIN)} to the stop`
+    : h.pushed ? `${stat} — pushed it, clean` : stat;
+  $('stop').hidden = false;
+
+  await animateCamera(preStop, stopFrame(round.at));
+
+  await new Promise((resolve) => {
+    $('stopContinue').addEventListener('click', resolve, { once: true });
+  });
+
+  $('stop').hidden = true;
+  await animateCamera(camera, preStop);
+  app.dataset.stage = 'playing';
+  stopped = false;
+}
+
+/**
+ * Recon on a candidate hop, the moment you're actually weighing it: the road
+ * you'd be on and the terrain it crosses, both real and both already
+ * knowable — the road from OSM's own ref/name (06-road-names.mjs), the
+ * terrain from the same measured pace-deviation stat the brief uses, scoped
+ * to this one hop instead of the whole trip. Never the thing that's still
+ * hidden — how fast the road actually runs — that's still the whole puzzle.
+ */
+function showRecon(to) {
+  const edge = g.adj[round.at].find((e) => e.to === to);
+  if (!edge) return;
+  const road = edge.road;
+  $('reconRoad').textContent = road
+    ? (road.share >= 55 ? road.label : `mostly the ${road.label}`)
+    : 'unclassified back roads';
+
+  const features = corridorFeatures(round.at, to, 90, 2);
+  const terrain = $('reconTerrain');
+  terrain.textContent = features
+    .map((f) => (f.pacePct != null ? `${f.name} (${f.pacePct > 0 ? '+' : ''}${f.pacePct}%)` : f.name))
+    .join(' · ');
+  terrain.hidden = !features.length;
+
+  // What pushing this specific hop would actually mean — shown only once
+  // armed, since it's the input to a live decision, not a fact worth
+  // surfacing on every hover.
+  const push = $('reconPush');
+  if (pushArmed) {
+    const gain = Math.round((pushGainFactor(edge) - 1) * 100);
+    const risk = Math.round(pushRiskChance(edge) * 100);
+    push.textContent = `Push: ~${gain}% faster · ~${risk}% chance of a stop`;
+    push.hidden = false;
+  } else {
+    push.hidden = true;
+  }
+
+  $('recon').hidden = false;
+}
+function hideRecon() { $('recon').hidden = true; }
 
 dots.forEach((node, i) => {
   node.addEventListener('click', () => { if (!dragged) choose(i); });
@@ -830,10 +1179,14 @@ dots.forEach((node, i) => {
     for (const path of $('reach').children) {
       if (path.dataset.to === String(i)) path.classList.add('reach-line--hot');
     }
+    showRecon(i);
   });
   node.addEventListener('pointerleave', () => {
     for (const line of $('reach').children) line.classList.remove('reach-line--hot');
+    hideRecon();
   });
+  node.addEventListener('focus', () => showRecon(i));
+  node.addEventListener('blur', hideRecon);
 });
 
 // --- the reveal ------------------------------------------------------------
@@ -1090,7 +1443,9 @@ async function finish() {
 function restore(saved) {
   const state = JSON.parse(saved);
   if (!Array.isArray(state.hops) || !state.hops.length) return false;
-  for (const h of state.hops) hop(g, round, h.to);
+  // push/caught replay exactly, rather than re-rolling the catch chance
+  // against a saved run that already happened one specific way.
+  for (const h of state.hops) hop(g, round, h.to, { push: h.pushed, forceCaught: h.caught });
   if (!round.finished) return false;
   return true;
 }
