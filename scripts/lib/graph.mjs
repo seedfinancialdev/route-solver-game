@@ -41,6 +41,119 @@ export function pathFrom(prev, src, dst) {
   return path.reverse();
 }
 
+// --- endurance-racing rules: EU professional-driver hours (EC 561/2006) ----
+// Real regulation, simplified for a turn-based game: 4.5 hours (270 min) of
+// continuous driving forces a 45-minute break. The break is charged in whole
+// units at hop boundaries — a hop that would cross one or more thresholds
+// pays 45 min per threshold crossed, exact modular arithmetic, not just "a
+// hop near the limit costs a bit more." What isn't modelled (yet): the daily
+// 9h cap and 11h rest. That rule's cost (11 hours!) dwarfs a typical puzzle's
+// whole budget — folding it in changes the game's pacing on a different
+// order of magnitude and needs its own measurement pass, not a bolt-on.
+export const HOS_CONTINUOUS_LIMIT = 270;
+export const HOS_BREAK_MIN = 45;
+
+/** Minutes actually charged for a hop, and the driving-clock state it leaves you in. */
+export function hosCost(sinceRest, hopMin) {
+  const total = sinceRest + hopMin;
+  const breaks = Math.floor(total / HOS_CONTINUOUS_LIMIT);
+  return { charged: hopMin + breaks * HOS_BREAK_MIN, sinceRest: total % HOS_CONTINUOUS_LIMIT, breaks };
+}
+
+/** Binary min-heap keyed by a numeric priority. Good enough to trust, small enough to read. */
+class MinHeap {
+  constructor() { this.a = []; }
+  get size() { return this.a.length; }
+  push(item, key) {
+    const a = this.a;
+    a.push([key, item]);
+    let i = a.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (a[p][0] <= a[i][0]) break;
+      [a[p], a[i]] = [a[i], a[p]]; i = p;
+    }
+  }
+  pop() {
+    const a = this.a;
+    const top = a[0];
+    const last = a.pop();
+    if (a.length) {
+      a[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1, r = l + 1;
+        let m = i;
+        if (l < a.length && a[l][0] < a[m][0]) m = l;
+        if (r < a.length && a[r][0] < a[m][0]) m = r;
+        if (m === i) break;
+        [a[m], a[i]] = [a[i], a[m]]; i = m;
+      }
+    }
+    return top && top[1];
+  }
+}
+
+/**
+ * The fastest *legal* route: Dijkstra over (city, minutes-since-last-break)
+ * states rather than just city, since the same road can cost a hop's plain
+ * minutes or that plus a mandatory 45-minute break depending on how much
+ * continuous driving is already banked when you reach it — a genuinely
+ * path-dependent cost, not something a plain shortest path can answer.
+ * State space is g.n * HOS_CONTINUOUS_LIMIT, so this wants a real heap
+ * (the plain dijkstra() above's linear scan assumes city-sized n).
+ * Returns {distTo(dst), pathTo(dst)} rather than a flat array — with ~470
+ * cities * 270 minute-states there's no reason to materialise the whole thing
+ * when a puzzle only ever asks for one destination.
+ */
+export function hosDijkstra(g, src, dst) {
+  const L = HOS_CONTINUOUS_LIMIT;
+  const state = (city, rest) => city * L + rest;
+  const dist = new Map();
+  const prev = new Map();
+  const start = state(src, 0);
+  dist.set(start, 0);
+  const heap = new MinHeap();
+  heap.push(start, 0);
+  const done = new Set();
+  let bestState = -1, bestDist = Infinity;
+
+  while (heap.size) {
+    const u = heap.pop();
+    if (done.has(u)) continue;
+    done.add(u);
+    const city = Math.floor(u / L), rest = u % L;
+    if (city === dst) {
+      // A state is only popped once its distance is finalised, so the very
+      // first (dst, *) state popped — for any rest value — is the cheapest
+      // arrival there is. No need to keep searching once we have it.
+      bestState = u; bestDist = dist.get(u);
+      break;
+    }
+    const d = dist.get(u);
+    for (const e of g.adj[city]) {
+      const { charged, sinceRest: newRest } = hosCost(rest, e.min);
+      const v = state(e.to, newRest);
+      const nd = d + charged;
+      if (nd < (dist.get(v) ?? Infinity)) {
+        dist.set(v, nd);
+        prev.set(v, u);
+        heap.push(v, nd);
+      }
+    }
+  }
+
+  if (bestState === -1) return { minutes: Infinity, path: [], stuck: true };
+
+  const path = [];
+  for (let v = bestState; v !== undefined; v = prev.get(v)) {
+    path.push(Math.floor(v / L));
+    if (v === start) break;
+  }
+  path.reverse();
+  return { minutes: bestDist, path, stuck: false };
+}
+
 export function allPairsCost(g, weight) {
   return Array.from({ length: g.n }, (_, i) => dijkstra(g, i, weight).dist);
 }

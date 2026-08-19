@@ -255,6 +255,33 @@ const urbanAreas = urbanGeo.features
   .map((f) => shapePath(f.geometry))
   .filter(Boolean);
 
+// How much slower (or faster) the roads actually near a named region run,
+// against the network-wide average — real, computed from the same OSRM
+// measurements every hop's pace tier already comes from, not a guess at
+// "mountains are slow." A region's own labelled polygon isn't trustworthy
+// for size (see RANGE_FACTS above) but is a fine coarse filter for "which
+// edges pass near here": edges are bucketed by the midpoint of their real
+// driven geometry, not by the unreliable polygon boundary itself.
+const NETWORK_KMH = graph.edges.reduce((s, e) => s + e.km, 0)
+  / (graph.edges.reduce((s, e) => s + e.min, 0) / 60);
+const PACE_SAMPLE_RADIUS_KM = 70;
+const PACE_MIN_EDGES = 4; // below this the percentage is noise, not a fact
+
+function paceDeviation(regionX, regionY) {
+  let km = 0, min = 0, n = 0;
+  for (const e of graph.edges) {
+    const geo = e.geometry;
+    if (!geo || !geo.length) continue;
+    const [lon, lat] = geo[Math.floor(geo.length / 2)];
+    const p = project(lon, lat);
+    if (Math.hypot(p.x - regionX, p.y - regionY) > PACE_SAMPLE_RADIUS_KM) continue;
+    km += e.km; min += e.min; n++;
+  }
+  if (n < PACE_MIN_EDGES) return null;
+  const kmh = km / (min / 60);
+  return { pct: Math.round((kmh - NETWORK_KMH) / NETWORK_KMH * 100), n };
+}
+
 // Named physical regions and seas, merged into one quiet-typography layer.
 // `kind` lets the browser style a mountain range differently from a sea —
 // both read as background orientation, neither as gameplay information.
@@ -262,14 +289,17 @@ const reliefLabels = reliefGeo.features
   .filter((f) => RELIEF_CLASSES.has(f.properties.FEATURECLA) && inFrame(f.geometry))
   .map((f) => {
     const p = roughCentroid(f.geometry);
+    if (!p) return null;
     const facts = RANGE_FACTS[f.properties.NAME] || null;
-    return p && {
+    const pace = paceDeviation(round(p.x), round(p.y));
+    return {
       name: f.properties.NAME, x: round(p.x), y: round(p.y), kind: 'relief',
       featurecla: f.properties.FEATURECLA,
       lengthKm: facts ? facts.lengthKm : null,
       peakName: facts ? facts.peak[0] : null,
       peakM: facts ? facts.peak[1] : null,
       blurb: RELIEF_BLURB[f.properties.FEATURECLA] || null,
+      pacePct: pace ? pace.pct : null,
     };
   })
   .filter(Boolean)

@@ -16,14 +16,25 @@
 // Criteria 2-4 are measured by simulating `roadReader` from play/bots.mjs, which
 // sees every road's length exactly and misjudges its speed.
 //
+// "The best time" is the fastest *legal* time: the driving-hours rule (EC
+// 561/2006, simplified — 4.5 continuous hours forces a 45-minute break,
+// scripts/lib/graph.mjs hosDijkstra/hosCost) applies to every route, not just
+// the shortest one, and it doesn't land evenly — measured overhead across the
+// graph ranges 11-17% depending on the route. That's wide enough that a pair
+// selected as a trap under plain drive-time can stop being one once both
+// routes pay their real HOS cost (measured directly: recomputing the old
+// selection's budgets under HOS without reselecting left 8.5% of pairs where
+// the shortest road outright won). So this reselects from scratch with HOS
+// costs at every stage, rather than patching the old selection's numbers.
+//
 // Output: data/puzzles.json
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { haversineKm } from './lib/geo.mjs';
-import { buildGraph, dijkstra, pathFrom } from './lib/graph.mjs';
-import { shortestRouter, roadReader } from '../play/bots.mjs';
+import { buildGraph, dijkstra } from './lib/graph.mjs';
+import { shortestRouter, roadReader, hosOptimal } from '../play/bots.mjs';
 
-const BUDGET_MULTIPLIER = Number(process.env.BUDGET_MULTIPLIER || 1.08);
+const BUDGET_MULTIPLIER = Number(process.env.BUDGET_MULTIPLIER || 1.11);
 const MIN_SHORTEST_PENALTY = 1.12;
 const MAX_WORST_RATIO = 1.45;
 const MIN_HOURS = 12;
@@ -36,40 +47,59 @@ const g = buildGraph(JSON.parse(readFileSync(new URL('../data/graph.json', impor
 const byMin = Array.from({ length: g.n }, (_, i) => dijkstra(g, i, (e) => e.min));
 const nm = (i) => g.cities[i].name;
 
-const legTime = (path) => {
-  let m = 0;
-  for (let i = 1; i < path.length; i++) m += g.adj[path[i - 1]].find((e) => e.to === path[i]).min;
-  return m;
-};
-const legKm = (path) => {
-  let k = 0;
-  for (let i = 1; i < path.length; i++) k += g.adj[path[i - 1]].find((e) => e.to === path[i]).km;
-  return k;
-};
+// --- stage 1: cheap filters, then the exact (expensive) HOS check ----------
+// hosOptimal searches a (city, minutes-since-rest) state space — real, but
+// too expensive to run on all ~111k pairs. Two cheap nets narrow the field
+// first, both using numbers that are already sitting around or trivial to get:
+//  1. Plain drive-time bounds (byMin, already computed per source), widened
+//     asymmetrically since HOS only ever adds time: the low end needs
+//     dividing by roughly the worst overhead seen (up to ~1.17x), the high
+//     end only needs a small safety margin below the best case.
+//  2. shortestRouter's real (cheap — one fixed path, no search) HOS cost,
+//     checked against a rough estimate of the true optimum. Loosened well
+//     below the real 1.12x bar so nothing genuine gets cut on the estimate.
+const LOW_MARGIN = 1.25;
+const HIGH_SAFETY = 1.05;
+const PREFILTER_PENALTY = 1.05;
+const RATIO_ESTIMATE = 1.15; // median measured HOS/plain overhead across the graph
 
-// --- stage 1: cheap filters ------------------------------------------------
 const shortlist = [];
+let preScanned = 0, total = 0;
+const t0 = Date.now();
 for (let a = 0; a < g.n; a++) {
   for (let b = a + 1; b < g.n; b++) {
-    const optMin = byMin[a].dist[b];
-    if (optMin < MIN_HOURS * 60 || optMin > MAX_HOURS * 60) continue;
-    const fastPath = pathFrom(byMin[a].prev, a, b);
-    const hops = fastPath.length - 1;
-    if (hops < MIN_HOPS || hops > MAX_HOPS) continue;
+    total++;
+    const plainOpt = byMin[a].dist[b];
+    if (plainOpt < (MIN_HOURS * 60) / LOW_MARGIN || plainOpt > (MAX_HOURS * 60) / HIGH_SAFETY) continue;
     const short = shortestRouter(g, a, b);
-    const penalty = short.minutes / optMin;
+    const estOpt = plainOpt * RATIO_ESTIMATE;
+    if (short.minutes / estOpt < PREFILTER_PENALTY) continue;
+    preScanned++;
+    if (preScanned % 500 === 0) {
+      console.log(`  ${preScanned} pre-filtered so far (${shortlist.length} qualifying), `
+        + `${((Date.now() - t0) / 1000).toFixed(0)}s, ${(total / (g.n * (g.n - 1) / 2) * 100).toFixed(0)}% scanned`);
+    }
+    const opt = hosOptimal(g, a, b);
+    if (opt.stuck) continue;
+    const hops = opt.path.length - 1;
+    if (opt.minutes < MIN_HOURS * 60 || opt.minutes > MAX_HOURS * 60) continue;
+    if (hops < MIN_HOPS || hops > MAX_HOPS) continue;
+    const penalty = short.minutes / opt.minutes;
     if (penalty < MIN_SHORTEST_PENALTY) continue;
-    shortlist.push({ a, b, optMin, hops, fastPath, shortMin: short.minutes, penalty });
+    shortlist.push({
+      a, b, optMin: opt.minutes, optKm: opt.km, optPath: opt.path, hops, shortMin: short.minutes, penalty,
+    });
   }
 }
-console.log(`${shortlist.length} pairs where the shortest road is >= ${MIN_SHORTEST_PENALTY}x the best time`);
+console.log(`${shortlist.length} pairs where the shortest road is >= ${MIN_SHORTEST_PENALTY}x the fastest `
+  + `*legal* time, ${((Date.now() - t0) / 1000).toFixed(0)}s\n`);
 
 // --- stage 2: simulate ------------------------------------------------------
 const graded = shortlist.map((s) => {
   const runs = [];
   for (let t = 0; t < TRIALS; t++) {
-    runs.push(roadReader(g, s.a, s.b, { seed: s.a * 977 + s.b * 13 + t }).minutes);
-    runs.push(roadReader(g, s.b, s.a, { seed: s.b * 977 + s.a * 13 + t }).minutes);
+    runs.push(roadReader(g, s.a, s.b, { seed: s.a * 977 + s.b * 13 + t, hos: true }).minutes);
+    runs.push(roadReader(g, s.b, s.a, { seed: s.b * 977 + s.a * 13 + t, hos: true }).minutes);
   }
   runs.sort((x, y) => x - y);
   const at = (p) => runs[Math.floor(runs.length * p)] / s.optMin;
@@ -103,7 +133,7 @@ while (pool.length) {
 const puzzles = schedule.map((r) => ({
   a: r.a, b: r.b,
   optimalMin: Math.round(r.optMin),
-  optimalKm: Math.round(legKm(r.fastPath)),
+  optimalKm: Math.round(r.optKm),
   // The trap, kept so the reveal can show what taking the short way would have cost.
   shortestMin: Math.round(r.shortMin),
   budgetMin: Math.round((r.optMin * BUDGET_MULTIPLIER) / 15) * 15,
@@ -117,6 +147,7 @@ writeFileSync(
     generated: new Date().toISOString().slice(0, 10),
     currency: 'minutes',
     budgetMultiplier: BUDGET_MULTIPLIER,
+    hos: { continuousLimitMin: 270, breakMin: 45 },
     criteria: { MIN_SHORTEST_PENALTY, MAX_WORST_RATIO, MIN_HOURS, MAX_HOURS, MIN_HOPS, MAX_HOPS },
     puzzles,
   }) + '\n',

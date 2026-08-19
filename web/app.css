@@ -335,6 +335,19 @@ html, body {
 .gauge__pace--lost strong { color: var(--red); }
 .gauge__pace:empty { display: none; }
 
+/* The driving-hours clock: the player's own status, same visibility tier as
+   the budget above it. Read before a hop trips the mandatory break, not
+   just after — the tiers mirror the pace-bet colours since it's the same
+   kind of read ("how much slack do I actually have"). */
+.gauge__fatigue {
+  margin: 4px 0 0; font-size: 12px; font-family: var(--mono); color: var(--dim);
+}
+.gauge__fatigue strong { font-weight: 500; }
+.gauge__fatigue--ok strong { color: var(--ink); }
+.gauge__fatigue--tight strong { color: var(--amber); }
+.gauge__fatigue--lost strong { color: var(--red); }
+.gauge__fatigue:empty { display: none; }
+
 /* The teaching moment: what the map suggested, against what the road charged.
    Aggregating this until the end is too late to learn anything from. */
 .paid {
@@ -358,6 +371,7 @@ html, body {
 .paid--mid strong { color: var(--amber); }
 .paid--hard strong { color: var(--red); }
 .paid__verdict { display: block; color: var(--dimmer); }
+.paid__break { display: block; color: var(--amber); }
 
 .leg--new { animation: legIn .45s ease-out both; }
 
@@ -404,6 +418,7 @@ html, body {
 .log__delta { font-style: normal; margin-right: 5px; }
 .log__delta--ahead { color: var(--neutral); }
 .log__delta--behind { color: var(--red); }
+.log li em.log__break { display: block; color: var(--amber); margin-left: 0; }
 .log__total { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--dimmer); color: var(--ink); }
 .log__total:empty { display: none; }
 
@@ -436,6 +451,13 @@ html, body {
   margin: 0 0 10px; font-family: var(--mono); font-size: 13px; color: var(--ink);
 }
 .brief__pace { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: var(--dim); }
+/* The one rule that has to land before the first hop, not mid-run — a border
+   rather than a filled box (the panel behind it is already --panel), so it
+   reads as a rule set apart from the pace note above it, not a new surface. */
+.brief__rule {
+  margin: 0 0 14px; padding: 2px 0 2px 10px; border-left: 2px solid var(--amber);
+  font-size: 12.5px; line-height: 1.5; color: var(--dim);
+}
 .brief__corridor { margin: 0 0 20px; text-align: left; }
 .brief__corridor:empty { margin: 0 0 8px; }
 .brief__seas { margin: 0 0 10px; font-size: 13px; font-style: italic; line-height: 1.5; color: var(--dim); }

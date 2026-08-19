@@ -39,8 +39,8 @@ export function buildGraph(data) {
     lakes: data.lakes || [], rivers: data.rivers || [],
     countryLabels: (data.countryLabels || []).map(([name, x, y]) => ({ name, x, y })),
     urbanAreas: data.urbanAreas || [],
-    physicalLabels: (data.physicalLabels || []).map(([name, x, y, kind, lengthKm, peakName, peakM, blurb]) => (
-      { name, x, y, kind, lengthKm, peakName, peakM, blurb }
+    physicalLabels: (data.physicalLabels || []).map(([name, x, y, kind, lengthKm, peakName, peakM, blurb, pacePct]) => (
+      { name, x, y, kind, lengthKm, peakName, peakM, blurb, pacePct }
     )),
     towns: (data.towns || []).map(([x, y, tier]) => ({ x, y, tier })),
     graticule: data.graticule || [],
@@ -130,20 +130,129 @@ function trace(g, prev, src, dst) {
   return { path, minutes: Math.round(minutes), km: Math.round(km) };
 }
 
-/** The answer the engine always knows and the player never needs. */
+/** The answer the engine always knows and the player never needs — real driving time only. */
 export function fastestRoute(g, src, dst) {
   return trace(g, dijkstra(g, src).prev, src, dst);
 }
 
-/** The trap: the route you get by trusting the map and taking the short way. */
+/**
+ * The trap: the route you get by trusting the map and taking the short way.
+ * Charged the same driving-hours rule as any other route — the shortest road
+ * doesn't skip mandatory breaks any more than the fastest one does, so its
+ * minutes have to come from walking the path with hosCost, not a plain sum
+ * of edge.min (mirrors play/bots.mjs's shortestRouter exactly).
+ */
 export function shortestRoute(g, src, dst) {
-  return trace(g, dijkstra(g, src, (e) => e.km).prev, src, dst);
+  const { path } = trace(g, dijkstra(g, src, (e) => e.km).prev, src, dst);
+  let minutes = 0, km = 0, sinceRest = 0;
+  for (let i = 1; i < path.length; i++) {
+    const e = g.adj[path[i - 1]].find((x) => x.to === path[i]);
+    const cost = hosCost(sinceRest, e.min);
+    minutes += cost.charged; km += e.km; sinceRest = cost.sinceRest;
+  }
+  return { path, minutes: Math.round(minutes), km: Math.round(km) };
+}
+
+// --- endurance-racing rules: EU professional-driver hours (EC 561/2006) ----
+// Real regulation, simplified for a turn-based game: 4.5 hours (270 min) of
+// continuous driving forces a 45-minute break, charged in whole units at hop
+// boundaries. Mirrors scripts/lib/graph.mjs's hosCost/hosDijkstra exactly —
+// same rule, same numbers — kept as a second copy here the way this file
+// already keeps its own dijkstra() rather than importing the Node one, since
+// nothing here can import fs-touching build scripts into the browser.
+export const HOS_CONTINUOUS_LIMIT = 270;
+export const HOS_BREAK_MIN = 45;
+
+/** Minutes actually charged for a hop, and the driving-clock state it leaves you in. */
+export function hosCost(sinceRest, hopMin) {
+  const total = sinceRest + hopMin;
+  const breaks = Math.floor(total / HOS_CONTINUOUS_LIMIT);
+  return { charged: hopMin + breaks * HOS_BREAK_MIN, sinceRest: total % HOS_CONTINUOUS_LIMIT, breaks };
+}
+
+/**
+ * The fastest *legal* route: Dijkstra over (city, minutes-since-last-break)
+ * states, since the same road can cost a hop's plain minutes or that plus a
+ * mandatory break depending on how much continuous driving is already
+ * banked on arrival — genuinely path-dependent, not something a plain
+ * shortest path can answer. Mirrors scripts/lib/graph.mjs's hosDijkstra —
+ * same algorithm, kept as its own copy for the reason dijkstra() above
+ * already is one: nothing here can import the Node build scripts.
+ * Runs once, on demand, at the reveal — not hot-path code.
+ */
+class MinHeap {
+  constructor() { this.a = []; }
+  get size() { return this.a.length; }
+  push(item, key) {
+    const a = this.a; a.push([key, item]);
+    let i = a.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (a[p][0] <= a[i][0]) break;
+      [a[p], a[i]] = [a[i], a[p]]; i = p;
+    }
+  }
+  pop() {
+    const a = this.a;
+    const top = a[0];
+    const last = a.pop();
+    if (a.length) {
+      a[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1, r = l + 1;
+        let m = i;
+        if (l < a.length && a[l][0] < a[m][0]) m = l;
+        if (r < a.length && a[r][0] < a[m][0]) m = r;
+        if (m === i) break;
+        [a[m], a[i]] = [a[i], a[m]]; i = m;
+      }
+    }
+    return top && top[1];
+  }
+}
+
+export function hosRoute(g, src, dst) {
+  const L = HOS_CONTINUOUS_LIMIT;
+  const state = (city, rest) => city * L + rest;
+  const dist = new Map(), prev = new Map(), done = new Set();
+  const start = state(src, 0);
+  dist.set(start, 0);
+  const heap = new MinHeap();
+  heap.push(start, 0);
+  let bestState = -1, bestDist = Infinity;
+
+  while (heap.size) {
+    const u = heap.pop();
+    if (done.has(u)) continue;
+    done.add(u);
+    const city = Math.floor(u / L), rest = u % L;
+    if (city === dst) { bestState = u; bestDist = dist.get(u); break; }
+    const d = dist.get(u);
+    for (const e of g.adj[city]) {
+      const c = hosCost(rest, e.min);
+      const v = state(e.to, c.sinceRest);
+      const nd = d + c.charged;
+      if (nd < (dist.get(v) ?? Infinity)) { dist.set(v, nd); prev.set(v, u); heap.push(v, nd); }
+    }
+  }
+  if (bestState === -1) return { path: [], minutes: Infinity, km: 0, stuck: true };
+
+  const path = [];
+  for (let v = bestState; v !== undefined; v = prev.get(v)) {
+    path.push(Math.floor(v / L));
+    if (v === start) break;
+  }
+  path.reverse();
+  let km = 0;
+  for (let i = 1; i < path.length; i++) km += g.adj[path[i - 1]].find((e) => e.to === path[i]).km;
+  return { path, minutes: Math.round(bestDist), km: Math.round(km), stuck: false };
 }
 
 export function newRound(g, { a, b, budget }) {
   return {
     start: a, target: b, budget,
-    at: a, spent: 0, km: 0,
+    at: a, spent: 0, km: 0, sinceRest: 0,
     visited: new Set([a]),
     hops: [],
     finished: false,
@@ -158,9 +267,16 @@ export function options(g, round) {
 export function hop(g, round, to) {
   const edge = options(g, round).find((e) => e.to === to);
   if (!edge) return round;
-  round.hops.push({ from: round.at, to, km: edge.km, min: edge.min });
-  round.spent += edge.min;
+  const cost = hosCost(round.sinceRest, edge.min);
+  // driveMin is the road's own time — what speedOf/narration read, so a
+  // forced break never makes a fast road look slow. min is what the budget
+  // actually pays: driving plus whatever break it triggered.
+  round.hops.push({
+    from: round.at, to, km: edge.km, driveMin: edge.min, breakMin: cost.charged - edge.min, min: cost.charged,
+  });
+  round.spent += cost.charged;
   round.km += edge.km;
+  round.sinceRest = cost.sinceRest;
   round.at = to;
   round.visited.add(to);
   if (to === round.target) round.finished = true;
@@ -207,7 +323,12 @@ export function requiredPace(g, round) {
 export function previewPace(g, round, to) {
   const edge = g.adj[round.at].find((e) => e.to === to);
   if (!edge) return null;
-  const leftAfter = remaining(round) - estimateHopMinutes(edge);
+  // The driving-hours clock is the player's own status, not a fact about the
+  // road — same visibility tier as the budget itself — so the preview is
+  // fair to account for it, using the same estimated minutes it already
+  // guesses everything else with.
+  const cost = hosCost(round.sinceRest, estimateHopMinutes(edge));
+  const leftAfter = remaining(round) - cost.charged;
   if (leftAfter <= 0) return Infinity;
   return crow(g, to, round.target) / (leftAfter / 60);
 }
@@ -224,7 +345,10 @@ export function hhmm(minutes) {
   return `${sign}${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`;
 }
 
-export const speedOf = (h) => h.km / (h.min / 60);
+// The road's own pace — driving time only. A hop that happened to trigger a
+// mandatory break shouldn't read as a slower road than it actually is;
+// h.driveMin falls back to h.min for anything that predates the field.
+export const speedOf = (h) => h.km / ((h.driveMin ?? h.min) / 60);
 
 /** How the road ran, which is the thing the map would not tell you. */
 export function hopGlyph(h) {

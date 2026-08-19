@@ -135,15 +135,19 @@ const bundle = {
   lakes: map.lakes,
   rivers: map.rivers,
   urbanAreas: map.urbanAreas,
-  // [name, x, y, kind, lengthKm, peakName, peakM, blurb] — kind is "relief"
-  // (a range, plateau, plain) or "sea". The four relief-only fields are null
-  // for sea, and lengthKm/peakName/peakM are null unless the range is one of
-  // the hand-curated RANGE_FACTS entries in 03-map.mjs (real reference
+  // [name, x, y, kind, lengthKm, peakName, peakM, blurb, pacePct] — kind is
+  // "relief" (a range, plateau, plain) or "sea". The relief-only fields are
+  // null for sea. lengthKm/peakName/peakM are null unless the range is one
+  // of the hand-curated RANGE_FACTS entries in 03-map.mjs (real reference
   // figures, not derived from this dataset's own — deliberately inaccurate
   // for this purpose — polygon geometry). blurb is the generic landform-type
-  // explainer and is set for every relief feature.
+  // explainer, set for every relief feature. pacePct is real and computed —
+  // the distance-weighted average speed of graph edges near this region
+  // against the network-wide average — null where fewer than 4 edges pass
+  // near enough to mean anything.
   physicalLabels: (map.physicalLabels || []).map((l) => [
     l.name, l.x, l.y, l.kind, l.lengthKm ?? null, l.peakName ?? null, l.peakM ?? null, l.blurb ?? null,
+    l.pacePct ?? null,
   ]),
   // [x, y, tier] — background towns below the playable roster's spacing cut.
   // Decoration only: they connect to nothing and cost nothing to draw wrong.

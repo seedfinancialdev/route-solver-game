@@ -1,7 +1,8 @@
 import {
-  buildGraph, crow, roadPath, roadRuns, paceMix, fastestRoute, shortestRoute,
+  buildGraph, crow, roadPath, roadRuns, paceMix, shortestRoute, hosRoute, hosCost,
   newRound, options, hop, remaining, hopGlyph, speedOf, hhmm, shareString, dayNumber,
   bearingWord, narrateHop, requiredPace, previewPace, paceRisk,
+  HOS_CONTINUOUS_LIMIT, HOS_BREAK_MIN,
 } from './engine.js';
 
 const $ = (id) => document.getElementById(id);
@@ -27,7 +28,7 @@ if (params.has('random')) {
   puzzle = data.puzzles[((day - 1) % data.puzzles.length + data.puzzles.length) % data.puzzles.length];
 }
 const [START, TARGET, BUDGET] = puzzle;
-const best = fastestRoute(g, START, TARGET);
+const best = hosRoute(g, START, TARGET);
 const trap = shortestRoute(g, START, TARGET);
 const storeKey = day === null ? null : `route:day:${day}`;
 
@@ -251,6 +252,13 @@ function renderBrief() {
   $('briefStats').textContent = `${crowKm.toLocaleString()} km as the crow flies · ${hhmm(BUDGET)} in the bank`;
   $('briefPace').textContent =
     `That's an average of ${Math.round(kmh)} km/h, door to door, if you drove it in a straight line.`;
+  // The one racing rule that applies before a single hop is chosen, not just
+  // read off a road: real driving hours (EC 561/2006, simplified). It has to
+  // land here, not discovered mid-run, since it changes what "the fastest
+  // way" even means before the player commits to anything.
+  $('briefRule').textContent =
+    `One rule of the road: ${hhmm(HOS_CONTINUOUS_LIMIT)} behind the wheel without a stop forces a `
+    + `${HOS_BREAK_MIN}-minute break, charged against your budget like anything else. Plan around it.`;
 
   const features = corridorFeatures(START, TARGET);
   const seas = features.filter((f) => f.kind === 'sea').map((f) => f.name).slice(0, 2);
@@ -278,8 +286,16 @@ function renderBrief() {
       const facts = r.lengthKm
         ? ` About ${r.lengthKm} km end to end, rising to ${r.peakName} at ${r.peakM.toLocaleString()} m.`
         : '';
+      // Real and computed (03-map.mjs paceDeviation): the actual distance-
+      // weighted average speed of roads near this region against the
+      // network-wide average. Not every range is slow — some, oddly, run
+      // faster — which is the entire point of learning this rather than
+      // assuming "mountains are slow" and calling it a strategy.
+      const pace = r.pacePct != null
+        ? ` Roads through here run about ${Math.abs(r.pacePct)}% ${r.pacePct < 0 ? 'slower' : 'faster'} than the network average.`
+        : '';
       const blurb = r.blurb ? ` ${r.blurb.charAt(0).toUpperCase()}${r.blurb.slice(1)}.` : '';
-      li.append(strong, document.createTextNode(` —${facts}${blurb}`));
+      li.append(strong, document.createTextNode(` —${facts}${pace}${blurb}`));
       ul.append(li);
     }
     corridor.append(ul);
@@ -537,6 +553,26 @@ function paint({ animate = false } = {}) {
     pace.replaceChildren(document.createTextNode('needs '), strong, document.createTextNode(' minimum from here'));
   }
 
+  // EU driving-hours rule (EC 561/2006, simplified): 4.5 continuous hours
+  // force a 45-minute break. This is the player's own status, not a fact
+  // about a road — same visibility tier as the budget gauge above it — so it
+  // has to be readable before the hop that would trip it, not just after.
+  const fatigue = $('gaugeFatigue');
+  if (round.finished) {
+    fatigue.replaceChildren();
+    fatigue.className = 'gauge__fatigue';
+  } else {
+    const toBreak = HOS_CONTINUOUS_LIMIT - round.sinceRest;
+    const strongF = document.createElement('strong');
+    strongF.textContent = hhmm(round.sinceRest);
+    const tier = toBreak <= 45 ? 'lost' : toBreak <= 90 ? 'tight' : 'ok';
+    fatigue.className = `gauge__fatigue gauge__fatigue--${tier}`;
+    fatigue.replaceChildren(
+      document.createTextNode('behind the wheel '), strongF,
+      document.createTextNode(` · ${hhmm(toBreak)} to mandatory break`),
+    );
+  }
+
   const reachable = new Set(options(g, round).map((e) => e.to));
   dots.forEach((node, i) => {
     node.classList.toggle('dot--reachable', reachable.has(i));
@@ -619,6 +655,15 @@ function paint({ animate = false } = {}) {
     const dist = document.createElement('em');
     dist.textContent = `${h.km} km`;
     cost.append(dist);
+    // The break is folded into h.min already; flag it separately, inside the
+    // same flex cell as the receipt, so a long number reads as "the clock
+    // made you stop" rather than "the road was slow".
+    if (h.breakMin > 0) {
+      const brk = document.createElement('em');
+      brk.className = 'log__break';
+      brk.textContent = `+ ${hhmm(h.breakMin)} break`;
+      cost.append(brk);
+    }
     li.append(name, cost);
     return li;
   }));
@@ -661,6 +706,15 @@ function showPaid(h) {
   second.className = 'paid__verdict';
   second.textContent = `${Math.round(kmh)} km/h · ${verdict}`;
   stat.append(cost, document.createTextNode(` for ${h.km} km`), second);
+  // A hop that banked enough continuous driving to trip the mandatory-break
+  // rule pays for it here — h.min already includes it, so without this the
+  // number just looks like a slower road than it actually was.
+  if (h.breakMin > 0) {
+    const brk = document.createElement('span');
+    brk.className = 'paid__break';
+    brk.textContent = `+ ${hhmm(h.breakMin)} mandatory break`;
+    stat.append(brk);
+  }
 
   clearTimeout(paidTimer);
   paidTimer = setTimeout(() => node.classList.remove('paid--on'), 4000);
@@ -816,12 +870,19 @@ function labelPlayable(reachable) {
 // that took four hours takes four hours' worth of the animation. You watch the
 // fast route pull away, on the stretch where it actually happened.
 
+// best.path is the fastest *legal* route (hosRoute), so re-walking it from a
+// fresh driving clock and charging hosCost at each hop reproduces the exact
+// same break points hosRoute found — same reasoning as the "you" lane, whose
+// hops already carry break-inclusive minutes from hop() itself.
 function hopsOf(path) {
   const out = [];
+  let sinceRest = 0;
   for (let i = 1; i < path.length; i++) {
     const from = path[i - 1], to = path[i];
     const edge = g.adj[from].find((e) => e.to === to);
-    out.push({ from, to, min: edge.min });
+    const cost = hosCost(sinceRest, edge.min);
+    out.push({ from, to, min: cost.charged });
+    sinceRest = cost.sinceRest;
   }
   return out;
 }
