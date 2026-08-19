@@ -591,20 +591,24 @@ function resizeMarks() {
     app.style.setProperty('--terrain-opacity', opacity.toFixed(3));
     ensureTerrainTiles();
     updateTerrainLayers();
-    ensureRoadNetwork();
+    // PROTOTYPE, deliberately not wired in: real roads with nowhere for the
+    // player to actually go on them isn't a feature yet, it's decoration
+    // with a real performance cost and no payoff — see the road-network
+    // scoping discussion. Reconnect this once a mode actually routes on it.
+    // ensureRoadNetwork();
     ensureStreets();
     $('streets').classList.toggle('streets--visible', camera.w <= STREET_ZOOM_KM);
 
     // Urban footprints are a flat 40% tint (.urban in app.css) — a fair hint
     // at continental scale, where a city's real built-up extent is a speck.
-    // At the pit stop's 3 km frame that same extent is most or all of the
-    // visible circle, so the same flat tint stops being a hint and becomes a
-    // solid block sitting over the real street grid it's meant to support.
-    // Fades the group's own opacity — compounding with the 40% already on
-    // each path — down toward near-invisible over the same close range the
-    // street grid becomes the thing actually worth reading.
-    const urbanFade = Math.max(0, Math.min(1, (camera.w - MIN_SPAN_KM) / (STREET_ZOOM_KM - MIN_SPAN_KM)));
-    $('urban').style.opacity = (0.15 + 0.85 * urbanFade).toFixed(3);
+    // A real city's footprint stays visually dominant much further out than
+    // the pit stop's 3 km frame, though — measured directly at Brest
+    // (pop. ~340k): still full, undimmed opacity at 80 km, only starting to
+    // fade below 14 km, which is far too late. Starts fading at 200 km
+    // instead — the same order of magnitude as terrain's own far fade —
+    // down to the same near-invisible floor at MIN_SPAN_KM.
+    const urbanFade = Math.max(0, Math.min(1, (camera.w - MIN_SPAN_KM) / (200 - MIN_SPAN_KM)));
+    $('urban').style.opacity = (0.12 + 0.88 * urbanFade).toFixed(3);
   }
 }
 
