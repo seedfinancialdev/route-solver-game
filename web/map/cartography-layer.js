@@ -1,17 +1,18 @@
 /**
  * Multi-Layered Cartography Canvas Renderer
- * Renders lakes, rivers, urban footprints, background towns, and real road geometries
- * using HTML5 Canvas Path2D and view matrix projections for 60fps rendering.
+ * Renders lakes, rivers, urban footprints, land cover (forests & farmland),
+ * background towns, and real road geometries using HTML5 Canvas Path2D.
  */
 
 export class CartographyLayer {
   constructor() {
     this.pathCache = new Map(); // svgStr -> Path2D instance
+    this.cartographyData = null;
 
     // Layer Visibility Toggles
     this.showWater = true;
-    this.showFarmland = true; // Urban footprints / land cover
-    this.showForest = true;    // Background towns & physical geography
+    this.showFarmland = true; // Farmland & urban land cover
+    this.showForest = true;   // Forest land cover
     this.showRoads = true;
     this.showStreets = true;
 
@@ -19,6 +20,17 @@ export class CartographyLayer {
     this.waterOpacity = 1.0;
     this.farmlandOpacity = 0.52;
     this.forestOpacity = 0.75;
+
+    this.init();
+  }
+
+  async init() {
+    try {
+      const res = await fetch('../cartography.json');
+      this.cartographyData = await res.json();
+    } catch {
+      // Graceful fallback if cartography.json is not present
+    }
   }
 
   getPath2D(svgStr) {
@@ -64,32 +76,51 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 2. Urban Footprints / Land Cover (urbanAreas)
-    if (this.showFarmland && g.urbanAreas && g.urbanAreas.length) {
+    // 2. Land Cover (Farmland / Urban Footprints)
+    if (this.showFarmland) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
       ctx.fillStyle = theme.farmland;
       ctx.globalAlpha = this.farmlandOpacity;
 
-      for (const areaPath of g.urbanAreas) {
-        const path = this.getPath2D(areaPath);
-        ctx.fill(path);
+      // Urban Areas from base graph
+      if (g.urbanAreas && g.urbanAreas.length) {
+        for (const areaPath of g.urbanAreas) {
+          ctx.fill(this.getPath2D(areaPath));
+        }
+      }
+
+      // Farmland Polygons from cartography data
+      if (this.cartographyData && this.cartographyData.farmland) {
+        for (const farmPath of this.cartographyData.farmland) {
+          ctx.fill(this.getPath2D(farmPath));
+        }
       }
       ctx.restore();
     }
 
-    // 3. Background Towns & Geography
-    if (this.showForest && g.towns && g.towns.length && camera.current.w <= 1200) {
+    // 3. Land Cover (Forests & Woods)
+    if (this.showForest) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
       ctx.fillStyle = theme.forest;
       ctx.globalAlpha = this.forestOpacity;
 
-      for (const town of g.towns) {
-        const r = (town.tier === 1 ? 2.5 : 1.5) / scaleX;
-        ctx.beginPath();
-        ctx.arc(town.x, town.y, r, 0, Math.PI * 2);
-        ctx.fill();
+      // Forest Polygons from cartography data
+      if (this.cartographyData && this.cartographyData.forest) {
+        for (const forestPath of this.cartographyData.forest) {
+          ctx.fill(this.getPath2D(forestPath));
+        }
+      }
+
+      // Background Towns
+      if (g.towns && g.towns.length && camera.current.w <= 1200) {
+        for (const town of g.towns) {
+          const r = (town.tier === 1 ? 2.5 : 1.5) / scaleX;
+          ctx.beginPath();
+          ctx.arc(town.x, town.y, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       ctx.restore();
     }
