@@ -58,6 +58,13 @@ npm run calibrate             # the budget-multiplier sweep
 npm run serve                 # then open http://localhost:8137
 ```
 
+## Branching & Deployment Workflow
+
+- **Primary Branch:** `main` is the main development branch and source of truth.
+- **Pull Requests:** Feature and fix branches should target `main`.
+- **Live Dev Environment:** Merging a Pull Request into `main` automatically triggers `.github/workflows/deploy.yml` to build and publish the static web application in `web/` to GitHub Pages.
+
+
 Rebuilding the data (needs an OSRM server; see below):
 
 ```sh
