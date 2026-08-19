@@ -54,6 +54,7 @@ roster, which stay out for the reason they always would have.
 | how long a road takes | only after you commit to it | every hop, with its average speed |
 | city names | start, target, and everywhere you can move to | all |
 | terrain | yes, from the first move — hillshade computed from ~390 m elevation data, in three levels down to 195 m per pixel | yes |
+| real street-level detail near a city | yes, once zoomed in close enough — decoration, not wired to any road's speed | yes |
 | named mountain ranges, plateaus and seas | yes | yes |
 | built-up footprints and background towns | yes — decoration only, unconnected to any road | yes |
 | a lat/long grid and a scale bar | yes | grid only; the scale bar hides at the reveal |
@@ -263,6 +264,25 @@ weight: you can read the option in front of you, not the network at large.
 None of it is the thing that's still genuinely hidden (how fast a road
 actually runs) — it's the context a real rally crew would have going in,
 not the answer.
+
+## Street-level detail
+
+Every playable city carries its own real street grid — actual OSM ways
+within 900 m of the city, real geometry, real road classes
+(`scripts/07-streets.mjs`), fetched on demand per city the same way terrain
+tiles already are, not bundled into the main payload (a single puzzle only
+ever visits 7-16 of the 479 cities). Decoration, same footing as the urban
+footprints and background towns: none of it is wired to a road's speed, it
+exists so a stop looks like a real place instead of a dot on empty ground.
+
+Visible once zoomed in close enough (the camera's minimum zoom came down
+from 90 km to 3 km to make this reachable at all — past 90 km there used to
+be nothing left to see, since terrain tiles bottom out around 195 m/px and
+nothing else scaled any finer). All 479 cities have real data as shipped; a
+city that genuinely can't be fetched (the public OSM mirrors this is built
+against are individually flaky under real load — measured directly, one
+mirror timed out on 3 of 4 back-to-back queries) just shows the plain map at
+close zoom instead, same graceful-fallback shape as a missing road name.
 
 ## Rules
 

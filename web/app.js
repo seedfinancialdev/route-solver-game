@@ -151,6 +151,54 @@ function updateTerrainLayers() {
 
   app.dataset.relief = tilesActive ? 'tiles' : detailReady ? 'detail' : 'overview';
 }
+
+// --- street-level detail -----------------------------------------------
+// Real OSM streets near each playable city (scripts/07-streets.mjs), fetched
+// on demand — same lazy-load shape as the terrain tiles above: a small
+// manifest loaded once, then only the cities actually inside the viewport,
+// only once you're zoomed in close enough for individual streets to be worth
+// drawing at all.
+const STREET_ZOOM_KM = 14;
+let streetManifest = null;
+const streetsShown = new Set();
+
+/** Delta-encoded, city-center-relative — decode into absolute map km. */
+function decodeStreetRuns(data) {
+  return data.runs.map(([tier, ...deltas]) => {
+    let x = data.cx, y = data.cy;
+    const pts = [];
+    for (let i = 0; i < deltas.length; i += 2) {
+      x += deltas[i] / data.quant; y += deltas[i + 1] / data.quant;
+      pts.push([x, y]);
+    }
+    return { tier, d: `M${pts.map(([px, py]) => `${px} ${py}`).join('L')}` };
+  });
+}
+
+async function ensureStreets() {
+  if (!camera || camera.w > STREET_ZOOM_KM) return;
+  if (!streetManifest) {
+    streetManifest = 'loading';
+    try { streetManifest = await (await fetch('streets/manifest.json')).json(); } catch { streetManifest = {}; }
+  }
+  if (streetManifest === 'loading') return;
+  for (const [idxStr, geonameid] of Object.entries(streetManifest)) {
+    const i = Number(idxStr);
+    if (streetsShown.has(i)) continue;
+    const c = g.cities[i];
+    const near = c.x > camera.x - 5 && c.x < camera.x + camera.w + 5
+      && c.y > camera.y - 5 && c.y < camera.y + camera.h + 5;
+    if (!near) continue;
+    streetsShown.add(i);
+    fetch(`streets/${geonameid}.json`).then((r) => r.json()).then((data) => {
+      const group = el('g', { class: 'street-city' });
+      for (const run of decodeStreetRuns(data)) {
+        group.append(el('path', { d: run.d, class: `street street--${run.tier}` }));
+      }
+      $('streets').append(group);
+    }).catch(() => {}); // a city with no street data just shows the plain map, same as any other decoration fallback
+  }
+}
 for (const d of g.rivers) $('rivers').append(el('path', { d, class: 'river' }));
 for (const d of g.lakes) $('lakes').append(el('path', { d, class: 'lake' }));
 
@@ -316,7 +364,13 @@ $('briefStart').addEventListener('click', () => {
 // stop re-framing under them, and only pan far enough to keep the city they are
 // standing in on screen.
 
-const MIN_SPAN_KM = 90;                        // how far in you may go
+// 90 km used to be the real floor — past that scale there was nothing left
+// to see, since terrain tiles bottom out around 195 m/px and nothing else
+// scaled any finer. Real street-level detail (scripts/07-streets.mjs) changes
+// that: a city's data covers roughly a 2 km circle, so the floor comes down
+// to let a player actually zoom into one instead of hitting a wall a city
+// block above where the streets start being visible at all.
+const MIN_SPAN_KM = 3;                          // how far in you may go
 const MAX_SPAN_KM = () => view.w * 1.15;       // and how far out
 
 let camera = null;
@@ -392,6 +446,8 @@ function resizeMarks() {
     app.style.setProperty('--terrain-opacity', (0.45 + 0.5 * fade).toFixed(3));
     ensureTerrainTiles();
     updateTerrainLayers();
+    ensureStreets();
+    $('streets').classList.toggle('streets--visible', camera.w <= STREET_ZOOM_KM);
   }
 }
 

@@ -69,6 +69,12 @@
       <!-- Background towns: unlabelled, inert, below the playable roster's own
            dots so they never compete with something you can actually click. -->
       <g id="towns" aria-hidden="true"></g>
+      <!-- Real OSM street grids, close-up detail for whichever playable city
+           you're actually zoomed in on — fetched on demand per city
+           (scripts/07-streets.mjs output), the same lazy-load pattern as the
+           terrain tiles above. Below every gameplay layer so the roads you
+           can actually act on always stay legible on top. -->
+      <g id="streets" aria-hidden="true"></g>
       <g id="optimalRoute"></g>
       <g id="travelled"></g>
       <g id="race"></g>

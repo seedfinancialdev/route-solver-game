@@ -62,6 +62,7 @@ Rebuilding the data (needs an OSRM server; see below):
 
 ```sh
 npm run data:cities && npm run data:graph && npm run data:puzzles && npm run data:map
+npm run data:streets   # optional: real street-level detail per city, ~50 min against public OSM mirrors
 ```
 
 ## What the phases turned up
@@ -137,6 +138,10 @@ the shortest road costs. On the 2,538 shipped puzzles at a 1.11× budget:
   elevation data's own resolution — of which the page paints exactly one.
 - Road distances and durations: OSRM over OpenStreetMap data
   (ODbL — © OpenStreetMap contributors).
+- Street-level detail: OpenStreetMap way geometry via the public Overpass API
+  (ODbL — © OpenStreetMap contributors), fetched once per city at build time
+  by `scripts/07-streets.mjs` and shipped as static per-city files — the game
+  itself makes no Overpass calls.
 
 `scripts/lib/osrm.mjs` defaults to the public OSRM demo server, which is fine
 for a one-off build of ~600 requests but is explicitly not for production use.

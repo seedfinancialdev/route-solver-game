@@ -101,6 +101,22 @@ html, body {
   fill: var(--urban); opacity: .4; stroke: none; pointer-events: none;
 }
 
+/* Real OSM streets, close-up detail fetched per city (scripts/07-streets.mjs)
+   once you're zoomed in far enough for them to mean anything. Hidden rather
+   than absent below that zoom — the fetch already happened, no reason to
+   punish a player who zooms back out and in again — and warm like the
+   built-up footprint above, same "this is a real place" register, not the
+   red a gameplay road uses. */
+.streets { opacity: 0; transition: opacity .4s ease; pointer-events: none; }
+.streets--visible { opacity: 1; }
+.street {
+  fill: none; stroke: var(--urban); stroke-linecap: round; stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.street--0 { stroke-width: .9; opacity: .55; }
+.street--1 { stroke-width: 1.3; opacity: .75; }
+.street--2 { stroke-width: 1.8; opacity: .9; }
+
 /* Borders are dashed, as they are on every paper map, because otherwise they
    are the same thin grey line as a road and the eye cannot separate them. The
    casing underneath is what makes them hold over a relief that is itself full
