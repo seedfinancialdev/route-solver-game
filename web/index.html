@@ -17,6 +17,11 @@
       <svg class="hud__arrow" viewBox="0 0 24 8" aria-hidden="true"><path d="M0 4h21M17 1l4 3-4 3"/></svg>
       <span id="destination">—</span>
     </div>
+    <!-- Where you actually are, right now — real, sourced legal speed
+         limits (scripts/lib/country-facts.mjs), the reason a country's
+         measured network pace runs the way it does. Updates on every stop;
+         flashes when the country you're in has just changed. -->
+    <p class="hud__country" id="hudCountry" aria-live="polite"></p>
 
     <div class="gauge">
       <div class="gauge__readout"><span id="remaining">0h00</span></div>
@@ -82,6 +87,15 @@
   <aside class="log">
     <ol id="hops"></ol>
     <div class="log__total" id="logTotal"></div>
+  </aside>
+
+  <!-- Recon on the candidate hop your pointer/focus is over — the road you'd
+       actually be on and the terrain it crosses, real and computed, both
+       already known before you commit. Never the thing that's still hidden
+       (how fast the road runs); that's still the whole puzzle. -->
+  <aside class="recon" id="recon" hidden>
+    <p class="recon__road" id="reconRoad"></p>
+    <p class="recon__terrain" id="reconTerrain"></p>
   </aside>
 
   <section class="brief" id="brief" hidden>

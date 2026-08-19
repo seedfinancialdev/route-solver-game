@@ -10,6 +10,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { project } from './lib/proj.mjs';
 import { COUNTRIES } from './lib/cities.mjs';
+import { COUNTRY_SPEED } from './lib/country-facts.mjs';
 
 const SIMPLIFY_KM = 0.12;  // Douglas-Peucker tolerance. The map zooms to 90 km
                            // across, where a tenth of a kilometre is about a
@@ -129,6 +130,11 @@ const bundle = {
   // from the same map scripts/00-cities.mjs used to pick the roster, so it
   // can't drift from the country list the game actually uses.
   countryNames: Object.fromEntries(COUNTRIES),
+  // ISO2 -> {motorway, rural, urban, note?} legal speed limits in km/h, real
+  // and sourced (scripts/lib/country-facts.mjs) — the reason a country's
+  // measured network pace runs faster or slower than average is often just
+  // this. motorway: null means no motorway network exists (Moldova).
+  countrySpeed: COUNTRY_SPEED,
   countries: map.countries.map((c) => c.d),
   // [name, x, y]
   countryLabels: map.labels.map((l) => [l.name, l.x, l.y]),

@@ -44,6 +44,11 @@ export function buildGraph(data) {
     )),
     towns: (data.towns || []).map(([x, y, tier]) => ({ x, y, tier })),
     graticule: data.graticule || [],
+    // ISO2 -> {motorway, rural, urban, note?}, real and sourced (real racing
+    // rules, not just real roads — same spirit as the driving-hours rule):
+    // scripts/lib/country-facts.mjs.
+    countrySpeed: data.countrySpeed || {},
+    countryNames,
   };
 }
 

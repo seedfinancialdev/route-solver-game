@@ -63,6 +63,8 @@ roster, which stay out for the reason they always would have.
 | how long you've been driving, and when the next mandatory break hits | yes, live, before you commit to a hop | yes, in the hop log |
 | the fastest route, and the shortest one | never | both, drawn against yours |
 | how fast a named region's roads run against the network average | yes, in the pre-game brief, for regions the route actually passes near | n/a |
+| the country you're in, and its real legal speed limits | yes, live, updates on every stop | n/a |
+| the road and terrain a candidate hop actually crosses | yes, on hover/focus of a reachable dot, before you commit | n/a |
 
 The pace figure is arithmetic on numbers already on screen — remaining budget
 and crow-flies distance to the target — not a new fact about any road. It's a
@@ -231,6 +233,36 @@ since the same road can cost a hop's plain minutes or that plus a forced break
 depending on how much continuous driving is already banked on arrival
 (`hosDijkstra`, `scripts/lib/graph.mjs`; mirrored as `hosRoute` in
 `web/engine.js` since browser code can't import the Node build scripts).
+
+## Recon
+
+Real rally prep is knowing the country, the terrain, and the road before you
+commit to a stage — not just the map. Three real, already-computed facts,
+surfaced at the moment they're actually useful instead of front-loaded once
+and forgotten:
+
+- **The country you're in.** Real, sourced legal speed limits
+  (`scripts/lib/country-facts.mjs` — motorway/rural/urban, cross-checked
+  against at least two independent sources per country), shown live in the
+  HUD and updated on every stop. This is the real-world reason a country's
+  measured network pace (the pace-deviation stat) runs the way it does —
+  Germany's derestricted autobahn sections and Poland/Bulgaria's 140 km/h
+  motorways aren't flavour, they're why those networks average faster. Quiet
+  on an ordinary stop; flashes on the one where the country actually changed,
+  the way a co-driver calls out a border crossing and nothing in between.
+- **The terrain a candidate hop crosses.** The same pace-deviation stat the
+  pre-game brief uses for the whole corridor, scoped down to the single hop
+  you're actually looking at, live, before you pick it.
+- **The road a candidate hop is on.** Real OSM route refs/names
+  (`06-road-names.mjs`), already computed for narration after a hop lands,
+  now also shown before you commit to one.
+
+All three are shown on hover or keyboard focus of a reachable dot, never
+automatically for the whole board — same principle as the pace-tier line
+weight: you can read the option in front of you, not the network at large.
+None of it is the thing that's still genuinely hidden (how fast a road
+actually runs) — it's the context a real rally crew would have going in,
+not the answer.
 
 ## Rules
 

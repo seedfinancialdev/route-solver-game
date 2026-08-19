@@ -38,6 +38,10 @@ let round = newRound(g, { a: START, b: TARGET, budget: BUDGET });
 // a restored (already-finished) round has no history to reconstruct this
 // from, so its log simply shows no delta.
 let neededAtHop = [];
+// The country shown last, so arriving somewhere new can flash rather than
+// silently repaint — same country, quiet update; new country, a beat that
+// says "this is worth reading."
+let shownCountry = null;
 
 // --- static map ------------------------------------------------------------
 const map = $('map');
@@ -573,6 +577,29 @@ function paint({ animate = false } = {}) {
     );
   }
 
+  // Where you actually are, right now: real, sourced legal speed limits
+  // (scripts/lib/country-facts.mjs) — the reason a country's measured
+  // network pace runs the way it does, made concrete instead of left as an
+  // unexplained percentage. Flashes on the stop where it actually changed;
+  // a rally crew reads the country you've just crossed into, not the one
+  // you've been in for six hops.
+  const country = $('hudCountry');
+  const here = g.cities[round.at];
+  const speed = g.countrySpeed[here.country];
+  const justCrossed = shownCountry !== null && shownCountry !== here.country;
+  shownCountry = here.country;
+  country.classList.toggle('hud__country--crossed', justCrossed);
+  if (!speed) {
+    country.textContent = here.countryName;
+  } else {
+    const limits = [
+      speed.motorway != null ? `motorway ${speed.motorway}` : 'no motorways',
+      `rural ${speed.rural}`, `urban ${speed.urban}`,
+    ].join(' · ');
+    country.textContent = `${here.countryName} — ${limits}`;
+    country.title = speed.note || '';
+  }
+
   const reachable = new Set(options(g, round).map((e) => e.to));
   dots.forEach((node, i) => {
     node.classList.toggle('dot--reachable', reachable.has(i));
@@ -821,6 +848,33 @@ async function choose(i) {
   if (round.finished) finish();
 }
 
+/**
+ * Recon on a candidate hop, the moment you're actually weighing it: the road
+ * you'd be on and the terrain it crosses, both real and both already
+ * knowable — the road from OSM's own ref/name (06-road-names.mjs), the
+ * terrain from the same measured pace-deviation stat the brief uses, scoped
+ * to this one hop instead of the whole trip. Never the thing that's still
+ * hidden — how fast the road actually runs — that's still the whole puzzle.
+ */
+function showRecon(to) {
+  const edge = g.adj[round.at].find((e) => e.to === to);
+  if (!edge) return;
+  const road = edge.road;
+  $('reconRoad').textContent = road
+    ? (road.share >= 55 ? road.label : `mostly the ${road.label}`)
+    : 'unclassified back roads';
+
+  const features = corridorFeatures(round.at, to, 90, 2);
+  const terrain = $('reconTerrain');
+  terrain.textContent = features
+    .map((f) => (f.pacePct != null ? `${f.name} (${f.pacePct > 0 ? '+' : ''}${f.pacePct}%)` : f.name))
+    .join(' · ');
+  terrain.hidden = !features.length;
+
+  $('recon').hidden = false;
+}
+function hideRecon() { $('recon').hidden = true; }
+
 dots.forEach((node, i) => {
   node.addEventListener('click', () => { if (!dragged) choose(i); });
   node.addEventListener('keydown', (ev) => {
@@ -830,10 +884,14 @@ dots.forEach((node, i) => {
     for (const path of $('reach').children) {
       if (path.dataset.to === String(i)) path.classList.add('reach-line--hot');
     }
+    showRecon(i);
   });
   node.addEventListener('pointerleave', () => {
     for (const line of $('reach').children) line.classList.remove('reach-line--hot');
+    hideRecon();
   });
+  node.addEventListener('focus', () => showRecon(i));
+  node.addEventListener('blur', hideRecon);
 });
 
 // --- the reveal ------------------------------------------------------------

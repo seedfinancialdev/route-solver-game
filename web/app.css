@@ -294,6 +294,17 @@ html, body {
 .hud__arrow { width: 24px; height: 8px; fill: none; stroke: var(--dimmer); stroke-width: 1.4; }
 .hud__trip span:last-child { color: var(--ink); }
 
+/* Where you actually are: real, sourced speed limits, the reason the
+   network's measured pace runs the way it does. Quiet by default — this is
+   ambient orientation, not a new stat to weigh — but flashes once on the
+   stop where the country actually changed, the way a co-driver would only
+   call it out at the border, not every mile in between. */
+.hud__country {
+  margin: 6px 0 0; font-family: var(--mono); font-size: 11.5px; color: var(--dim);
+}
+.hud__country--crossed { animation: countryFlash 1.6s ease-out; }
+@keyframes countryFlash { from { color: var(--accent); } }
+
 .gauge { margin-top: 14px; }
 .gauge__readout {
   display: flex; align-items: baseline; gap: 8px;
@@ -421,6 +432,21 @@ html, body {
 .log li em.log__break { display: block; color: var(--amber); margin-left: 0; }
 .log__total { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--dimmer); color: var(--ink); }
 .log__total:empty { display: none; }
+
+/* --- recon ---------------------------------------------------------------
+   The road you'd be on and the terrain it crosses, for whichever candidate
+   hop you're actually weighing — real, and already knowable before you
+   commit, same as the pace-tier line weight already is. Top-right so it
+   never collides with the hop log (bottom-left) or the gauge (top-left). */
+.recon {
+  position: absolute; right: 26px; top: 22px; z-index: 2;
+  max-width: min(280px, 70vw);
+  font-family: var(--mono); font-size: 12px; color: var(--dim);
+  text-align: right; pointer-events: none;
+}
+.recon__road { margin: 0; color: var(--ink); }
+.recon__terrain { margin: 3px 0 0; color: var(--dimmer); }
+.recon__terrain[hidden] { display: none; }
 
 /* --- brief ---------------------------------------------------------------
    The pre-game beat: start, target, budget, and the macro-geography between
