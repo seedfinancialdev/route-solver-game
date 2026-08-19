@@ -199,7 +199,8 @@ function decodeStreetRuns(data) {
 // closer. Not the real pipeline — see the road-network scoping discussion.
 const ROAD_GRID = 6;
 const ROAD_TIER_ZOOM = [Infinity, 850, 200]; // motorway always, trunk <= 850km, primary <= 200km
-const roadTilesShown = new Set();
+const roadTileData = new Map();   // key -> fetched tiers, or 'loading'
+const roadTierBuilt = new Set();  // "${key}_${tier}" already turned into a <path>
 async function ensureRoadNetwork() {
   if (!camera) return;
   const tw = g.view.w / ROAD_GRID, th = g.view.h / ROAD_GRID;
@@ -210,25 +211,66 @@ async function ensureRoadNetwork() {
   for (let row = r0; row <= r1; row++) {
     for (let col = c0; col <= c1; col++) {
       const key = `${col}_${row}`;
-      if (roadTilesShown.has(key)) continue;
-      roadTilesShown.add(key);
-      fetch(`road-network-proto/${key}.json`).then((r) => (r.ok ? r.json() : null)).then((data) => {
-        if (!data) return;
-        const group = el('g', { class: 'road-network-tile' });
-        for (const tierStr of Object.keys(data.tiers)) {
-          const tier = Number(tierStr);
-          for (const pts of data.tiers[tierStr]) {
-            const dAttr = `M${pts.map(([x, y]) => `${x} ${y}`).join('L')}`;
-            group.append(el('path', { d: dAttr, class: `road-network road-network--${tier}` }));
-          }
-        }
-        $('roadNetwork').append(group);
-      }).catch(() => {});
+      if (!roadTileData.has(key)) {
+        roadTileData.set(key, 'loading');
+        fetch(`road-network-proto/${key}.json`).then((r) => (r.ok ? r.json() : null))
+          .then((data) => roadTileData.set(key, data && data.tiers))
+          .catch(() => roadTileData.set(key, null));
+      }
+      const tiers = roadTileData.get(key);
+      if (!tiers || tiers === 'loading') continue;
+      // A tier costs real paint time just by existing in the DOM, even fully
+      // transparent — the fix for 74k separate <path> elements (one path per
+      // tier instead of one per road) wasn't enough on its own, because an
+      // opacity:0 tier is still full geometry the browser repaints every
+      // frame. Only ever build the tiers actually visible at the current
+      // zoom, the same "nothing until it's needed" rule as everything else
+      // that's lazy-loaded here — a tier zoomed past isn't just hidden, it's
+      // never created at all.
+      for (let tier = 0; tier < ROAD_TIER_ZOOM.length; tier++) {
+        const tierKey = `${key}_${tier}`;
+        if (camera.w > ROAD_TIER_ZOOM[tier] || roadTierBuilt.has(tierKey)) continue;
+        const ways = tiers[tier];
+        if (!ways || !ways.length) continue;
+        roadTierBuilt.add(tierKey);
+        buildRoadTierChunked(ways, tier);
+      }
     }
   }
+  // Cheap either way — at most 3 elements per tier exist regardless of tile
+  // count — but display:none (not opacity:0) means a tier zoomed back past
+  // costs nothing to repaint while it's hidden, not just nothing to see.
   for (let tier = 0; tier < ROAD_TIER_ZOOM.length; tier++) {
-    $('roadNetwork').classList.toggle(`road-network--show-${tier}`, camera.w <= ROAD_TIER_ZOOM[tier]);
+    for (const node of document.querySelectorAll(`.road-network--${tier}`)) {
+      node.style.display = camera.w <= ROAD_TIER_ZOOM[tier] ? '' : 'none';
+    }
   }
+}
+
+/**
+ * Building one tier's ~10-50k-way path in a single synchronous call was the
+ * real cost behind "horribly slow" — not an ongoing frame-rate problem
+ * (panning was fine once built, measured at 16ms/frame), a one-time ~900ms
+ * layout/paint spike the instant a big tier's geometry first lands. Splitting
+ * the same geometry across several smaller <path> elements, one per rAF
+ * instead of all at once, spreads that cost over several frames so nothing
+ * blocks the main thread long enough to read as a freeze. Same total work,
+ * same final picture — just handed to the browser in pieces it can keep up
+ * with, the way a real tile pyramid would only ever ask for one tile's worth
+ * at a time.
+ */
+function buildRoadTierChunked(ways, tier, chunkSize = 1500) {
+  let i = 0;
+  const step = () => {
+    const batch = ways.slice(i, i + chunkSize);
+    i += chunkSize;
+    if (batch.length) {
+      const dAttr = batch.map((pts) => `M${pts.map(([x, y]) => `${x} ${y}`).join('L')}`).join('');
+      $('roadNetwork').append(el('path', { d: dAttr, class: `road-network road-network--${tier}` }));
+    }
+    if (i < ways.length) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 async function ensureStreets() {

@@ -119,14 +119,14 @@ html, body {
 
 /* PROTOTYPE — country-scale road network, revealed by zoom like terrain
    tiles and street detail already are. Tier 0 (motorway) is cheap enough to
-   stay on at any zoom; 1 (trunk) and 2 (primary) fade in as the tiles
-   holding them are worth reading. Not the shipping data yet. */
+   stay on at any zoom; 1 (trunk) and 2 (primary) only ever get built once
+   the camera is already close enough for them (app.js) — an untouched tier
+   costs real paint time just by existing, even at opacity 0, so it's never
+   created at all rather than created-then-hidden. Not the shipping data yet. */
 .road-network { fill: none; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .road-network--0 { stroke: var(--road); stroke-width: 1.6; opacity: .85; }
-.road-network--1 { stroke: var(--amber); stroke-width: 1.1; opacity: 0; transition: opacity .4s ease; }
-.road-network--2 { stroke: var(--dim); stroke-width: .7; opacity: 0; transition: opacity .4s ease; }
-#roadNetwork.road-network--show-1 .road-network--1 { opacity: .7; }
-#roadNetwork.road-network--show-2 .road-network--2 { opacity: .45; }
+.road-network--1 { stroke: var(--amber); stroke-width: 1.1; opacity: .7; }
+.road-network--2 { stroke: var(--dim); stroke-width: .7; opacity: .45; }
 
 /* Borders are dashed, as they are on every paper map, because otherwise they
    are the same thin grey line as a road and the eye cannot separate them. The
