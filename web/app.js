@@ -162,6 +162,22 @@ const STREET_ZOOM_KM = 14;
 let streetManifest = null;
 const streetsShown = new Set();
 
+/**
+ * A tight, aspect-corrected box centred on a city — close enough that its
+ * real street grid (a 900 m radius per city, scripts/07-streets.mjs) is what
+ * fills the screen, not the blurred relief around it. MIN_SPAN_KM is already
+ * the game's own floor for "zoomed all the way into a city"; this reuses it
+ * rather than picking a second, looser number.
+ */
+function stopFrame(cityIndex) {
+  const c = g.cities[cityIndex];
+  const rect = map.getBoundingClientRect();
+  const aspect = rect.width && rect.height ? rect.width / rect.height : 1;
+  const w = MIN_SPAN_KM;
+  const h = w / aspect;
+  return { x: c.x - w / 2, y: c.y - h / 2, w, h };
+}
+
 /** Delta-encoded, city-center-relative — decode into absolute map km. */
 function decodeStreetRuns(data) {
   return data.runs.map(([tier, ...deltas]) => {
@@ -387,6 +403,39 @@ function applyCamera(box) {
   unit = Math.max(box.w / rect.width, box.h / rect.height);
   resizeMarks();
   $('resetView').hidden = !userMoved;
+}
+
+/**
+ * Ease the camera between two boxes rather than cutting to the new one — the
+ * pit-stop zoom needs to read as driving into a place and back out of it, not
+ * as a jump cut. Every other camera move in the game (drag, wheel, the
+ * puzzle's own opening frame) is still instant; this is the one place the
+ * game asks the player to sit still for a moment on purpose.
+ */
+function animateCamera(from, to, duration = 650) {
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced || !from) { applyCamera(to); return Promise.resolve(); }
+  return new Promise((resolve) => {
+    const started = performance.now();
+    const step = (now) => {
+      // Clamped on both ends: a rAF callback's timestamp is occasionally a
+      // hair earlier than a performance.now() read just before scheduling
+      // it (seen under headless/throttled rendering), which without the
+      // lower clamp produces a negative t, a negative eased cube, and a
+      // momentarily negative-width viewBox.
+      const t = Math.max(0, Math.min(1, (now - started) / duration));
+      const eased = 1 - (1 - t) ** 3;
+      applyCamera({
+        x: from.x + (to.x - from.x) * eased,
+        y: from.y + (to.y - from.y) * eased,
+        w: from.w + (to.w - from.w) * eased,
+        h: from.h + (to.h - from.h) * eased,
+      });
+      if (t < 1) requestAnimationFrame(step);
+      else resolve();
+    };
+    requestAnimationFrame(step);
+  });
 }
 
 /** Dots and labels hold their size on screen, not in map kilometres. */
@@ -871,8 +920,9 @@ function animateHop(from, to) {
 }
 
 let hopBusy = false;
+let stopped = false;
 async function choose(i) {
-  if (hopBusy || round.finished || !options(g, round).some((e) => e.to === i)) return;
+  if (hopBusy || stopped || round.finished || !options(g, round).some((e) => e.to === i)) return;
   hopBusy = true;
 
   // Acknowledge the click before anything else happens: a pulse on the dot
@@ -901,7 +951,40 @@ async function choose(i) {
   showArrival(h, neededKmh);
   paint({ animate: true });
   followPlayer();
-  if (round.finished) finish();
+  if (round.finished) { finish(); return; }
+  await pitStop(h);
+}
+
+/**
+ * The turn boundary itself: the camera settles in on the city you just
+ * pulled into, tight enough to show its real street grid, and the next hop
+ * stays inert until "Continue driving" hands control back. Skipped on the
+ * final hop — that arrival already has its own, bigger beat in finish().
+ */
+async function pitStop(h) {
+  const preStop = camera;
+  stopped = true;
+  app.dataset.stage = 'stopped';
+  // The floating arrival callout is sized and placed for the camera it was
+  // born under; the stop panel below is about to say the same thing anyway,
+  // so drop it rather than carry stale, wrongly-scaled text into the zoom.
+  clearTimeout(arrivalTimer);
+  $('arrivalCallout').replaceChildren();
+  const c = g.cities[round.at];
+  $('stopCity').textContent = `${c.name}, ${c.countryName}`;
+  $('stopStat').textContent = `${hhmm(h.min)} for ${h.km} km · ${Math.round(speedOf(h))} km/h`;
+  $('stop').hidden = false;
+
+  await animateCamera(preStop, stopFrame(round.at));
+
+  await new Promise((resolve) => {
+    $('stopContinue').addEventListener('click', resolve, { once: true });
+  });
+
+  $('stop').hidden = true;
+  await animateCamera(camera, preStop);
+  app.dataset.stage = 'playing';
+  stopped = false;
 }
 
 /**

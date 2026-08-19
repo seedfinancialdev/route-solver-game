@@ -104,6 +104,18 @@
     <p class="recon__terrain" id="reconTerrain"></p>
   </aside>
 
+  <!-- The turn boundary made explicit: arriving at a city is a stop, not an
+       instant repaint. The camera pulls in tight enough to show the real
+       street grid (scripts/07-streets.mjs) for wherever you just pulled
+       into; the next hop's candidates stay on screen but inert until you
+       actually choose to pull back out. -->
+  <section class="stop" id="stop" hidden>
+    <p class="stop__eyebrow">Pit stop</p>
+    <h2 id="stopCity">—</h2>
+    <p class="stop__stat" id="stopStat"></p>
+    <button id="stopContinue" type="button">Continue driving</button>
+  </section>
+
   <section class="brief" id="brief" hidden>
     <p class="brief__eyebrow">Today's route</p>
     <h2 id="briefTrip">— → —</h2>

@@ -284,6 +284,24 @@ against are individually flaky under real load — measured directly, one
 mirror timed out on 3 of 4 back-to-back queries) just shows the plain map at
 close zoom instead, same graceful-fallback shape as a missing road name.
 
+## Pit stops
+
+Arriving somewhere is a stop, not a repaint. On every hop but the last, the
+camera eases in on the city you just pulled into — tight enough to show its
+real street grid (see "Street-level detail" above) instead of the corridor
+around it — and shows what that hop actually cost. The next hop's candidates
+stay visible on the map but out of reach until you press **Continue
+driving**, which eases the camera back out to where you were and hands
+control back. Recon on the next candidates (the "Recon" section above) is
+unavailable while stopped for the same reason: reading the stop you're
+actually at is the beat, not lining up the next one early.
+
+The final hop skips this — arriving at the target flows straight into the
+race and reveal, which already has its own, bigger version of the same idea
+(both routes driving side by side, then the numbers). A pit stop mid-route
+and the reveal at the end are the same "you arrived, look at what that
+cost" beat at two different scales, not two different mechanics.
+
 ## Rules
 
 - Start on the origin city. Each turn, pick any adjacent city you have not
