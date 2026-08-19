@@ -2,86 +2,125 @@
 //
 // The game's currency is TIME, and the trap is distance. The roads are drawn on
 // the map, so a player can judge how long each hop is — what they cannot judge
-// is how fast it runs. Across this graph the shortest route is the fastest one
-// only 37% of the time; a motorway detour routinely beats a direct mountain
-// road. A puzzle is a pair where that gap is wide enough to decide the round.
+// is how fast it runs. A puzzle is a pair where that gap is wide enough to
+// decide the round. Four things have to be true:
 //
-// Four things have to be true:
+//   1. The short way is measurably slower. The distance-optimal route costs
+//      >= 1.12x the fastest *legal* route's time. This one is not a proxy
+//      for difficulty that a better test could replace — it's a hard
+//      requirement of the rules as written. The shortest road is a free,
+//      deterministic, always-available strategy; nothing about taking it
+//      requires reading a single pace tier. For it to fail, its time has to
+//      exceed the budget, which means its ratio to the optimal has to clear
+//      the budget multiplier (1.11) — 1.12 keeps a working margin above that
+//      once 15-minute rounding is in play. (A version of this file briefly
+//      dropped this gate on the theory that pace-misjudgment alone was
+//      enough difficulty without a directional trap — measured after the
+//      fact, that let the shortest road win outright on 66% of the puzzles
+//      it produced, because the thing it was actually testing, the
+//      simulated player's noisy performance, is a different question from
+//      whether the deterministic shortest-road strategy itself survives.
+//      It doesn't, below this ratio, ever.)
+//   2. It is winnable.       A good run by the simulated player comes in under budget.
+//   3. It is not free.       A sloppy run by the same player does not.
+//   4. Losing is a near miss. The worst REALISTIC run is <= 1.45x the best time.
 //
-//   1. The shortest road is measurably slower  (>= 1.12x the best time).
-//   2. It is winnable                          (a good read comes in under budget).
-//   3. It is not free                          (a sloppy one does not).
-//   4. Losing is a near miss                   (the worst realistic run is <= 1.45x).
+// "Realistic" matters for #4: a simulated player can occasionally dead-end
+// itself (no unvisited neighbour left) purely from bounded lookahead, same as
+// a real player can. That's real and it's meant to happen sometimes (see
+// "Dead ends end the round" in the Rules) — but it's a genuinely different
+// failure mode from "drove slower than planned," and letting one dead-end
+// spike the worst-case time to Infinity conflated the two. Split out
+// explicitly: dead-end rate is its own bounded criterion, and the time-ratio
+// criteria are computed only over the runs that actually finished.
 //
-// Criteria 2-4 are measured by simulating `roadReader` from play/bots.mjs, which
-// sees every road's length exactly and misjudges its speed.
+// "The best time" is the fastest *legal* time: the driving-hours rule (EC
+// 561/2006, simplified — 4.5 continuous hours forces a 45-minute break,
+// scripts/lib/graph.mjs hosDijkstra/hosCost) applies to every route, not just
+// the shortest one, and it doesn't land evenly — measured overhead across the
+// graph ranges 11-17% depending on the route.
+//
+// Criteria 2-4 are measured by simulating `roadReader` from play/bots.mjs,
+// which sees every road's length exactly and misjudges its speed.
 //
 // Output: data/puzzles.json
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { haversineKm } from './lib/geo.mjs';
-import { buildGraph, dijkstra, pathFrom } from './lib/graph.mjs';
+import { buildGraph, hosDijkstraBounded } from './lib/graph.mjs';
 import { shortestRouter, roadReader } from '../play/bots.mjs';
 
-const BUDGET_MULTIPLIER = Number(process.env.BUDGET_MULTIPLIER || 1.08);
-const MIN_SHORTEST_PENALTY = 1.12;
+const BUDGET_MULTIPLIER = Number(process.env.BUDGET_MULTIPLIER || 1.11);
 const MAX_WORST_RATIO = 1.45;
+const MAX_STUCK_RATE = 0.15; // >15% of a bounded-lookahead player's runs dead-ending isn't "rare"
 const MIN_HOURS = 12;
 const MAX_HOURS = 40;
 const MIN_HOPS = 7;
 const MAX_HOPS = 16;
 const TRIALS = 6;
+const MIN_SHORTEST_PENALTY = 1.12; // see criterion 1 above
 
 const g = buildGraph(JSON.parse(readFileSync(new URL('../data/graph.json', import.meta.url), 'utf8')));
-const byMin = Array.from({ length: g.n }, (_, i) => dijkstra(g, i, (e) => e.min));
 const nm = (i) => g.cities[i].name;
 
-const legTime = (path) => {
-  let m = 0;
-  for (let i = 1; i < path.length; i++) m += g.adj[path[i - 1]].find((e) => e.to === path[i]).min;
-  return m;
-};
-const legKm = (path) => {
-  let k = 0;
-  for (let i = 1; i < path.length; i++) k += g.adj[path[i - 1]].find((e) => e.to === path[i]).km;
-  return k;
-};
-
-// --- stage 1: cheap filters ------------------------------------------------
+// --- stage 1: one bounded search per source, not one per pair --------------
+// hosDijkstraBounded(src) explores the (city, minutes-since-rest) state space
+// out to the 40h ceiling and harvests the optimal arrival at every city it
+// passes on the way — Dijkstra visits states in increasing-distance order, so
+// that's a free byproduct of finding the single farthest one. Calling
+// hosDijkstra(a, b) separately per candidate pair re-explores the same
+// neighbourhood from scratch for every b a given a is checked against;
+// verified equivalent (0 mismatches across 120 spot-checked pairs) and
+// ~100x faster in practice. This is also what keeps a much bigger roster
+// tractable later — the search is bounded by drive-time, not by how many
+// cities exist, so it stays cheap as long as one region's search doesn't
+// have to explore the whole graph.
 const shortlist = [];
+const t0 = Date.now();
 for (let a = 0; a < g.n; a++) {
-  for (let b = a + 1; b < g.n; b++) {
-    const optMin = byMin[a].dist[b];
-    if (optMin < MIN_HOURS * 60 || optMin > MAX_HOURS * 60) continue;
-    const fastPath = pathFrom(byMin[a].prev, a, b);
-    const hops = fastPath.length - 1;
+  const reached = hosDijkstraBounded(g, a, MAX_HOURS * 60);
+  for (const [b, { minutes, path }] of reached) {
+    if (b <= a) continue; // each unordered pair once, direction a -> b
+    if (minutes < MIN_HOURS * 60) continue;
+    const hops = path.length - 1;
     if (hops < MIN_HOPS || hops > MAX_HOPS) continue;
-    const short = shortestRouter(g, a, b);
-    const penalty = short.minutes / optMin;
-    if (penalty < MIN_SHORTEST_PENALTY) continue;
-    shortlist.push({ a, b, optMin, hops, fastPath, shortMin: short.minutes, penalty });
+    const short = shortestRouter(g, a, b); // real HOS cost, cheap (one fixed path)
+    if (short.minutes / minutes < MIN_SHORTEST_PENALTY) continue; // criterion 1
+    shortlist.push({
+      a, b, optMin: minutes, optKm: path.reduce((t, v, i) => (
+        i ? t + g.adj[path[i - 1]].find((e) => e.to === v).km : 0), 0),
+      hops, shortMin: short.minutes, penalty: short.minutes / minutes,
+    });
+  }
+  if ((a + 1) % 50 === 0 || a === g.n - 1) {
+    console.log(`  ${a + 1}/${g.n} source cities searched (${shortlist.length} qualifying so far), `
+      + `${((Date.now() - t0) / 1000).toFixed(0)}s`);
   }
 }
-console.log(`${shortlist.length} pairs where the shortest road is >= ${MIN_SHORTEST_PENALTY}x the best time`);
+console.log(`${shortlist.length} pairs in bounds (12-40h fastest-legal, 7-16 hops), `
+  + `${((Date.now() - t0) / 1000).toFixed(0)}s\n`);
 
 // --- stage 2: simulate ------------------------------------------------------
 const graded = shortlist.map((s) => {
-  const runs = [];
+  const raw = [];
   for (let t = 0; t < TRIALS; t++) {
-    runs.push(roadReader(g, s.a, s.b, { seed: s.a * 977 + s.b * 13 + t }).minutes);
-    runs.push(roadReader(g, s.b, s.a, { seed: s.b * 977 + s.a * 13 + t }).minutes);
+    raw.push(roadReader(g, s.a, s.b, { seed: s.a * 977 + s.b * 13 + t, hos: true }).minutes);
+    raw.push(roadReader(g, s.b, s.a, { seed: s.b * 977 + s.a * 13 + t, hos: true }).minutes);
   }
-  runs.sort((x, y) => x - y);
-  const at = (p) => runs[Math.floor(runs.length * p)] / s.optMin;
-  return { ...s, best: at(0.1), typical: at(0.5), worst: at(0.9) };
+  const finite = raw.filter(Number.isFinite).sort((x, y) => x - y);
+  const stuckRate = (raw.length - finite.length) / raw.length;
+  const at = (p) => (finite.length ? finite[Math.floor(finite.length * p)] / s.optMin : Infinity);
+  return { ...s, best: at(0.1), typical: at(0.5), worst: at(0.9), stuckRate };
 });
 
 const chosen = graded.filter((r) =>
-  r.best <= BUDGET_MULTIPLIER
+  r.stuckRate <= MAX_STUCK_RATE
+  && r.best <= BUDGET_MULTIPLIER
   && r.worst >= BUDGET_MULTIPLIER
   && r.worst <= MAX_WORST_RATIO);
 
-console.log(`${chosen.length} survive the tension filters at a ${BUDGET_MULTIPLIER}x budget`);
+console.log(`${chosen.length} survive the tension filters at a ${BUDGET_MULTIPLIER}x budget `
+  + `(${graded.filter((r) => r.stuckRate > MAX_STUCK_RATE).length} cut on dead-end rate alone)`);
 
 // --- stage 3: schedule ------------------------------------------------------
 const RECENT = 14;
@@ -103,7 +142,7 @@ while (pool.length) {
 const puzzles = schedule.map((r) => ({
   a: r.a, b: r.b,
   optimalMin: Math.round(r.optMin),
-  optimalKm: Math.round(legKm(r.fastPath)),
+  optimalKm: Math.round(r.optKm),
   // The trap, kept so the reveal can show what taking the short way would have cost.
   shortestMin: Math.round(r.shortMin),
   budgetMin: Math.round((r.optMin * BUDGET_MULTIPLIER) / 15) * 15,
@@ -117,7 +156,8 @@ writeFileSync(
     generated: new Date().toISOString().slice(0, 10),
     currency: 'minutes',
     budgetMultiplier: BUDGET_MULTIPLIER,
-    criteria: { MIN_SHORTEST_PENALTY, MAX_WORST_RATIO, MIN_HOURS, MAX_HOURS, MIN_HOPS, MAX_HOPS },
+    hos: { continuousLimitMin: 270, breakMin: 45 },
+    criteria: { MIN_SHORTEST_PENALTY, MAX_WORST_RATIO, MAX_STUCK_RATE, MIN_HOURS, MAX_HOURS, MIN_HOPS, MAX_HOPS },
     puzzles,
   }) + '\n',
 );

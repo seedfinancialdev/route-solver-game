@@ -16,6 +16,14 @@
   --dimmer: #414b58;
   --speck: #4a5462;
   --reachable: #97a2b1;
+  /* A third hue, warm where land is neutral and water is cold, so a metro's
+     built-up footprint reads as human rather than as more terrain. */
+  --urban: #a2895c;
+  /* Roads read as roads the way a paper atlas draws them: red. Distinct from
+     --red below, which is the budget gauge's alarm colour — the two shouldn't
+     mean the same thing, so they're not the same hue. */
+  --road: #c0392b;
+  --road-hot: #e6503c;
 
   --neutral: #cdd5e0;
   --amber: #e6b455;
@@ -79,6 +87,20 @@ html, body {
 
 .country { fill: var(--land); stroke: none; }
 
+/* Chart furniture. It sits under the relief on purpose, the same way the
+   country names do — the overlay blend lets it stay faint rather than
+   disappearing outright, and it never needs to compete with a road. */
+.graticule-line {
+  fill: none; stroke: var(--land-edge); stroke-width: 1; opacity: .08;
+  vector-effect: non-scaling-stroke; pointer-events: none;
+}
+
+/* Built-up footprints. Warm against the cool land/sea split so a metro's
+   sprawl reads as "lived in" without being mistaken for the relief itself. */
+.urban {
+  fill: var(--urban); opacity: .4; stroke: none; pointer-events: none;
+}
+
 /* Borders are dashed, as they are on every paper map, because otherwise they
    are the same thin grey line as a road and the eye cannot separate them. The
    casing underneath is what makes them hold over a relief that is itself full
@@ -104,7 +126,14 @@ html, body {
   vector-effect: non-scaling-stroke;
 }
 
-.dot { fill: var(--speck); transition: fill .25s, r .25s; }
+/* Background towns: the GeoNames places that lost out to the roster's 75km
+   spacing rule. Smaller and dimmer than a speck you could ever click, on
+   purpose — they fill in the empty ground between playable cities without
+   ever being mistaken for one. */
+.town { fill: var(--speck); opacity: .55; pointer-events: none; transition: r .25s; }
+.town--big { opacity: .7; }
+
+.dot { fill: var(--speck); transition: fill .25s, r .25s, opacity .2s; }
 .dot--reachable { fill: var(--reachable); cursor: pointer; }
 .dot--reachable:hover, .dot--reachable:focus-visible { fill: var(--ink); outline: none; }
 .dot--visited { fill: var(--dim); }
@@ -117,11 +146,54 @@ html, body {
 }
 .dot--reachable { stroke: var(--bg); stroke-width: 2; vector-effect: non-scaling-stroke; }
 
+/* The instant a click registers, before the travel animation even starts —
+   no dead air between doing something and seeing something. */
+.dot--picked { animation: dotPick .5s ease-out; transform-box: fill-box; transform-origin: center; }
+@keyframes dotPick {
+  0% { transform: scale(1); }
+  35% { transform: scale(2); }
+  100% { transform: scale(1); }
+}
+/* While a hop is travelling, everything except the road actually being
+   driven steps back — attention goes where the marker is, not to the roads
+   that are no longer live options. */
+.map--travelling .dot--reachable:not(.dot--picked) { opacity: .3; }
+.map--travelling .reach-line { opacity: .12; transition: opacity .2s; }
+
+/* The comparison the corner gauge alone can't give you: what your required
+   pace becomes if you pick this candidate, sitting right next to it instead
+   of in a corner you have to look away from the map to read. An estimate,
+   marked as one ("~") — engine.js's previewPace uses assumed tier speeds,
+   the same judgement call the drawn line weight already asks you to make. */
+.pace-chip {
+  text-anchor: middle; font-family: var(--mono); font-weight: 600;
+  paint-order: stroke; stroke: var(--bg); stroke-width: 3.5px; stroke-linejoin: round;
+  pointer-events: none;
+}
+.pace-chip--ok { fill: var(--ink); }
+.pace-chip--tight { fill: var(--amber); }
+.pace-chip--lost { fill: var(--red); }
+
+/* The verdict on the hop that just happened, floating where you were
+   actually looking — the city you just arrived at — not just in the corner
+   HUD, which is easy to lose track of while your eyes are on the map. */
+.arrival-callout { opacity: 0; animation: arrivalFade .3s ease forwards; }
+.arrival-callout--out { opacity: 0 !important; transition: opacity .4s ease; }
+@keyframes arrivalFade { to { opacity: 1; } }
+.arrival-callout__kmh, .arrival-callout__delta {
+  text-anchor: middle; pointer-events: none;
+  paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round;
+}
+.arrival-callout__kmh { font-family: var(--mono); font-weight: 600; fill: var(--ink); }
+.arrival-callout__delta { font-family: var(--mono); }
+.arrival-callout--ahead .arrival-callout__delta { fill: var(--neutral); }
+.arrival-callout--behind .arrival-callout__delta { fill: var(--red); }
+
 /* The roads you could take, drawn as they actually run — and weighted by how
    fast they run, the way a road atlas weights a motorway against a B road.
    Heavy and bright is quick; hairline is a slow road. */
 .reach-line {
-  fill: none; stroke: var(--reachable);
+  fill: none; stroke: var(--road);
   stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
 }
 /* Weight carries the hierarchy; opacity only supports it. A slow road still has
@@ -129,7 +201,7 @@ html, body {
 .reach-line.pace-2 { stroke-width: 3.4; opacity: .95; }
 .reach-line.pace-1 { stroke-width: 2; opacity: .74; }
 .reach-line.pace-0 { stroke-width: 1.2; opacity: .56; }
-.reach-line--hot { stroke: var(--ink); opacity: 1; }
+.reach-line--hot { stroke: var(--road-hot); opacity: 1; }
 
 .leg.pace-2 { stroke-width: 3.6; }
 .leg.pace-1 { stroke-width: 2.4; }
@@ -139,6 +211,16 @@ html, body {
   fill: none; stroke: var(--accent); stroke-width: 2.5;
   stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
 }
+
+/* The hop actually happening: a marker riding the real road, drawn a moment
+   before the committed `.leg` it becomes. Road red while it's still a road
+   you're driving; it hands off to the budget-accent colour of `.leg` the
+   instant it's paid for and becomes part of your travelled route. */
+.hop-preview {
+  fill: none; stroke: var(--road); stroke-width: 2.5; opacity: .9;
+  stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
+}
+.hop-head { fill: var(--road); pointer-events: none; }
 .best.pace-2 { stroke-width: 3.4; }
 .best.pace-1 { stroke-width: 2; }
 .best.pace-0 { stroke-width: 1.2; }
@@ -168,6 +250,19 @@ html, body {
   transition: opacity .6s ease;
 }
 [data-stage="reveal"] .country-label { opacity: .28; }
+
+/* A second, quieter layer of typography: named ranges and seas. Italic marks
+   them as physical rather than political, the way a paper atlas does. */
+.physical-label {
+  fill: var(--dim); opacity: .38; pointer-events: none;
+  font-family: var(--sans); font-style: italic; letter-spacing: .05em;
+  text-anchor: middle;
+  paint-order: stroke; stroke: var(--bg); stroke-width: 3px;
+  stroke-linejoin: round; vector-effect: non-scaling-stroke;
+  transition: opacity .6s ease;
+}
+.physical-label--sea { fill: var(--water-line); letter-spacing: .16em; }
+[data-stage="reveal"] .physical-label { opacity: .24; }
 
 /* No font-size here, and no `font:` shorthand — the shorthand sets font-size and
    CSS beats the presentation attribute, so the labels were sized in map
@@ -224,21 +319,59 @@ html, body {
 }
 .gauge__caption { margin: 10px 0 0; font-size: 12px; color: var(--dim); font-family: var(--mono); }
 
+/* The bet, quantified: budget remaining ÷ crow-flies distance from here,
+   recalculated every hop. This is arithmetic on numbers already on screen —
+   it doesn't reveal a single road's speed, it just makes the stakes of the
+   next guess explicit instead of something you track in your head. Colour
+   answers "how much slack do I actually have" the same way the pace-tier
+   lines already do: the tiers a driver would recognise as safe / tight / a
+   bet you probably lose. */
+.gauge__pace {
+  margin: 4px 0 0; font-size: 12px; font-family: var(--mono); color: var(--dim);
+}
+.gauge__pace strong { font-weight: 500; }
+.gauge__pace--ok strong { color: var(--ink); }
+.gauge__pace--tight strong { color: var(--amber); }
+.gauge__pace--lost strong { color: var(--red); }
+.gauge__pace:empty { display: none; }
+
+/* The driving-hours clock: the player's own status, same visibility tier as
+   the budget above it. Read before a hop trips the mandatory break, not
+   just after — the tiers mirror the pace-bet colours since it's the same
+   kind of read ("how much slack do I actually have"). */
+.gauge__fatigue {
+  margin: 4px 0 0; font-size: 12px; font-family: var(--mono); color: var(--dim);
+}
+.gauge__fatigue strong { font-weight: 500; }
+.gauge__fatigue--ok strong { color: var(--ink); }
+.gauge__fatigue--tight strong { color: var(--amber); }
+.gauge__fatigue--lost strong { color: var(--red); }
+.gauge__fatigue:empty { display: none; }
+
 /* The teaching moment: what the map suggested, against what the road charged.
    Aggregating this until the end is too late to learn anything from. */
 .paid {
-  /* Two lines are reserved whether or not they're used: this sits directly
-     under the gauge, and a line appearing must not shove the HUD around. */
-  margin: 8px 0 0; min-height: 2.8em; font-family: var(--mono); font-size: 12px;
+  /* Room for the story line plus the two-line receipt is reserved whether or
+     not they're used: this sits directly under the gauge, and a line
+     appearing must not shove the HUD around. */
+  margin: 8px 0 0; min-height: 4.6em; font-family: var(--mono); font-size: 12px;
   line-height: 1.4;
   color: var(--dim); opacity: 0; transform: translateY(-3px);
   transition: opacity .35s ease, transform .35s ease;
 }
 .paid--on { opacity: 1; transform: none; }
+/* The narrated line reads like a travelogue, not a receipt — a different
+   voice from the stat line under it, which stays the plain, exact number. */
+.paid__story {
+  display: block; margin-bottom: 6px; font-family: var(--sans); font-style: italic;
+  color: var(--dim); opacity: .9;
+}
+.paid__stat { display: block; }
 .paid strong { font-weight: 500; color: var(--ink); }
 .paid--mid strong { color: var(--amber); }
 .paid--hard strong { color: var(--red); }
 .paid__verdict { display: block; color: var(--dimmer); }
+.paid__break { display: block; color: var(--amber); }
 
 .leg--new { animation: legIn .45s ease-out both; }
 
@@ -280,8 +413,68 @@ html, body {
 .log li { display: flex; justify-content: space-between; gap: 16px; padding: 3px 0; }
 .log li span:first-child { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .log li em { font-style: normal; color: var(--dimmer); margin-left: 8px; }
+/* Needed vs. got, at a glance — the same bet the pace gauge quantified live,
+   now scored after the fact instead of left as prose to parse. */
+.log__delta { font-style: normal; margin-right: 5px; }
+.log__delta--ahead { color: var(--neutral); }
+.log__delta--behind { color: var(--red); }
+.log li em.log__break { display: block; color: var(--amber); margin-left: 0; }
 .log__total { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--dimmer); color: var(--ink); }
 .log__total:empty { display: none; }
+
+/* --- brief ---------------------------------------------------------------
+   The pre-game beat: start, target, budget, and the macro-geography between
+   them — everything already visible once play starts (crow-flies distance,
+   the named ranges/seas layer), just handed over before the first click
+   instead of making the player go find it. Deliberately stops short of
+   naming which road through a range is the fast one — that's still the
+   puzzle. Centred, not side-docked like the reveal: this is the one moment
+   nothing else on screen has happened yet. */
+.brief {
+  position: absolute; z-index: 4; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 52px));
+  padding: 28px; border: 1px solid var(--land-edge); border-radius: 3px;
+  background: var(--panel); backdrop-filter: blur(10px);
+  text-align: center;
+  animation: rise .6s cubic-bezier(.2,.7,.3,1) both;
+}
+.brief[hidden] { display: none; }
+.brief__eyebrow {
+  margin: 0 0 6px; font-family: var(--mono); font-size: 11px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--dim);
+}
+.brief h2 {
+  margin: 0 0 16px; font-family: var(--mono); font-weight: 500;
+  font-size: 1.4rem; letter-spacing: -.01em; color: var(--accent);
+}
+.brief__stats {
+  margin: 0 0 10px; font-family: var(--mono); font-size: 13px; color: var(--ink);
+}
+.brief__pace { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: var(--dim); }
+/* The one rule that has to land before the first hop, not mid-run — a border
+   rather than a filled box (the panel behind it is already --panel), so it
+   reads as a rule set apart from the pace note above it, not a new surface. */
+.brief__rule {
+  margin: 0 0 14px; padding: 2px 0 2px 10px; border-left: 2px solid var(--amber);
+  font-size: 12.5px; line-height: 1.5; color: var(--dim);
+}
+.brief__corridor { margin: 0 0 20px; text-align: left; }
+.brief__corridor:empty { margin: 0 0 8px; }
+.brief__seas { margin: 0 0 10px; font-size: 13px; font-style: italic; line-height: 1.5; color: var(--dim); }
+/* The educational part of the ask: not just a name, but how big the thing
+   actually is (measured off its own geometry) and what that kind of terrain
+   generally means for a road — real facts, not flavour text. */
+.brief__relief { margin: 0; padding: 0; list-style: none; }
+.brief__relief li {
+  margin: 0 0 8px; font-size: 12.5px; line-height: 1.5; color: var(--dim);
+}
+.brief__relief strong { color: var(--ink); font-weight: 500; }
+.brief__relief li:last-child { margin-bottom: 0; }
+#briefStart {
+  font: inherit; font-size: 13px; padding: 10px 22px; cursor: pointer;
+  color: var(--bg); background: var(--accent); border: 0; border-radius: 2px;
+}
+[data-stage="brief"] .hint { opacity: 0; }
 
 /* --- reveal ------------------------------------------------------------- */
 .reveal {
@@ -339,6 +532,25 @@ html, body {
 .reset-view:hover { color: var(--ink); }
 [data-stage="reveal"] .reset-view { display: none; }
 
+/* A road's length is already meant to be read off the map; this just
+   calibrates the eye for it. It says nothing about how fast a road runs. */
+.scale-bar {
+  position: absolute; z-index: 2; left: 50%; bottom: 22px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+  pointer-events: none;
+}
+.scale-bar__tick {
+  display: block; height: 0; border-top: 2px solid var(--dimmer);
+  position: relative;
+}
+.scale-bar__tick::before, .scale-bar__tick::after {
+  content: ''; position: absolute; top: -4px; width: 1px; height: 8px; background: var(--dimmer);
+}
+.scale-bar__tick::before { left: 0; }
+.scale-bar__tick::after { right: 0; }
+[data-stage="reveal"] .scale-bar { opacity: 0; }
+
 .hint {
   position: absolute; z-index: 2; right: 26px; bottom: 22px;
   max-width: 260px; text-align: right; font-size: 12px; line-height: 1.5; color: var(--dimmer);
@@ -353,7 +565,7 @@ html, body {
   display: flex; align-items: center; justify-content: flex-end; gap: 9px;
   font-family: var(--mono); font-size: 11px; padding: 2px 0;
 }
-.roadkey__line { display: block; width: 26px; border-top-style: solid; border-top-color: var(--reachable); }
+.roadkey__line { display: block; width: 26px; border-top-style: solid; border-top-color: var(--road); }
 .roadkey__line--2 { border-top-width: 3.4px; opacity: .95; }
 .roadkey__line--1 { border-top-width: 2px; opacity: .74; }
 .roadkey__line--0 { border-top-width: 1.2px; opacity: .56; }
@@ -389,6 +601,9 @@ html, body {
 [data-stage="reveal"] .reset-view { display: none; }
 
 .hint { display: none; }
+  /* The hop log already claims this corner of a narrow screen; the scale bar
+     loses the fight for it. */
+  .scale-bar { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

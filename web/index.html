@@ -25,7 +25,12 @@
         <div class="gauge__over" id="gaugeOver"></div>
       </div>
       <p class="gauge__caption" id="caption">remaining of <span id="budget">0</span> km</p>
-      <p class="paid" id="paid" aria-live="polite"></p>
+      <p class="gauge__pace" id="gaugePace"></p>
+      <p class="gauge__fatigue" id="gaugeFatigue"></p>
+      <p class="paid" id="paid" aria-live="polite">
+        <span class="paid__story" id="paidStory"></span>
+        <span class="paid__stat" id="paidStat"></span>
+      </p>
       <p class="race-clock" id="raceClock" hidden></p>
     </div>
   </header>
@@ -36,7 +41,12 @@
         <clipPath id="landClip"></clipPath>
       </defs>
       <g id="countries"></g>
+      <!-- A lat/long grid, faint chart furniture under everything else. It's
+           computed from the same projection as the roads, not fetched, and it
+           tells a player nothing a road doesn't. -->
+      <g id="graticule" aria-hidden="true"></g>
       <g id="countryLabels" aria-hidden="true"></g>
+      <g id="physicalLabels" aria-hidden="true"></g>
       <!-- Above the country fills, not below them: it blends onto the land it
            is modelling, and the clip keeps it off the sea. -->
       <image id="terrain" href="terrain.webp" clip-path="url(#landClip)" preserveAspectRatio="none"></image>
@@ -44,17 +54,28 @@
            request starts and the image is fetched exactly once. -->
       <image id="terrainDetail" clip-path="url(#landClip)" preserveAspectRatio="none"></image>
       <g id="terrainTiles" clip-path="url(#landClip)"></g>
+      <!-- Built-up footprints, above the relief so the tint actually shows. -->
+      <g id="urban" aria-hidden="true"></g>
       <g id="rivers"></g>
       <g id="lakes"></g>
       <!-- Borders go above the relief. Underneath it they were being washed out
            by the hillshade's overlay blend, which is why they disappeared. -->
       <g id="borders"></g>
+      <!-- Background towns: unlabelled, inert, below the playable roster's own
+           dots so they never compete with something you can actually click. -->
+      <g id="towns" aria-hidden="true"></g>
       <g id="optimalRoute"></g>
       <g id="travelled"></g>
       <g id="race"></g>
       <g id="reach"></g>
       <g id="dots"></g>
       <g id="labels"></g>
+      <!-- The comparison the corner gauge alone couldn't give you: what your
+           required pace becomes if you pick each candidate, right next to it. -->
+      <g id="pacePreview" aria-hidden="true"></g>
+      <!-- The verdict on your last hop, where you were actually looking when
+           it landed — not just in the corner HUD. -->
+      <g id="arrivalCallout" aria-hidden="true"></g>
     </svg>
   </div>
 
@@ -62,6 +83,16 @@
     <ol id="hops"></ol>
     <div class="log__total" id="logTotal"></div>
   </aside>
+
+  <section class="brief" id="brief" hidden>
+    <p class="brief__eyebrow">Today's route</p>
+    <h2 id="briefTrip">— → —</h2>
+    <p class="brief__stats" id="briefStats"></p>
+    <p class="brief__pace" id="briefPace"></p>
+    <p class="brief__rule" id="briefRule"></p>
+    <div class="brief__corridor" id="briefCorridor"></div>
+    <button id="briefStart" type="button">Start driving</button>
+  </section>
 
   <section class="reveal" id="reveal" hidden>
     <h2 id="revealVerdict">—</h2>
@@ -81,6 +112,11 @@
   </section>
 
   <button class="reset-view" id="resetView" type="button" hidden>Reset view</button>
+
+  <div class="scale-bar" id="scaleBar" aria-hidden="true">
+    <span class="scale-bar__tick" id="scaleBarTick"></span>
+    <span class="scale-bar__label" id="scaleBarLabel">0 km</span>
+  </div>
 
   <div class="hint" id="hint">
     <p>Pick a neighbouring city. You pay the hours the road takes.</p>

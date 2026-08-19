@@ -17,20 +17,33 @@ function decodeShape(deltas, quant) {
 }
 
 export function buildGraph(data) {
-  const cities = data.cities.map(([name, country, x, y], i) => ({ i, name, country, x, y }));
+  const countryNames = data.countryNames || {};
+  const cities = data.cities.map(([name, country, x, y], i) => (
+    { i, name, country, countryName: countryNames[country] || country, x, y }
+  ));
   const adj = cities.map(() => []);
   const quant = data.quant || 4;
-  for (const [a, b, km, min, tiers, ...deltas] of data.edges) {
+  const roadNames = data.roadNames || [];
+  data.edges.forEach(([a, b, km, min, tiers, ...deltas], i) => {
     const shape = decodeShape(deltas, quant);
     const pace = [...tiers].map(Number);
-    adj[a].push({ to: b, km, min, shape, pace });
-    adj[b].push({ to: a, km, min, shape, pace });
-  }
+    // [label, km, sharePercent] of the road's longest named stretch — real
+    // OSRM refs/names, for narration only. Never read by the routing itself.
+    const road = roadNames[i] ? { label: roadNames[i][0], km: roadNames[i][1], share: roadNames[i][2] } : null;
+    adj[a].push({ to: b, km, min, shape, pace, road });
+    adj[b].push({ to: a, km, min, shape, pace, road });
+  });
   return {
     cities, adj, n: cities.length,
     view: data.view, countries: data.countries,
     lakes: data.lakes || [], rivers: data.rivers || [],
     countryLabels: (data.countryLabels || []).map(([name, x, y]) => ({ name, x, y })),
+    urbanAreas: data.urbanAreas || [],
+    physicalLabels: (data.physicalLabels || []).map(([name, x, y, kind, lengthKm, peakName, peakM, blurb, pacePct]) => (
+      { name, x, y, kind, lengthKm, peakName, peakM, blurb, pacePct }
+    )),
+    towns: (data.towns || []).map(([x, y, tier]) => ({ x, y, tier })),
+    graticule: data.graticule || [],
   };
 }
 
@@ -117,20 +130,129 @@ function trace(g, prev, src, dst) {
   return { path, minutes: Math.round(minutes), km: Math.round(km) };
 }
 
-/** The answer the engine always knows and the player never needs. */
+/** The answer the engine always knows and the player never needs — real driving time only. */
 export function fastestRoute(g, src, dst) {
   return trace(g, dijkstra(g, src).prev, src, dst);
 }
 
-/** The trap: the route you get by trusting the map and taking the short way. */
+/**
+ * The trap: the route you get by trusting the map and taking the short way.
+ * Charged the same driving-hours rule as any other route — the shortest road
+ * doesn't skip mandatory breaks any more than the fastest one does, so its
+ * minutes have to come from walking the path with hosCost, not a plain sum
+ * of edge.min (mirrors play/bots.mjs's shortestRouter exactly).
+ */
 export function shortestRoute(g, src, dst) {
-  return trace(g, dijkstra(g, src, (e) => e.km).prev, src, dst);
+  const { path } = trace(g, dijkstra(g, src, (e) => e.km).prev, src, dst);
+  let minutes = 0, km = 0, sinceRest = 0;
+  for (let i = 1; i < path.length; i++) {
+    const e = g.adj[path[i - 1]].find((x) => x.to === path[i]);
+    const cost = hosCost(sinceRest, e.min);
+    minutes += cost.charged; km += e.km; sinceRest = cost.sinceRest;
+  }
+  return { path, minutes: Math.round(minutes), km: Math.round(km) };
+}
+
+// --- endurance-racing rules: EU professional-driver hours (EC 561/2006) ----
+// Real regulation, simplified for a turn-based game: 4.5 hours (270 min) of
+// continuous driving forces a 45-minute break, charged in whole units at hop
+// boundaries. Mirrors scripts/lib/graph.mjs's hosCost/hosDijkstra exactly —
+// same rule, same numbers — kept as a second copy here the way this file
+// already keeps its own dijkstra() rather than importing the Node one, since
+// nothing here can import fs-touching build scripts into the browser.
+export const HOS_CONTINUOUS_LIMIT = 270;
+export const HOS_BREAK_MIN = 45;
+
+/** Minutes actually charged for a hop, and the driving-clock state it leaves you in. */
+export function hosCost(sinceRest, hopMin) {
+  const total = sinceRest + hopMin;
+  const breaks = Math.floor(total / HOS_CONTINUOUS_LIMIT);
+  return { charged: hopMin + breaks * HOS_BREAK_MIN, sinceRest: total % HOS_CONTINUOUS_LIMIT, breaks };
+}
+
+/**
+ * The fastest *legal* route: Dijkstra over (city, minutes-since-last-break)
+ * states, since the same road can cost a hop's plain minutes or that plus a
+ * mandatory break depending on how much continuous driving is already
+ * banked on arrival — genuinely path-dependent, not something a plain
+ * shortest path can answer. Mirrors scripts/lib/graph.mjs's hosDijkstra —
+ * same algorithm, kept as its own copy for the reason dijkstra() above
+ * already is one: nothing here can import the Node build scripts.
+ * Runs once, on demand, at the reveal — not hot-path code.
+ */
+class MinHeap {
+  constructor() { this.a = []; }
+  get size() { return this.a.length; }
+  push(item, key) {
+    const a = this.a; a.push([key, item]);
+    let i = a.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (a[p][0] <= a[i][0]) break;
+      [a[p], a[i]] = [a[i], a[p]]; i = p;
+    }
+  }
+  pop() {
+    const a = this.a;
+    const top = a[0];
+    const last = a.pop();
+    if (a.length) {
+      a[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1, r = l + 1;
+        let m = i;
+        if (l < a.length && a[l][0] < a[m][0]) m = l;
+        if (r < a.length && a[r][0] < a[m][0]) m = r;
+        if (m === i) break;
+        [a[m], a[i]] = [a[i], a[m]]; i = m;
+      }
+    }
+    return top && top[1];
+  }
+}
+
+export function hosRoute(g, src, dst) {
+  const L = HOS_CONTINUOUS_LIMIT;
+  const state = (city, rest) => city * L + rest;
+  const dist = new Map(), prev = new Map(), done = new Set();
+  const start = state(src, 0);
+  dist.set(start, 0);
+  const heap = new MinHeap();
+  heap.push(start, 0);
+  let bestState = -1, bestDist = Infinity;
+
+  while (heap.size) {
+    const u = heap.pop();
+    if (done.has(u)) continue;
+    done.add(u);
+    const city = Math.floor(u / L), rest = u % L;
+    if (city === dst) { bestState = u; bestDist = dist.get(u); break; }
+    const d = dist.get(u);
+    for (const e of g.adj[city]) {
+      const c = hosCost(rest, e.min);
+      const v = state(e.to, c.sinceRest);
+      const nd = d + c.charged;
+      if (nd < (dist.get(v) ?? Infinity)) { dist.set(v, nd); prev.set(v, u); heap.push(v, nd); }
+    }
+  }
+  if (bestState === -1) return { path: [], minutes: Infinity, km: 0, stuck: true };
+
+  const path = [];
+  for (let v = bestState; v !== undefined; v = prev.get(v)) {
+    path.push(Math.floor(v / L));
+    if (v === start) break;
+  }
+  path.reverse();
+  let km = 0;
+  for (let i = 1; i < path.length; i++) km += g.adj[path[i - 1]].find((e) => e.to === path[i]).km;
+  return { path, minutes: Math.round(bestDist), km: Math.round(km), stuck: false };
 }
 
 export function newRound(g, { a, b, budget }) {
   return {
     start: a, target: b, budget,
-    at: a, spent: 0, km: 0,
+    at: a, spent: 0, km: 0, sinceRest: 0,
     visited: new Set([a]),
     hops: [],
     finished: false,
@@ -145,9 +267,16 @@ export function options(g, round) {
 export function hop(g, round, to) {
   const edge = options(g, round).find((e) => e.to === to);
   if (!edge) return round;
-  round.hops.push({ from: round.at, to, km: edge.km, min: edge.min });
-  round.spent += edge.min;
+  const cost = hosCost(round.sinceRest, edge.min);
+  // driveMin is the road's own time — what speedOf/narration read, so a
+  // forced break never makes a fast road look slow. min is what the budget
+  // actually pays: driving plus whatever break it triggered.
+  round.hops.push({
+    from: round.at, to, km: edge.km, driveMin: edge.min, breakMin: cost.charged - edge.min, min: cost.charged,
+  });
+  round.spent += cost.charged;
   round.km += edge.km;
+  round.sinceRest = cost.sinceRest;
   round.at = to;
   round.visited.add(to);
   if (to === round.target) round.finished = true;
@@ -157,6 +286,58 @@ export function hop(g, round, to) {
 
 export const remaining = (round) => round.budget - round.spent;
 
+// --- the corridor bet, made comparable --------------------------------
+// The current hop's pace tier is exact — it's drawn that way. What's still
+// unknown is exactly how fast the "ordinary" 65-85 km/h stretch of it runs.
+// ASSUMED_KMH is a nominal midpoint per tier, used only to estimate that —
+// the same judgement a player is already asked to make from the drawn line
+// weight, just doing the arithmetic instead of leaving it to be eyeballed.
+const ASSUMED_KMH = [50, 75, 95]; // slow, ordinary, motorway
+
+/** A rough, honestly-labelled minutes estimate for a hop not yet taken. */
+export function estimateHopMinutes(edge) {
+  const mix = paceMix(edge);
+  const kmh = mix[0] * ASSUMED_KMH[0] + mix[1] * ASSUMED_KMH[1] + mix[2] * ASSUMED_KMH[2];
+  return (edge.km / kmh) * 60;
+}
+
+/**
+ * Budget remaining ÷ crow-flies distance to the target, from wherever the
+ * player is actually standing. Pure arithmetic on numbers already on
+ * screen — it can't leak a single road's speed. A floor, not a promise:
+ * real roads run longer than the straight line.
+ */
+export function requiredPace(g, round) {
+  const left = remaining(round);
+  if (left <= 0) return Infinity;
+  return crow(g, round.at, round.target) / (left / 60);
+}
+
+/**
+ * What requiredPace becomes if the player takes a specific hop next — an
+ * ESTIMATE (built on estimateHopMinutes), not a promise, since the real
+ * minutes a hop costs are still hidden until it's actually taken. Lets a
+ * player compare candidates side by side instead of holding the arithmetic
+ * for each one in their head.
+ */
+export function previewPace(g, round, to) {
+  const edge = g.adj[round.at].find((e) => e.to === to);
+  if (!edge) return null;
+  // The driving-hours clock is the player's own status, not a fact about the
+  // road — same visibility tier as the budget itself — so the preview is
+  // fair to account for it, using the same estimated minutes it already
+  // guesses everything else with.
+  const cost = hosCost(round.sinceRest, estimateHopMinutes(edge));
+  const leftAfter = remaining(round) - cost.charged;
+  if (leftAfter <= 0) return Infinity;
+  return crow(g, to, round.target) / (leftAfter / 60);
+}
+
+/** The same safe/tight/lost read the pace-tier lines already use. */
+export function paceRisk(kmh) {
+  return kmh >= 85 ? 'lost' : kmh >= 65 ? 'tight' : 'ok';
+}
+
 /** Minutes as a driver reads them: 27h15. */
 export function hhmm(minutes) {
   const sign = minutes < 0 ? '−' : '';
@@ -164,12 +345,51 @@ export function hhmm(minutes) {
   return `${sign}${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`;
 }
 
-export const speedOf = (h) => h.km / (h.min / 60);
+// The road's own pace — driving time only. A hop that happened to trigger a
+// mandatory break shouldn't read as a slower road than it actually is;
+// h.driveMin falls back to h.min for anything that predates the field.
+export const speedOf = (h) => h.km / ((h.driveMin ?? h.min) / 60);
 
 /** How the road ran, which is the thing the map would not tell you. */
 export function hopGlyph(h) {
   const kmh = speedOf(h);
   return kmh < 65 ? '▲' : kmh < 85 ? '◆' : '·';
+}
+
+const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+
+export function bearingWord(g, from, to) {
+  const a = g.cities[from], b = g.cities[to];
+  const deg = (Math.atan2(b.x - a.x, a.y - b.y) * 180 / Math.PI + 360) % 360;
+  return COMPASS[Math.round(deg / 45) % 8];
+}
+
+/**
+ * One sentence about how a hop actually went — the road's own name/ref
+ * (scripts/06-road-names.mjs, from OSRM; narration only, never routing), the
+ * direction, and the pace mix that was already shown as line weight before
+ * the player committed. Deliberately stops short of the time/km/km-h receipt
+ * — that's shown numerically alongside this, not restated in prose.
+ */
+export function narrateHop(g, h) {
+  const edge = g.adj[h.from].find((e) => e.to === h.to);
+  const from = g.cities[h.from].name, to = g.cities[h.to].name;
+  const dir = bearingWord(g, h.from, h.to);
+  const kmh = speedOf(h);
+  const mix = edge ? paceMix(edge) : [0, 1, 0];
+  const road = edge && edge.road;
+
+  const onRoad = road
+    ? (road.share >= 55 ? `the ${road.label}` : `mostly the ${road.label}`)
+    : 'back roads';
+
+  const verdict = kmh >= 85
+    ? `clear on ${onRoad} the whole way`
+    : kmh >= 65
+      ? (mix[0] > 0.35 ? `on ${onRoad}, but it slows for stretches` : `a steady run on ${onRoad}`)
+      : (mix[2] > 0.15 ? `on ${onRoad} — fast where it can be, crawling everywhere else` : `on ${onRoad}, and it never opens up`);
+
+  return `Out of ${from} heading ${dir}, ${verdict} to ${to}.`;
 }
 
 export function shareString(g, round, dayNumber) {

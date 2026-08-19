@@ -147,23 +147,88 @@ for (const e of edges) {
 edges.length = 0;
 edges.push(...direct);
 
-// --- connectivity ----------------------------------------------------------
-// Whatever is left over after the filters is by definition unreachable by road,
-// so it leaves the game: islands, and anything hanging off a single ferry.
-const adj = cities.map(() => []);
-for (const e of edges) { adj[e.a].push(e.b); adj[e.b].push(e.a); }
-
-const comp = new Array(cities.length).fill(-1);
-const sizes = [];
-for (let s = 0; s < cities.length; s++) {
-  if (comp[s] !== -1) continue;
-  const id = sizes.length; let n = 0; const stack = [s]; comp[s] = id;
-  while (stack.length) {
-    const v = stack.pop(); n++;
-    for (const w of adj[v]) if (comp[w] === -1) { comp[w] = id; stack.push(w); }
+function componentsOf(edgeList) {
+  const a = cities.map(() => []);
+  for (const e of edgeList) { a[e.a].push(e.b); a[e.b].push(e.a); }
+  const c = new Array(cities.length).fill(-1);
+  const sz = [];
+  for (let s = 0; s < cities.length; s++) {
+    if (c[s] !== -1) continue;
+    const id = sz.length; let n = 0; const stack = [s]; c[s] = id;
+    while (stack.length) {
+      const v = stack.pop(); n++;
+      for (const w of a[v]) if (c[w] === -1) { c[w] = id; stack.push(w); }
+    }
+    sz.push(n);
   }
-  sizes.push(n);
+  return { comp: c, sizes: sz };
 }
+
+// --- rescue --------------------------------------------------------------
+// MAX_EDGE_KM/MAX_DETOUR_RATIO are tuned for typical Central European
+// distances. Fjord and mountain geography breaks that assumption: measured
+// directly, Bergen (Norway's 2nd-largest city) has *zero* surviving
+// candidates under the normal caps — every real route out of it is a
+// 1.5-1.8x detour around a fjord, or a touch over 420 km, or both. That's not
+// "no road exists," it's the fixed continental cap being wrong for this
+// terrain. One rescue edge per otherwise-stranded city — its single cheapest
+// real connection to the main component, cap loosened but not removed, ferry
+// rule unchanged — puts it back on the map without loosening anything for
+// the rest of the continent. A city that's stranded for a *real* reason
+// (Crete, Sicily — genuinely only reachable by a real ferry) fails the
+// rescue too, for the same reason it failed the first time, and correctly
+// stays out.
+const RESCUE_CANDIDATE_KM = 700;
+const RESCUE_KNN = 10;
+const RESCUE_MAX_EDGE_KM = 700;
+
+const strictResult = componentsOf(edges);
+const strictMain = strictResult.sizes.indexOf(Math.max(...strictResult.sizes));
+const stranded = cities.filter((c) => strictResult.comp[c.i] !== strictMain);
+const mainland = cities.filter((c) => strictResult.comp[c.i] === strictMain);
+
+if (stranded.length) {
+  console.log(`\nrescue: ${stranded.length} cities stranded by the normal caps — `
+    + `${stranded.map((c) => c.name).join(', ')}`);
+  const rescueJobs = [];
+  for (const s of stranded) {
+    const near = mainland
+      .map((c) => ({ c, km: haversineKm(s, c) }))
+      .filter((d) => d.km <= RESCUE_CANDIDATE_KM)
+      .sort((x, y) => x.km - y.km)
+      .slice(0, RESCUE_KNN);
+    for (const n of near) rescueJobs.push({ a: s, b: n.c, key: `${s.geonameid}-${n.c.geonameid}` });
+  }
+  if (rescueJobs.length) {
+    const rescueMeasured = await measurePairs(rescueJobs, (done, tot) => {
+      if (done % 25 === 0 || done === tot) console.log(`  rescue-routed ${done}/${tot}`);
+    });
+    const byCity = new Map();
+    rescueJobs.forEach((j, idx) => {
+      const r = rescueMeasured[idx];
+      if (!r || !r.km) return;
+      if (r.ferryKm > MAX_FERRY_KM) return; // the ferry rule is not a loosen-able cap
+      if (r.km > RESCUE_MAX_EDGE_KM) return;
+      const cur = byCity.get(j.a.i);
+      if (!cur || r.km < cur.km) byCity.set(j.a.i, { to: j.b.i, km: r.km, min: r.min, geometry: r.geometry, steps: r.steps });
+    });
+    for (const s of stranded) {
+      const best = byCity.get(s.i);
+      if (!best) { console.log(`  ${s.name}: no rescue found even at ${RESCUE_CANDIDATE_KM}km/${RESCUE_MAX_EDGE_KM}km — stays out`); continue; }
+      edges.push({
+        a: s.i, b: best.to, km: Math.round(best.km), min: Math.round(best.min),
+        geometry: thinGeometry(best.geometry), steps: best.steps,
+      });
+      console.log(`  ${s.name} -> ${cities[best.to].name}: rescued at ${best.km.toFixed(0)} km`);
+    }
+  }
+}
+
+// --- connectivity ----------------------------------------------------------
+// Whatever is left over after the filters (rescue included) is by definition
+// unreachable by road, so it leaves the game: islands, and anything hanging
+// off a single ferry.
+const { comp, sizes } = componentsOf(edges);
 const main = sizes.indexOf(Math.max(...sizes));
 
 const keep = cities.filter((c) => comp[c.i] === main);

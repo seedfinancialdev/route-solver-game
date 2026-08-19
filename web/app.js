@@ -1,6 +1,8 @@
 import {
-  buildGraph, crow, roadPath, roadRuns, paceMix, fastestRoute, shortestRoute,
+  buildGraph, crow, roadPath, roadRuns, paceMix, shortestRoute, hosRoute, hosCost,
   newRound, options, hop, remaining, hopGlyph, speedOf, hhmm, shareString, dayNumber,
+  bearingWord, narrateHop, requiredPace, previewPace, paceRisk,
+  HOS_CONTINUOUS_LIMIT, HOS_BREAK_MIN,
 } from './engine.js';
 
 const $ = (id) => document.getElementById(id);
@@ -10,7 +12,6 @@ const el = (name, attrs = {}) => {
   for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
   return node;
 };
-const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
 
 const app = $('app');
 const params = new URLSearchParams(location.search);
@@ -27,11 +28,16 @@ if (params.has('random')) {
   puzzle = data.puzzles[((day - 1) % data.puzzles.length + data.puzzles.length) % data.puzzles.length];
 }
 const [START, TARGET, BUDGET] = puzzle;
-const best = fastestRoute(g, START, TARGET);
+const best = hosRoute(g, START, TARGET);
 const trap = shortestRoute(g, START, TARGET);
 const storeKey = day === null ? null : `route:day:${day}`;
 
 let round = newRound(g, { a: START, b: TARGET, budget: BUDGET });
+// The required pace at the moment each hop was chosen, parallel to
+// round.hops — for scoring "needed vs. got" after the fact. Live play only;
+// a restored (already-finished) round has no history to reconstruct this
+// from, so its log simply shows no delta.
+let neededAtHop = [];
 
 // --- static map ------------------------------------------------------------
 const map = $('map');
@@ -165,6 +171,32 @@ const countryLabels = g.countryLabels.map((c) => {
   return node;
 });
 
+// Named ranges, plateaus and seas — one layer further from the surface than a
+// country name, same idea: it says where you are, not which road is quick.
+const physicalLabels = g.physicalLabels.map((p) => {
+  const node = el('text', { x: p.x, y: p.y, class: `physical-label physical-label--${p.kind}` });
+  node.textContent = p.kind === 'sea' ? p.name.toUpperCase() : p.name;
+  $('physicalLabels').append(node);
+  return node;
+});
+
+// A faint lat/long grid, pure chart furniture.
+for (const d of g.graticule) $('graticule').append(el('path', { d, class: 'graticule-line' }));
+
+// Built-up footprints. A dot is a city; this is the sprawl a dot can't show —
+// static geometry that isn't connected to a single road, so it can't leak
+// anything about which one runs fast.
+for (const d of g.urbanAreas) $('urban').append(el('path', { d, class: 'urban' }));
+
+// Background towns: everything that would have qualified for the roster but
+// lost out to the 75km spacing rule (00-cities.mjs). Unlabelled and inert —
+// they connect to nothing, so they can only make the map look lived-in.
+const towns = g.towns.map((t) => {
+  const node = el('circle', { cx: t.x, cy: t.y, r: 1, class: `town${t.tier ? ' town--big' : ''}` });
+  $('towns').append(node);
+  return node;
+});
+
 const dots = g.cities.map((c) => {
   const node = el('circle', { cx: c.x, cy: c.y, r: 4, class: 'dot' });
   $('dots').append(node);
@@ -179,6 +211,100 @@ $('dots').append(targetRing, hereRing);
 $('origin').textContent = g.cities[START].name;
 $('destination').textContent = g.cities[TARGET].name;
 $('budget').textContent = hhmm(BUDGET);
+
+// --- the brief ---------------------------------------------------------
+// Everything here is already visible once play starts — crow-flies distance,
+// the named-ranges/seas layer — just handed over before the first click
+// instead of making the player scroll around to find it. It stops at naming
+// what's in the way, never which road through it is the quick one: that's
+// still the puzzle.
+function distToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2)) : 0;
+  return { d: Math.hypot(px - (ax + t * dx), py - (ay + t * dy)), t };
+}
+
+// The physical-labels source (Natural Earth's geography_regions) writes
+// bigger features in ALL CAPS and smaller ones in title case — a size cue
+// that works fine as a map label but reads like a typo inline in a sentence
+// ("...then CARPATHIAN MOUNTAINS"). Normalised for prose only; the map labels
+// keep the source casing.
+const titleCase = (s) => s.replace(/\S+/g, (w) => w[0].toUpperCase() + w.slice(1).toLowerCase());
+
+/** Named ranges/plains/seas that sit near the straight line, in travel order. */
+function corridorFeatures(aIdx, bIdx, maxKm = 180, limit = 6) {
+  const a = g.cities[aIdx], b = g.cities[bIdx];
+  const hits = [];
+  for (const p of g.physicalLabels) {
+    const { d, t } = distToSegment(p.x, p.y, a.x, a.y, b.x, b.y);
+    if (d <= maxKm) hits.push({ ...p, name: titleCase(p.name), t });
+  }
+  hits.sort((x, y) => x.t - y.t);
+  return hits.slice(0, limit);
+}
+
+function renderBrief() {
+  const crowKm = Math.round(crow(g, START, TARGET));
+  const kmh = crowKm / (BUDGET / 60);
+  const from = g.cities[START], to = g.cities[TARGET];
+  $('briefTrip').textContent = `${from.name}, ${from.countryName} → ${to.name}, ${to.countryName}`;
+  $('briefStats').textContent = `${crowKm.toLocaleString()} km as the crow flies · ${hhmm(BUDGET)} in the bank`;
+  $('briefPace').textContent =
+    `That's an average of ${Math.round(kmh)} km/h, door to door, if you drove it in a straight line.`;
+  // The one racing rule that applies before a single hop is chosen, not just
+  // read off a road: real driving hours (EC 561/2006, simplified). It has to
+  // land here, not discovered mid-run, since it changes what "the fastest
+  // way" even means before the player commits to anything.
+  $('briefRule').textContent =
+    `One rule of the road: ${hhmm(HOS_CONTINUOUS_LIMIT)} behind the wheel without a stop forces a `
+    + `${HOS_BREAK_MIN}-minute break, charged against your budget like anything else. Plan around it.`;
+
+  const features = corridorFeatures(START, TARGET);
+  const seas = features.filter((f) => f.kind === 'sea').map((f) => f.name).slice(0, 2);
+  const relief = features.filter((f) => f.kind === 'relief').slice(0, 3);
+
+  const corridor = $('briefCorridor');
+  corridor.replaceChildren();
+  if (seas.length) {
+    const p = document.createElement('p');
+    p.className = 'brief__seas';
+    p.textContent = `Along the way: the ${seas.join(' and the ')} coast.`;
+    corridor.append(p);
+  }
+  if (relief.length) {
+    const ul = document.createElement('ul');
+    ul.className = 'brief__relief';
+    for (const r of relief) {
+      const li = document.createElement('li');
+      const strong = document.createElement('strong');
+      strong.textContent = r.name;
+      // Real, hand-checked figures for the ranges most players will
+      // recognise (03-map.mjs RANGE_FACTS); the generic landform-type note
+      // otherwise. No invented specifics for the rest — see 03-map.mjs for
+      // why the polygon geometry itself isn't trustworthy for size.
+      const facts = r.lengthKm
+        ? ` About ${r.lengthKm} km end to end, rising to ${r.peakName} at ${r.peakM.toLocaleString()} m.`
+        : '';
+      // Real and computed (03-map.mjs paceDeviation): the actual distance-
+      // weighted average speed of roads near this region against the
+      // network-wide average. Not every range is slow — some, oddly, run
+      // faster — which is the entire point of learning this rather than
+      // assuming "mountains are slow" and calling it a strategy.
+      const pace = r.pacePct != null
+        ? ` Roads through here run about ${Math.abs(r.pacePct)}% ${r.pacePct < 0 ? 'slower' : 'faster'} than the network average.`
+        : '';
+      const blurb = r.blurb ? ` ${r.blurb.charAt(0).toUpperCase()}${r.blurb.slice(1)}.` : '';
+      li.append(strong, document.createTextNode(` —${facts}${pace}${blurb}`));
+      ul.append(li);
+    }
+    corridor.append(ul);
+  }
+}
+$('briefStart').addEventListener('click', () => {
+  $('brief').hidden = true;
+  app.dataset.stage = 'playing';
+});
 
 // --- camera ----------------------------------------------------------------
 // The frame above is only a starting position. Past that the player drives the
@@ -221,6 +347,31 @@ function resizeMarks() {
   // player zooms right in — at that scale they are noise, not orientation.
   const countryPx = camera && camera.w < 900 ? 0 : 16;
   for (const label of countryLabels) label.setAttribute('font-size', countryPx * unit);
+  // Physical names (ranges, seas) fade in a touch later than country names —
+  // they're the second layer of orientation, not the first — and step away
+  // at the same zoom, once the roads themselves are what's worth reading.
+  const physicalPx = camera && camera.w < 700 ? 0 : 12.5;
+  for (const label of physicalLabels) label.setAttribute('font-size', physicalPx * unit);
+  // Background towns hold a constant dot size too, and fade out once the
+  // player is zoomed out far enough that they'd just be noise between the
+  // cities that matter. They also shrink well below click-target size in a
+  // ring around wherever the player is actually standing — a full-size
+  // background town parked next to the current city, at the exact zoom a
+  // player is scanning for candidates, reads as a missed connection. Shrunk
+  // rather than hidden outright: killing them completely was trading away
+  // exactly the "lived-in" texture right where the player is looking most.
+  const townR = camera && camera.w > 2600 ? 0 : 1;
+  const TOWN_KEEPOUT_KM = 120;
+  const at = g.cities[round.at];
+  towns.forEach((node, i) => {
+    const t = g.towns[i];
+    const near = Math.hypot(t.x - at.x, t.y - at.y) < TOWN_KEEPOUT_KM;
+    const base = node.classList.contains('town--big') ? townR * 1.7 : townR;
+    const r = near ? base * 0.4 : base;
+    node.setAttribute('r', r * unit);
+  });
+  for (const chip of $('pacePreview').children) chip.setAttribute('font-size', 11 * unit);
+  updateScaleBar();
 
   // The relief is 1.8 km per pixel at source. Zoomed in past roughly a
   // kilometre per pixel it stops being terrain and starts being blur, so it
@@ -238,6 +389,22 @@ function resizeMarks() {
     ensureTerrainTiles();
     updateTerrainLayers();
   }
+}
+
+// A road's length is meant to be readable off the map — "you can see exactly
+// how long each road is" is the deal the game makes with the player — so a
+// scale bar is furniture for a mechanic that's already meant to be visible,
+// not a new one. It never reveals a road's *speed*, only confirms its length.
+const SCALE_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000];
+function updateScaleBar() {
+  const rect = map.getBoundingClientRect();
+  if (!rect.width || !camera) return;
+  const kmPerPx = camera.w / rect.width;
+  const targetKm = 110 * kmPerPx;
+  const km = SCALE_STEPS.reduce((best, v) => (
+    Math.abs(Math.log(v / targetKm)) < Math.abs(Math.log(best / targetKm)) ? v : best), SCALE_STEPS[0]);
+  $('scaleBarTick').style.width = `${km / kmPerPx}px`;
+  $('scaleBarLabel').textContent = `${km.toLocaleString()} km`;
 }
 
 function layout() {
@@ -369,6 +536,43 @@ function paint({ animate = false } = {}) {
 
   $('remaining').textContent = hhmm(left);
 
+  // The bet, quantified: what average pace the rest of the trip needs, given
+  // where you're actually standing and what's actually left of the budget.
+  // Pure arithmetic on numbers already on screen — crow-flies distance and
+  // remaining time — so it can't leak a single road's speed. It's a floor,
+  // not a promise: real roads run longer than the straight line.
+  const pace = $('gaugePace');
+  const needed = requiredPace(g, round);
+  if (round.finished || !Number.isFinite(needed)) {
+    pace.replaceChildren();
+    pace.className = 'gauge__pace';
+  } else {
+    const strong = document.createElement('strong');
+    strong.textContent = `${Math.round(needed)} km/h`;
+    pace.className = `gauge__pace gauge__pace--${paceRisk(needed)}`;
+    pace.replaceChildren(document.createTextNode('needs '), strong, document.createTextNode(' minimum from here'));
+  }
+
+  // EU driving-hours rule (EC 561/2006, simplified): 4.5 continuous hours
+  // force a 45-minute break. This is the player's own status, not a fact
+  // about a road — same visibility tier as the budget gauge above it — so it
+  // has to be readable before the hop that would trip it, not just after.
+  const fatigue = $('gaugeFatigue');
+  if (round.finished) {
+    fatigue.replaceChildren();
+    fatigue.className = 'gauge__fatigue';
+  } else {
+    const toBreak = HOS_CONTINUOUS_LIMIT - round.sinceRest;
+    const strongF = document.createElement('strong');
+    strongF.textContent = hhmm(round.sinceRest);
+    const tier = toBreak <= 45 ? 'lost' : toBreak <= 90 ? 'tight' : 'ok';
+    fatigue.className = `gauge__fatigue gauge__fatigue--${tier}`;
+    fatigue.replaceChildren(
+      document.createTextNode('behind the wheel '), strongF,
+      document.createTextNode(` · ${hhmm(toBreak)} to mandatory break`),
+    );
+  }
+
   const reachable = new Set(options(g, round).map((e) => e.to));
   dots.forEach((node, i) => {
     node.classList.toggle('dot--reachable', reachable.has(i));
@@ -380,7 +584,7 @@ function paint({ animate = false } = {}) {
       node.setAttribute('role', 'button');
       // The name is deliberately withheld, so describe the dot the way the map
       // does: a direction and a distance.
-      node.setAttribute('aria-label', `city to the ${COMPASS[bearingIndex(round.at, i)]}, about ${km} km away`);
+      node.setAttribute('aria-label', `city to the ${bearingWord(g, round.at, i)}, about ${km} km away`);
     } else {
       node.removeAttribute('role');
       node.removeAttribute('aria-label');
@@ -399,21 +603,67 @@ function paint({ animate = false } = {}) {
       return node;
     })));
 
-  $('travelled').replaceChildren(...round.hops.flatMap((h, i) =>
-    paceRuns(h.from, h.to).map((r) => el('path', {
-      d: r.d,
-      class: `leg pace-${r.tier}${animate && i === round.hops.length - 1 ? ' leg--new' : ''}`,
-    }))));
+  // The comparison itself, not just the ingredients for one: what required
+  // pace becomes for each candidate, sitting right on the map next to the
+  // dot it's about. An estimate ("~"), not a promise — see previewPace.
+  $('pacePreview').replaceChildren(...[...reachable].map((i) => {
+    const c = g.cities[i];
+    const preview = previewPace(g, round, i);
+    const risk = Number.isFinite(preview) ? paceRisk(preview) : 'lost';
+    const node = el('text', {
+      x: c.x, y: c.y - 14 * unit, class: `pace-chip pace-chip--${risk}`, 'font-size': 11 * unit,
+    });
+    node.textContent = Number.isFinite(preview) ? `~${Math.round(preview)}` : 'over';
+    return node;
+  }));
+
+  // Older hops step back rather than staying at full strength: the whole
+  // travelled path can zigzag once several hops of real, locally-sound
+  // choices are laid end to end, and that history shouldn't out-compete the
+  // decision actually in front of you. The most recent hop — how you got to
+  // where you're standing — stays fully lit.
+  $('travelled').replaceChildren(...round.hops.flatMap((h, i) => {
+    const age = round.hops.length - 1 - i;
+    const opacity = Math.max(0.35, 1 - age * 0.18);
+    return paceRuns(h.from, h.to).map((r) => {
+      const node = el('path', {
+        d: r.d,
+        class: `leg pace-${r.tier}${animate && i === round.hops.length - 1 ? ' leg--new' : ''}`,
+      });
+      node.style.opacity = opacity;
+      return node;
+    });
+  }));
 
   $('hops').replaceChildren(...round.hops.map((h, i) => {
     const li = document.createElement('li');
     const name = document.createElement('span');
     name.textContent = `${i + 1}. ${g.cities[h.to].name}`;
     const cost = document.createElement('span');
-    cost.textContent = hhmm(h.min);
+    // Needed vs. got, scored: the same bet the pace gauge quantified live,
+    // at the moment it was made (neededAtHop), against what the road
+    // actually charged. Absent for a restored round — no history to score.
+    const wasNeeded = neededAtHop[i];
+    if (Number.isFinite(wasNeeded)) {
+      const ahead = speedOf(h) >= wasNeeded;
+      const delta = document.createElement('b');
+      delta.className = `log__delta log__delta--${ahead ? 'ahead' : 'behind'}`;
+      delta.textContent = ahead ? '▲' : '▼';
+      cost.append(delta);
+    }
+    cost.append(document.createTextNode(hhmm(h.min)));
     const dist = document.createElement('em');
     dist.textContent = `${h.km} km`;
     cost.append(dist);
+    // The break is folded into h.min already; flag it separately, inside the
+    // same flex cell as the receipt, so a long number reads as "the clock
+    // made you stop" rather than "the road was slow".
+    if (h.breakMin > 0) {
+      const brk = document.createElement('em');
+      brk.className = 'log__break';
+      brk.textContent = `+ ${hhmm(h.breakMin)} break`;
+      cost.append(brk);
+    }
     li.append(name, cost);
     return li;
   }));
@@ -437,12 +687,6 @@ function edgePath(from, to) {
   return road || `M${g.cities[from].x} ${g.cities[from].y}L${g.cities[to].x} ${g.cities[to].y}`;
 }
 
-function bearingIndex(from, to) {
-  const a = g.cities[from], b = g.cities[to];
-  const deg = (Math.atan2(b.x - a.x, a.y - b.y) * 180 / Math.PI + 360) % 360;
-  return Math.round(deg / 45) % 8;
-}
-
 // --- interaction -----------------------------------------------------------
 let paidTimer;
 /** What the map suggested, against what the road charged — said out loud, now. */
@@ -451,21 +695,127 @@ function showPaid(h) {
   const verdict = kmh < 65 ? 'slow road' : kmh < 85 ? 'ordinary going' : 'motorway pace';
   const node = $('paid');
   node.className = `paid paid--on ${kmh < 65 ? 'paid--hard' : kmh < 85 ? 'paid--mid' : 'paid--easy'}`;
-  node.innerHTML = '';
+
+  $('paidStory').textContent = narrateHop(g, h);
+
+  const stat = $('paidStat');
+  stat.replaceChildren();
   const cost = document.createElement('strong');
   cost.textContent = hhmm(h.min);
   const second = document.createElement('span');
   second.className = 'paid__verdict';
   second.textContent = `${Math.round(kmh)} km/h · ${verdict}`;
-  node.append(cost, document.createTextNode(` for ${h.km} km`), second);
+  stat.append(cost, document.createTextNode(` for ${h.km} km`), second);
+  // A hop that banked enough continuous driving to trip the mandatory-break
+  // rule pays for it here — h.min already includes it, so without this the
+  // number just looks like a slower road than it actually was.
+  if (h.breakMin > 0) {
+    const brk = document.createElement('span');
+    brk.className = 'paid__break';
+    brk.textContent = `+ ${hhmm(h.breakMin)} mandatory break`;
+    stat.append(brk);
+  }
+
   clearTimeout(paidTimer);
   paidTimer = setTimeout(() => node.classList.remove('paid--on'), 4000);
 }
 
-function choose(i) {
-  if (round.finished || !options(g, round).some((e) => e.to === i)) return;
+/**
+ * The verdict on the hop that just landed, floating at the city you actually
+ * arrived at — where you were looking when it happened — rather than only in
+ * the corner HUD. `neededKmh` is the pace the bet was made against, snapshot
+ * the instant the hop was chosen (before this one's real cost was known).
+ */
+let arrivalTimer;
+function showArrival(h, neededKmh) {
+  $('arrivalCallout').replaceChildren();
+  const c = g.cities[h.to];
+  const kmh = speedOf(h);
+  const ahead = !Number.isFinite(neededKmh) || kmh >= neededKmh;
+
+  const group = el('g', { class: `arrival-callout arrival-callout--${ahead ? 'ahead' : 'behind'}` });
+  const headline = el('text', {
+    x: c.x, y: c.y - 22 * unit, class: 'arrival-callout__kmh', 'font-size': 15 * unit,
+  });
+  headline.textContent = `${Math.round(kmh)} km/h`;
+  const sub = el('text', {
+    x: c.x, y: c.y - 8 * unit, class: 'arrival-callout__delta', 'font-size': 11 * unit,
+  });
+  sub.textContent = Number.isFinite(neededKmh)
+    ? `${ahead ? '▲' : '▼'} ${Math.abs(Math.round(kmh - neededKmh))} ${ahead ? 'above' : 'below'} pace`
+    : 'arrived';
+  group.append(headline, sub);
+  $('arrivalCallout').append(group);
+
+  clearTimeout(arrivalTimer);
+  arrivalTimer = setTimeout(() => {
+    group.classList.add('arrival-callout--out');
+    setTimeout(() => group.remove(), 400);
+  }, 2200);
+}
+
+/**
+ * Draw the hop actually happening — a marker riding the real road geometry —
+ * before any state changes. Fast rather than true-to-pace (that's what the
+ * reveal race is for): this is about feeling the hop happen, not measuring it.
+ */
+function animateHop(from, to) {
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const d = edgePath(from, to);
+  const node = el('path', { d, class: 'hop-preview' });
+  const head = el('circle', { r: 5 * unit, class: 'hop-head' });
+  $('travelled').append(node, head);
+  const len = node.getTotalLength();
+  if (reduced || !len) { node.remove(); head.remove(); return Promise.resolve(); }
+
+  node.style.strokeDasharray = `${len}`;
+  node.style.strokeDashoffset = `${len}`;
+  const duration = Math.min(900, Math.max(280, len * 1.1));
+
+  return new Promise((resolve) => {
+    const started = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, (now - started) / duration);
+      const eased = 1 - (1 - t) ** 2;
+      node.style.strokeDashoffset = `${len * (1 - eased)}`;
+      const p = node.getPointAtLength(len * eased);
+      head.setAttribute('cx', p.x); head.setAttribute('cy', p.y);
+      if (t < 1) requestAnimationFrame(step);
+      else { node.remove(); head.remove(); resolve(); }
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+let hopBusy = false;
+async function choose(i) {
+  if (hopBusy || round.finished || !options(g, round).some((e) => e.to === i)) return;
+  hopBusy = true;
+
+  // Acknowledge the click before anything else happens: a pulse on the dot
+  // you picked, and the road you didn't pick stepping back, so there's no
+  // dead beat between doing something and seeing something respond.
+  dots[i].classList.add('dot--picked');
+  setTimeout(() => dots[i].classList.remove('dot--picked'), 600);
+  map.classList.add('map--travelling');
+  $('pacePreview').replaceChildren();
+
+  // The bet, snapshot at the moment it was made — before this hop's real
+  // cost is known — so the arrival verdict and the hop log can score
+  // "needed vs. got" against what the player actually knew when they chose.
+  const neededKmh = requiredPace(g, round);
+
+  try {
+    await animateHop(round.at, i);
+  } finally {
+    hopBusy = false;
+    map.classList.remove('map--travelling');
+  }
   hop(g, round, i);
-  showPaid(round.hops[round.hops.length - 1]);
+  neededAtHop.push(neededKmh);
+  const h = round.hops[round.hops.length - 1];
+  showPaid(h);
+  showArrival(h, neededKmh);
   paint({ animate: true });
   followPlayer();
   if (round.finished) finish();
@@ -520,12 +870,19 @@ function labelPlayable(reachable) {
 // that took four hours takes four hours' worth of the animation. You watch the
 // fast route pull away, on the stretch where it actually happened.
 
+// best.path is the fastest *legal* route (hosRoute), so re-walking it from a
+// fresh driving clock and charging hosCost at each hop reproduces the exact
+// same break points hosRoute found — same reasoning as the "you" lane, whose
+// hops already carry break-inclusive minutes from hop() itself.
 function hopsOf(path) {
   const out = [];
+  let sinceRest = 0;
   for (let i = 1; i < path.length; i++) {
     const from = path[i - 1], to = path[i];
     const edge = g.adj[from].find((e) => e.to === to);
-    out.push({ from, to, min: edge.min });
+    const cost = hosCost(sinceRest, edge.min);
+    out.push({ from, to, min: cost.charged });
+    sinceRest = cost.sinceRest;
   }
   return out;
 }
@@ -646,6 +1003,8 @@ async function finish() {
   }
 
   $('reach').replaceChildren();
+  clearTimeout(arrivalTimer);
+  $('arrivalCallout').replaceChildren();
 
   // The terrain has been there all along; what the reveal adds is the names of
   // everywhere the routes went, and then the race.
@@ -743,11 +1102,14 @@ try {
 } catch { restored = false; }
 
 if (restored) {
+  $('brief').hidden = true;
   paint();
   await finish();
 } else {
   if (saved) localStorage.removeItem(storeKey);
   round = newRound(g, { a: START, b: TARGET, budget: BUDGET });
-  app.dataset.stage = 'playing';
+  renderBrief();
+  $('brief').hidden = false;
+  app.dataset.stage = 'brief';
   paint();
 }

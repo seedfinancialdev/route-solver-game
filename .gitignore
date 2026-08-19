@@ -4,3 +4,6 @@ node_modules/
 data/raw/
 # Elevation tiles: ~825 of them, re-fetched by scripts/04-terrain.py on demand.
 data/raw/dem/
+# play/calibrate-hos.mjs's own cache of its ~20-minute pool scan, so re-sweeping
+# a different multiplier range doesn't redo it. Not a build artifact.
+data/.calibrate-hos-cache.json

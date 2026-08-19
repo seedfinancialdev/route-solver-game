@@ -16,7 +16,11 @@ ordinary going*. The map shows terrain, rivers, country names, and the roads out
 city — each drawn with the weight of how fast it runs, the way a road atlas
 weights a motorway against a B road. That is deliberately local: you can read the
 hop in front of you, but not the corridor beyond it, which is where the puzzle
-lives.
+lives. Everything else on the map — named mountain ranges and seas, the built-up
+footprint of a city, the background towns filling in the space between the ones
+you can act on — is scenery. It's there so the map feels like a real, lived-in
+place rather than 479 dots and lines; none of it is wired to a road, so none of
+it can tell you which one is fast.
 
 When the route is locked, both routes drive it again side by side at their real
 paces, so you watch the fast one pull away exactly where it happened. Then the
@@ -92,7 +96,7 @@ two-lane runs at 45. Same measurement, different currency:
 
 So the game switched currency, drew the actual roads on the map — you can judge
 distance now, which is exactly the trap — and set the budget below what taking
-the shortest road costs. On the 2,165 shipped puzzles at a 1.08× budget:
+the shortest road costs. On the 2,538 shipped puzzles at a 1.11× budget:
 
 | player | wins |
 | --- | --- |
@@ -114,9 +118,10 @@ the shortest road costs. On the 2,165 shipped puzzles at a 1.08× budget:
 
 ## Data and routing
 
-- Cities: [GeoNames](https://www.geonames.org/) `cities15000` (CC BY 4.0).
-- Boundaries, rivers and lakes: [Natural Earth](https://www.naturalearthdata.com/)
-  (public domain).
+- Cities and background towns: [GeoNames](https://www.geonames.org/) `cities15000`
+  (CC BY 4.0).
+- Boundaries, rivers, lakes, urban footprints, and named physical/marine
+  regions: [Natural Earth](https://www.naturalearthdata.com/) (public domain).
 - Elevation: [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) —
   a compilation of SRTM, USGS 3DEP, GMTED2010, ETOPO1 and national datasets. The
   hillshade is computed from it by `scripts/04-terrain.py` rather than taken

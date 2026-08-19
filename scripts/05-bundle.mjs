@@ -9,6 +9,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { project } from './lib/proj.mjs';
+import { COUNTRIES } from './lib/cities.mjs';
 
 const SIMPLIFY_KM = 0.12;  // Douglas-Peucker tolerance. The map zooms to 90 km
                            // across, where a tenth of a kilometre is about a
@@ -19,6 +20,11 @@ const read = (f) => JSON.parse(readFileSync(new URL(`../data/${f}`, import.meta.
 const graph = read('graph.json');
 const map = read('map.json');
 const pack = read('puzzles.json');
+// Optional: real road names/refs (scripts/06-road-names.mjs), for narration
+// only. Missing this file just means hop narration falls back to a generic
+// line — it was never part of the routing data.
+let roadNames = null;
+try { roadNames = read('road-names.json'); } catch { /* not built yet */ }
 
 const round = (v) => Math.round(v * 2) / 2;
 
@@ -119,11 +125,45 @@ const bundle = {
   // once already and every road silently landed in the wrong place.
   quant: QUANT,
   view: map.view,
+  // ISO2 -> full name, for showing a city's country in the brief. Sourced
+  // from the same map scripts/00-cities.mjs used to pick the roster, so it
+  // can't drift from the country list the game actually uses.
+  countryNames: Object.fromEntries(COUNTRIES),
   countries: map.countries.map((c) => c.d),
   // [name, x, y]
   countryLabels: map.labels.map((l) => [l.name, l.x, l.y]),
   lakes: map.lakes,
   rivers: map.rivers,
+  urbanAreas: map.urbanAreas,
+  // [name, x, y, kind, lengthKm, peakName, peakM, blurb, pacePct] — kind is
+  // "relief" (a range, plateau, plain) or "sea". The relief-only fields are
+  // null for sea. lengthKm/peakName/peakM are null unless the range is one
+  // of the hand-curated RANGE_FACTS entries in 03-map.mjs (real reference
+  // figures, not derived from this dataset's own — deliberately inaccurate
+  // for this purpose — polygon geometry). blurb is the generic landform-type
+  // explainer, set for every relief feature. pacePct is real and computed —
+  // the distance-weighted average speed of graph edges near this region
+  // against the network-wide average — null where fewer than 4 edges pass
+  // near enough to mean anything.
+  physicalLabels: (map.physicalLabels || []).map((l) => [
+    l.name, l.x, l.y, l.kind, l.lengthKm ?? null, l.peakName ?? null, l.peakM ?? null, l.blurb ?? null,
+    l.pacePct ?? null,
+  ]),
+  // [x, y, tier] — background towns below the playable roster's spacing cut.
+  // Decoration only: they connect to nothing and cost nothing to draw wrong.
+  towns: (map.towns || []).map((t) => [t.x, t.y, t.tier]),
+  graticule: map.graticule || [],
+  // [label, km, sharePercent] aligned index-for-index with `edges` above, or
+  // null where OSRM had no ref and no name for the road's longest stretch.
+  // Decoration for narration — the game's routing never reads this.
+  roadNames: graph.edges.map((e, i) => {
+    // road-names.json was built by walking these same edges in this same
+    // order (06-road-names.mjs), so index i lines up directly — no need to
+    // re-match by (a, b).
+    const r = roadNames && roadNames.roads[i];
+    if (!r || r.a !== e.a || r.b !== e.b || !r.dominant) return null;
+    return [r.dominant.label, r.dominant.km, Math.round(r.dominant.share * 100)];
+  }),
   cities,
   edges,
   currency: pack.currency,
