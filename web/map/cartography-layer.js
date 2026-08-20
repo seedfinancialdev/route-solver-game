@@ -1,6 +1,6 @@
 /**
  * Vector Cartography Canvas Renderer
- * High-performance, tactile cartographic rendering for coastlines, landmasses,
+ * High-performance, tactile cartographic rendering for crisp country borders,
  * lakes, rivers, urban footprints, background towns, and proportional road networks.
  */
 
@@ -15,7 +15,7 @@ export class CartographyLayer {
     this.showForest = true;     // Raster forest layer toggle
     this.showTowns = true;      // Background towns
     this.showRoads = true;      // Road networks
-    this.showShoreline = true;  // Coastline & Lake shoreline highlights
+    this.showShoreline = true;  // Lake shoreline highlights
 
     // Opacity & Width Controls
     this.waterOpacity = 1.0;
@@ -48,14 +48,14 @@ export class CartographyLayer {
     const translateY = -camera.current.y * scaleY;
     const zoomKm = camera.current.w;
 
-    // 1. Landmass & Coastline Outlines
+    // 1. National Country Boundaries & Coastlines (Crisp Tactical White)
     if (this.showCoastlines && g.countries && g.countries.length) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
 
-      // Draw Landmass Coastline Stroke
-      ctx.strokeStyle = theme.coastline || 'rgba(100, 180, 240, 0.45)';
-      ctx.lineWidth = Math.max(1.0, 1.2 * (camera.viewportWidth / 1400)) / scaleX;
+      // Draw National Country Border Stroke (Crisp White)
+      ctx.strokeStyle = theme.coastline || 'rgba(255, 255, 255, 0.65)';
+      ctx.lineWidth = (theme.borderWidth || 1.6) / scaleX;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
 
@@ -81,7 +81,7 @@ export class CartographyLayer {
         }
 
         if (this.showShoreline) {
-          ctx.strokeStyle = theme.coastline || 'rgba(100, 180, 240, 0.45)';
+          ctx.strokeStyle = 'rgba(80, 170, 230, 0.35)';
           ctx.lineWidth = 1.0 / scaleX;
           for (const lakePath of g.lakes) {
             const path = this.getPath2D(lakePath);
