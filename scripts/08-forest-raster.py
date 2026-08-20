@@ -1,7 +1,7 @@
 """Pre-Rendered Lambert Raster Forest Generator.
 
 Generates pixel-perfect raster landcover maps (`web/forest.webp` and `web/forest-detail.webp`)
-using the exact inverse Lambert Conformal Conic coordinate grid and cached DEM elevation matrix
+using the exact inverse Lambert Conformal Conic coordinate grid and DEM elevation matrix
 from `scripts/04-terrain.py`.
 
   python3 scripts/08-forest-raster.py
@@ -14,6 +14,7 @@ from PIL import Image
 Image.MAX_IMAGE_PIXELS = None
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CACHE = ROOT / 'data' / 'raw' / 'dem'
+CACHE.mkdir(parents=True, exist_ok=True)
 
 import os
 ZOOM = int(os.environ.get('DEM_ZOOM', 8))
@@ -48,6 +49,23 @@ def merc_xy(lon, lat):
             (0.5 - np.log((1 + sin) / (1 - sin)) / (4 * math.pi)) * span)
 
 
+def fetch(tile):
+    x, y = tile
+    path = CACHE / f'{ZOOM}_{x}_{y}.tif'
+    if path.exists():
+        return path
+    url = SOURCE.format(z=ZOOM, x=x, y=y)
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(url, timeout=90) as r:
+                path.write_bytes(r.read())
+            return path
+        except Exception:
+            if attempt == 3:
+                return None
+    return None
+
+
 view = json.loads((ROOT / 'data' / 'map.json').read_text())['view']
 
 gx, gy = np.meshgrid(np.linspace(view['x'], view['x'] + view['w'], 80),
@@ -57,6 +75,14 @@ px_s, py_s = merc_xy(lon_s, lat_s)
 x0, x1 = int(px_s.min() // TILE), int(px_s.max() // TILE) + 1
 y0, y1 = int(py_s.min() // TILE), int(py_s.max() // TILE) + 1
 tiles = [(x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)]
+
+missing = [t for t in tiles if not (CACHE / f'{ZOOM}_{t[0]}_{t[1]}.tif').exists()]
+if missing:
+    print(f'Fetching {len(missing)} DEM elevation tiles in parallel (32 workers)...')
+    with futures.ThreadPoolExecutor(max_workers=32) as pool:
+        for i, _ in enumerate(pool.map(fetch, missing), 1):
+            if i % 200 == 0 or i == len(missing):
+                print(f'  {i}/{len(missing)}')
 
 width, height = (x1 - x0 + 1) * TILE, (y1 - y0 + 1) * TILE
 dem = np.zeros((height, width), dtype=np.int16)
@@ -99,22 +125,22 @@ def render_forest(box, out_w, out_h):
     slope_deg = np.degrees(np.arctan(np.hypot(dzdx, dzdy)))
 
     # Real ecological forest distribution rules in Europe:
-    # 1. Elevation band: forests thrive between 250m and 1800m
-    elev_mask = np.clip((land - 150.0) / 350.0, 0, 1) * np.clip((2100.0 - land) / 450.0, 0, 1)
+    # 1. Elevation band: forests thrive between 100m and 2200m
+    elev_mask = np.clip((land - 50.0) / 200.0, 0, 1) * np.clip((2400.0 - land) / 450.0, 0, 1)
 
-    # 2. Slope preference: steeper slopes (3-25 deg) hold natural woodland
-    slope_mask = np.clip(slope_deg / 4.5, 0.2, 1.0)
+    # 2. Slope preference & ridge density: woodland follows terrain contours
+    slope_mask = np.clip(slope_deg / 3.0, 0.35, 1.0)
 
     # Combined forest density factor
     density = np.clip(elev_mask * slope_mask, 0, 1)
 
     # Generate RGBA image
-    # Deep pine forest green: RGB(20, 56, 32)
+    # Deep organic forest green: RGB(22, 58, 34)
     rgba = np.zeros((out_h, out_w, 4), dtype=np.uint8)
-    rgba[..., 0] = 20  # Red
-    rgba[..., 1] = 56  # Green
-    rgba[..., 2] = 32  # Blue
-    rgba[..., 3] = (density * 185.0).astype(np.uint8)  # Alpha transparency channel
+    rgba[..., 0] = 22  # Red
+    rgba[..., 1] = 58  # Green
+    rgba[..., 2] = 34  # Blue
+    rgba[..., 3] = (density * 210.0).astype(np.uint8)  # Alpha transparency channel
 
     return rgba
 
@@ -124,7 +150,7 @@ for name, out_w, quality in OUTPUTS:
     out_h = round(out_w * view['h'] / view['w'])
     img_rgba = render_forest(view, out_w, out_h)
     out = ROOT / 'web' / name
-    Image.fromarray(img_rgba, mode='RGBA').save(out, 'WEBP', quality=quality, method=5)
+    Image.fromarray(img_rgba).save(out, 'WEBP', quality=quality, method=5)
     print(f'wrote {out.relative_to(ROOT)}  {out_w}x{out_h}  '
           f'{out.stat().st_size / 1024:.0f} KB')
 
