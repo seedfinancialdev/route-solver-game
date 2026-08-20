@@ -1,19 +1,21 @@
 /**
  * Vector Cartography Canvas Renderer
  * High-performance, tactile cartographic rendering for crisp country borders,
- * lakes, rivers, urban footprints, background towns, dual-cased asphalt road networks,
+ * lakes, rivers, 24-hour day/night urban night lights, dual-cased asphalt road networks,
  * and European Highway Shields / Alpine Pass Waypoints.
  */
 
-// Iconic Alpine Passes & Cannonball Strategic Chokepoints
+// Iconic Alpine Passes & Cannonball Strategic Chokepoints (Real Lambert Proj Coordinates)
 const STRATEGIC_WAYPOINTS = [
-  { name: 'St. Gotthard Pass', alt: '2,106m', x: 268, y: -245, kind: 'pass' },
-  { name: 'Brenner Pass', alt: '1,370m', x: 420, y: -220, kind: 'pass' },
-  { name: 'Mont Blanc Tunnel', alt: '1,274m', x: 145, y: -310, kind: 'tunnel' },
-  { name: 'Großglockner Pass', alt: '2,504m', x: 535, y: -215, kind: 'pass' },
-  { name: 'San Bernardino Pass', alt: '2,066m', x: 310, y: -260, kind: 'pass' },
-  { name: 'Simplon Pass', alt: '2,005m', x: 215, y: -275, kind: 'pass' },
-  { name: 'Col de Turini', alt: '1,604m', x: 175, y: -455, kind: 'pass' },
+  { name: 'St. Gotthard Pass', alt: '2,106m', x: -487.7, y: 576.1, kind: 'pass' },
+  { name: 'Brenner Pass', alt: '1,370m', x: -262.6, y: 542.2, kind: 'pass' },
+  { name: 'Mont Blanc Tunnel', alt: '1,274m', x: -624.1, y: 635.2, kind: 'tunnel' },
+  { name: 'Stelvio Pass', alt: '2,757m', x: -344.8, y: 590.5, kind: 'pass' },
+  { name: 'San Bernardino Pass', alt: '2,066m', x: -442.1, y: 586.9, kind: 'pass' },
+  { name: 'Simplon Pass', alt: '2,005m', x: -530.8, y: 606.3, kind: 'pass' },
+  { name: 'Great St Bernard Pass', alt: '2,469m', x: -600.9, y: 641.4, kind: 'pass' },
+  { name: 'Großglockner Pass', alt: '2,504m', x: -161.9, y: 538.8, kind: 'pass' },
+  { name: 'Col de Turini', alt: '1,604m', x: -606.1, y: 851.3, kind: 'pass' },
 ];
 
 export class CartographyLayer {
@@ -23,7 +25,7 @@ export class CartographyLayer {
     // Layer Visibility Toggles
     this.showCoastlines = true; // Country & coastline boundaries
     this.showWater = true;      // Lakes & Rivers
-    this.showFarmland = true;   // Urban footprints
+    this.showFarmland = true;   // Urban footprints / Night Lights
     this.showForest = true;     // Raster forest layer toggle
     this.showTowns = true;      // Background towns
     this.showRoads = true;      // Road networks
@@ -32,7 +34,7 @@ export class CartographyLayer {
 
     // Opacity & Width Controls
     this.waterOpacity = 1.0;
-    this.farmlandOpacity = 0.35;
+    this.farmlandOpacity = 0.40;
     this.forestOpacity = 0.65;
     this.townsOpacity = 0.50;
     this.riverWidthScale = 1.0;
@@ -60,6 +62,7 @@ export class CartographyLayer {
     const translateX = -camera.current.x * scaleX;
     const translateY = -camera.current.y * scaleY;
     const zoomKm = camera.current.w;
+    const nightFactor = theme.nightFactor !== undefined ? theme.nightFactor : 0.85;
 
     // 1. National Country Boundaries & Coastlines (Crisp Tactical White)
     if (this.showCoastlines && g.countries && g.countries.length) {
@@ -127,16 +130,40 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 3. Urban Footprints (Built-up City Footprints - Enhanced inside 140–800 km)
+    // 3. Day/Night Dynamic Urban Sprawl & Metropolitan Night Lights
     if (this.showFarmland && g.urbanAreas && g.urbanAreas.length) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-      ctx.fillStyle = theme.farmland || 'rgba(162, 137, 92, 0.35)';
-      ctx.globalAlpha = this.farmlandOpacity * (zoomKm <= 600 ? 1.0 : 0.7);
 
-      for (const areaPath of g.urbanAreas) {
-        const path = this.getPath2D(areaPath);
-        if (path) ctx.fill(path);
+      // Daytime Base Concrete
+      if (nightFactor < 0.9) {
+        ctx.fillStyle = theme.urbanDay || 'rgba(145, 130, 110, 0.40)';
+        ctx.globalAlpha = this.farmlandOpacity * (1.0 - nightFactor);
+        for (const areaPath of g.urbanAreas) {
+          const path = this.getPath2D(areaPath);
+          if (path) ctx.fill(path);
+        }
+      }
+
+      // Nighttime Glowing Streetlights (NASA Black Marble Sprawl)
+      if (nightFactor > 0.1) {
+        ctx.globalCompositeOperation = 'screen';
+        ctx.fillStyle = theme.urbanNight || 'rgba(255, 175, 55, 0.75)';
+        ctx.globalAlpha = this.farmlandOpacity * nightFactor * (zoomKm <= 600 ? 1.0 : 0.75);
+
+        for (const areaPath of g.urbanAreas) {
+          const path = this.getPath2D(areaPath);
+          if (path) ctx.fill(path);
+        }
+
+        // Outer Urban Radiance
+        ctx.fillStyle = theme.urbanGlow || 'rgba(255, 150, 30, 0.35)';
+        ctx.globalAlpha = 0.25 * nightFactor;
+        ctx.lineWidth = 4.0 / scaleX;
+        for (const areaPath of g.urbanAreas) {
+          const path = this.getPath2D(areaPath);
+          if (path) ctx.stroke(path);
+        }
       }
       ctx.restore();
     }
@@ -145,7 +172,7 @@ export class CartographyLayer {
     if (this.showTowns && g.towns && g.towns.length && zoomKm <= 900) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-      ctx.fillStyle = 'rgba(215, 195, 155, 0.65)';
+      ctx.fillStyle = nightFactor > 0.5 ? 'rgba(255, 210, 120, 0.75)' : 'rgba(215, 195, 155, 0.65)';
       ctx.globalAlpha = this.townsOpacity;
 
       for (const town of g.towns) {
@@ -239,7 +266,7 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 6. European Highway Route Shields & Strategic Waypoints (Zoom <= 850 km)
+    // 6. European Highway Route Shields & Strategic Alpine Pass Waypoints (Zoom <= 850 km)
     if (this.showShields && zoomKm <= 850) {
       this.renderHighwayShieldsAndWaypoints(ctx, camera, theme, g, dpr);
     }
@@ -262,7 +289,6 @@ export class CartographyLayer {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const renderedShields = new Set();
-    const minSpacing = 65; // Screen pixels collision spacing
 
     // A. Render Highway Shields
     for (const cityEdges of g.adj) {
@@ -276,14 +302,12 @@ export class CartographyLayer {
         const pt = edge.shape[midIdx];
         const screenPos = camera.worldToScreen(pt[0], pt[1]);
 
-        // Screen bounds culling
         if (screenPos.x < 20 || screenPos.x > camera.viewportWidth - 20 ||
             screenPos.y < 20 || screenPos.y > camera.viewportHeight - 20) {
           continue;
         }
 
-        // Determine badge style
-        let badgeBg = '#1d4ed8'; // Blue for Autobahns/Motorways (A1, A8, M1, AP-9)
+        let badgeBg = '#1d4ed8'; // Blue for Motorways (A1, A8, M1, AP-9)
         let badgeBorder = '#3b82f6';
         let badgeText = '#ffffff';
 
@@ -302,7 +326,6 @@ export class CartographyLayer {
         const bx = screenPos.x - badgeW / 2;
         const by = screenPos.y - badgeH / 2;
 
-        // Draw Badge Background Pill
         ctx.fillStyle = badgeBg;
         ctx.strokeStyle = badgeBorder;
         ctx.lineWidth = 1;
@@ -312,7 +335,6 @@ export class CartographyLayer {
         ctx.fill();
         ctx.stroke();
 
-        // Draw Label Text
         ctx.fillStyle = badgeText;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -322,7 +344,7 @@ export class CartographyLayer {
       }
     }
 
-    // B. Render Strategic Alpine Passes & Chokepoints
+    // B. Render Strategic Alpine Passes & Chokepoints (Real Coordinates)
     for (const wp of STRATEGIC_WAYPOINTS) {
       const pos = camera.worldToScreen(wp.x, wp.y);
       if (pos.x < 20 || pos.x > camera.viewportWidth - 20 ||
@@ -330,21 +352,24 @@ export class CartographyLayer {
         continue;
       }
 
-      // Draw Pass Icon / Badge
-      ctx.fillStyle = '#0f172a';
-      ctx.strokeStyle = '#f59e0b';
+      const isTunnel = wp.kind === 'tunnel';
+      const label = isTunnel ? `🚇 ${wp.name} (${wp.alt})` : `▲ ${wp.name} (${wp.alt})`;
+      ctx.font = '700 9px "Inter", sans-serif';
+      const tw = ctx.measureText(label).width;
+      const bw = tw + 12;
+      const bh = 18;
+
+      // Draw Pass/Tunnel Badge
+      ctx.fillStyle = isTunnel ? 'rgba(12, 74, 110, 0.90)' : 'rgba(15, 23, 42, 0.90)';
+      ctx.strokeStyle = isTunnel ? '#38bdf8' : '#f59e0b';
       ctx.lineWidth = 1.5;
 
-      const label = `▲ ${wp.name} (${wp.alt})`;
-      ctx.font = '600 9px "Inter", sans-serif';
-      const tw = ctx.measureText(label).width;
-
       ctx.beginPath();
-      ctx.roundRect(pos.x - tw / 2 - 5, pos.y - 8, tw + 10, 16, 4);
+      ctx.roundRect(pos.x - bw / 2, pos.y - bh / 2, bw, bh, 4);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = '#fbbf24';
+      ctx.fillStyle = isTunnel ? '#e0f2fe' : '#fbbf24';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(label, pos.x, pos.y);

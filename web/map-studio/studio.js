@@ -1,7 +1,6 @@
 /**
  * Map Studio Interactive Controller
- * Binds control panel sliders, theme selectors, and layer toggles directly to MapEngine,
- * with real-time OpenStreetMap / Google Maps dynamic dual-unit cartographic scale bar.
+ * Binds control panel sliders, theme selectors, and 24-hour solar time-of-day controls directly to MapEngine.
  */
 
 import { MapEngine } from '../map/map-engine.js';
@@ -13,6 +12,15 @@ const mapEngine = new MapEngine(viewport, '../data.json');
 const fpsCounter = document.getElementById('fps-counter');
 const presetSelect = document.getElementById('preset-select');
 const forestBlendSelect = document.getElementById('forest-blend-select');
+
+// 24-Hour Solar Time of Day Elements
+const sliderTime = document.getElementById('slider-time');
+const rallyClock = document.getElementById('rally-clock');
+const btnNoon = document.getElementById('btn-time-noon');
+const btnDusk = document.getElementById('btn-time-dusk');
+const btnNight = document.getElementById('btn-time-night');
+const btnDawn = document.getElementById('btn-time-dawn');
+const timeBtns = [btnNoon, btnDusk, btnNight, btnDawn];
 
 // Vector Layer Toggles
 const toggleTerrain = document.getElementById('toggle-terrain');
@@ -42,6 +50,46 @@ const scaleKmLine = document.getElementById('scale-km-line');
 const scaleMiText = document.getElementById('scale-mi-text');
 const scaleMiLine = document.getElementById('scale-mi-line');
 const statTier = document.getElementById('stat-tier');
+
+// 24-Hour Solar Clock Logic
+function setSolarTime(hour, activeBtn = null) {
+  mapEngine.themeManager.setTimeOfDay(hour);
+  sliderTime.value = hour;
+
+  const h = Math.floor(hour);
+  const m = Math.round((hour - h) * 60);
+  const hStr = String(h).padStart(2, '0');
+  const mStr = String(m).padStart(2, '0');
+  rallyClock.textContent = `${hStr}:${mStr} CET`;
+
+  timeBtns.forEach(b => b.classList.remove('active'));
+  if (activeBtn) activeBtn.classList.add('active');
+}
+
+sliderTime.addEventListener('input', (e) => {
+  const h = parseFloat(e.target.value);
+  setSolarTime(h);
+});
+
+btnNoon.addEventListener('click', () => {
+  mapEngine.themeManager.loadPreset('satelliteDay');
+  presetSelect.value = 'satelliteDay';
+  setSolarTime(12.0, btnNoon);
+});
+
+btnDusk.addEventListener('click', () => {
+  setSolarTime(19.5, btnDusk);
+});
+
+btnNight.addEventListener('click', () => {
+  mapEngine.themeManager.loadPreset('cannonballNight');
+  presetSelect.value = 'cannonballNight';
+  setSolarTime(22.0, btnNight);
+});
+
+btnDawn.addEventListener('click', () => {
+  setSolarTime(6.0, btnDawn);
+});
 
 // Bind Theme Selector
 presetSelect.addEventListener('change', (e) => {
@@ -111,6 +159,9 @@ sliderFarmland.addEventListener('input', (e) => {
 // Standard Cartographic Interval Sets
 const KM_INTERVALS = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
 const MI_INTERVALS = [500, 200, 100, 50, 20, 10, 5, 2, 1];
+
+// Initialize 22:00 CET Night Ops
+setSolarTime(22.0, btnNight);
 
 // Update HUD & FPS stats loop (Dynamic Dual-Unit Scale Bar)
 setInterval(() => {

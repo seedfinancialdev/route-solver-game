@@ -34,7 +34,7 @@
     /* Floating Studio Control Panel */
     .studio-panel {
       position: absolute; top: 20px; right: 20px;
-      width: 340px; max-height: calc(100vh - 40px);
+      width: 350px; max-height: calc(100vh - 40px);
       background: var(--panel-bg);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
@@ -76,6 +76,30 @@
       color: var(--text); padding: 8px 12px; border-radius: 6px;
       font-size: 13px; font-family: inherit; outline: none;
     }
+
+    /* 24-Hour Time of Day Controls */
+    .time-badge-row {
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .rally-clock {
+      font-size: 13px; font-weight: 700; color: #fbbf24;
+      font-variant-numeric: tabular-nums;
+      background: rgba(245, 158, 11, 0.12);
+      padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .time-btn-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+    }
+    .time-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--panel-border);
+      color: var(--text); padding: 6px 4px; border-radius: 6px;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      transition: all 0.15s ease;
+    }
+    .time-btn:hover { background: rgba(0, 240, 255, 0.15); border-color: var(--accent); }
+    .time-btn.active { background: rgba(0, 240, 255, 0.25); border-color: var(--accent); color: var(--accent); }
 
     .toggle-row {
       display: flex; justify-content: space-between; align-items: center;
@@ -156,12 +180,28 @@
     </div>
     <div class="panel-body">
 
+      <!-- 24-Hour Solar Time of Day -->
+      <div class="control-group">
+        <div class="time-badge-row">
+          <div class="group-label">24-Hour Rally Time</div>
+          <div class="rally-clock" id="rally-clock">22:00 CET</div>
+        </div>
+        <input type="range" id="slider-time" min="0" max="24" step="0.25" value="22">
+        <div class="time-btn-grid">
+          <button class="time-btn" id="btn-time-noon"><span>☀️</span>Noon</button>
+          <button class="time-btn" id="btn-time-dusk"><span>🌅</span>Dusk</button>
+          <button class="time-btn active" id="btn-time-night"><span>🌙</span>Night</button>
+          <button class="time-btn" id="btn-time-dawn"><span>🌄</span>Dawn</button>
+        </div>
+      </div>
+
       <!-- Preset Selector -->
       <div class="control-group">
         <div class="group-label">Color Theme Preset</div>
         <select id="preset-select">
           <option value="satelliteTopo">Satellite Topo (Default)</option>
-          <option value="tacticalDark">Tactical Dark</option>
+          <option value="cannonballNight">Night Ops (Cannonball)</option>
+          <option value="satelliteDay">Daylight Topo (Noon)</option>
           <option value="vintageTopo">Vintage Topo</option>
           <option value="nordicSlate">Nordic Slate</option>
         </select>
@@ -197,7 +237,7 @@
         </div>
 
         <div class="toggle-row">
-          <span>Urban Footprints</span>
+          <span>City Footprints & Night Lights</span>
           <label class="switch"><input type="checkbox" id="toggle-farmland" checked><span class="slider"></span></label>
         </div>
 
@@ -207,7 +247,7 @@
         </div>
 
         <div class="toggle-row">
-          <span>Highway Shields & Passes</span>
+          <span>Highway Shields & Alpine Passes</span>
           <label class="switch"><input type="checkbox" id="toggle-shields" checked><span class="slider"></span></label>
         </div>
 
@@ -242,8 +282,8 @@
         </div>
 
         <div class="slider-row">
-          <div class="slider-header"><span>Urban Footprint Opacity</span><span id="val-farmland">35%</span></div>
-          <input type="range" id="slider-farmland" min="0" max="100" value="35">
+          <div class="slider-header"><span>Urban / Light Opacity</span><span id="val-farmland">40%</span></div>
+          <input type="range" id="slider-farmland" min="0" max="100" value="40">
         </div>
       </div>
 
