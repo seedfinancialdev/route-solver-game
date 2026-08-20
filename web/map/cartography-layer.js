@@ -1,7 +1,7 @@
 /**
  * Vector Cartography Canvas Renderer
- * High-performance, tactile cartographic rendering for ocean bathymetry, coastlines,
- * lakes, smooth tapered rivers, urban footprints, background towns, and road networks.
+ * High-performance, clean cartographic rendering for lakes, urban footprints,
+ * background towns, and road networks.
  */
 
 export class CartographyLayer {
@@ -46,58 +46,18 @@ export class CartographyLayer {
     const translateX = -camera.current.x * scaleX;
     const translateY = -camera.current.y * scaleY;
 
-    // 1. Water Bodies (Ocean Coastlines, Lakes, & Tapered River Networks)
+    // 1. Water Bodies (Shoreline Border Highlights & Lake Shading)
     if (this.showWater) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
       ctx.globalAlpha = this.waterOpacity;
 
-      // A. Lake Polygon Fills & Depth Styling
-      if (g.lakes && g.lakes.length) {
-        // Core Lake Fill
-        ctx.fillStyle = theme.water || '#12283a';
+      // Lake Shoreline Border Highlights
+      if (this.showShoreline && g.lakes && g.lakes.length) {
+        ctx.strokeStyle = 'rgba(120, 190, 230, 0.40)';
+        ctx.lineWidth = 1.2 / scaleX;
         for (const lakePath of g.lakes) {
           const path = this.getPath2D(lakePath);
-          if (path) ctx.fill(path);
-        }
-
-        // Shoreline Highlight Ring
-        if (this.showShoreline) {
-          ctx.strokeStyle = 'rgba(120, 190, 230, 0.40)';
-          ctx.lineWidth = 1.2 / scaleX;
-          for (const lakePath of g.lakes) {
-            const path = this.getPath2D(lakePath);
-            if (path) ctx.stroke(path);
-          }
-        }
-      }
-
-      // B. River Network (Multi-tier tapered width pass for realistic flow)
-      if (g.rivers && g.rivers.length) {
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        // Base Outer River Channel
-        ctx.strokeStyle = theme.water || '#12283a';
-        ctx.lineWidth = (3.2 * this.riverWidthScale) / scaleX;
-        for (const riverPath of g.rivers) {
-          const path = this.getPath2D(riverPath);
-          if (path) ctx.stroke(path);
-        }
-
-        // Inner Flow Core
-        ctx.strokeStyle = 'rgba(75, 155, 205, 0.75)';
-        ctx.lineWidth = (1.6 * this.riverWidthScale) / scaleX;
-        for (const riverPath of g.rivers) {
-          const path = this.getPath2D(riverPath);
-          if (path) ctx.stroke(path);
-        }
-
-        // Mountain Spring Highlight
-        ctx.strokeStyle = 'rgba(130, 210, 255, 0.45)';
-        ctx.lineWidth = (0.8 * this.riverWidthScale) / scaleX;
-        for (const riverPath of g.rivers) {
-          const path = this.getPath2D(riverPath);
           if (path) ctx.stroke(path);
         }
       }

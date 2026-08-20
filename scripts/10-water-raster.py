@@ -2,14 +2,14 @@
 
 Generates pixel-perfect raster water maps (`web/water.webp` and `web/water-detail.webp`)
 using the exact inverse Lambert Conformal Conic coordinate grid, DEM elevation matrix,
-and river corridor geometries.
+and 236 multi-segment river corridors and lakes.
 
   python3 scripts/10-water-raster.py
 """
 import concurrent.futures as futures
-import json, math, pathlib, urllib.request
+import json, math, pathlib, re, urllib.request
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 Image.MAX_IMAGE_PIXELS = None
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -133,41 +133,23 @@ def render_water(box, out_w, out_h):
     # Draw Lake Polygons
     if 'lakes' in raw_map:
         for lake_svg in raw_map['lakes']:
-            # Parse simple SVG path M...L...
-            cmd_pts = []
-            tokens = lake_svg.replace('M', ' ').replace('L', ' ').replace('Z', '').strip().split()
-            for tok in tokens:
-                parts = tok.split()
-                for p in parts:
-                    coords = p.split()
-                    if len(coords) == 2:
-                        try:
-                            mx, my = float(coords[0]), float(coords[1])
-                            cmd_pts.append(map_to_px(mx, my))
-                        except ValueError:
-                            pass
-            if len(cmd_pts) >= 3:
-                draw.polygon(cmd_pts, fill=255)
+            sub_paths = [p.strip() for p in lake_svg.split('M') if p.strip()]
+            for sub in sub_paths:
+                coords = re.findall(r'[-+]?\d*\.\d+|\d+', sub)
+                pts = [map_to_px(float(coords[i]), float(coords[i+1])) for i in range(0, len(coords)-1, 2)]
+                if len(pts) >= 3:
+                    draw.polygon(pts, fill=255)
 
-    # Draw River Channels with 2.5px to 5.0px width
+    # Draw River Channels (236 sub-segments)
     if 'rivers' in raw_map:
+        stroke_w = max(int(round(7.0 * (out_w / 2400.0))), 4)
         for river_svg in raw_map['rivers']:
-            pts = []
-            tokens = river_svg.replace('M', ' ').replace('L', ' ').replace('Z', '').split()
-            for tok in tokens:
-                sub = tok.strip()
-                if not sub: continue
-                # Match numbers
-                import re
-                nums = re.findall(r'[-+]?\d*\.\d+|\d+', sub)
-                if len(nums) >= 2:
-                    for i in range(0, len(nums) - 1, 2):
-                        mx, my = float(nums[i]), float(nums[i+1])
-                        pts.append(map_to_px(mx, my))
-
-            if len(pts) >= 2:
-                stroke_w = max(int(round(3.0 * (out_w / 2400.0))), 2)
-                draw.line(pts, fill=255, width=stroke_w)
+            sub_paths = [p.strip() for p in river_svg.split('M') if p.strip()]
+            for sub in sub_paths:
+                coords = re.findall(r'[-+]?\d*\.\d+|\d+', sub)
+                pts = [map_to_px(float(coords[i]), float(coords[i+1])) for i in range(0, len(coords)-1, 2)]
+                if len(pts) >= 2:
+                    draw.line(pts, fill=255, width=stroke_w)
 
     river_lake_arr = np.asarray(overlay, dtype=np.float32) / 255.0
 
@@ -175,12 +157,12 @@ def render_water(box, out_w, out_h):
     combined_water = np.clip(ocean_mask.astype(np.float32) + river_lake_arr, 0, 1)
 
     # 4. Generate RGBA Water Image
-    # Deep Midnight Ocean Blue: RGB(14, 29, 43)
+    # Deep Midnight Ocean & River Blue: RGB(14, 34, 52)
     rgba = np.zeros((out_h, out_w, 4), dtype=np.uint8)
     rgba[..., 0] = 14  # Red
-    rgba[..., 1] = 29  # Green
-    rgba[..., 2] = 43  # Blue
-    rgba[..., 3] = (combined_water * 240.0).astype(np.uint8)
+    rgba[..., 1] = 34  # Green
+    rgba[..., 2] = 52  # Blue
+    rgba[..., 3] = (combined_water * 255.0).astype(np.uint8)
 
     return rgba
 
