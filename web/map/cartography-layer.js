@@ -1,18 +1,17 @@
 /**
  * Vector Cartography Canvas Renderer
  * High-performance, clean cartographic rendering for lakes, rivers, urban footprints,
- * woodland contours, background towns, and road networks.
+ * background towns, and road networks.
  */
 
 export class CartographyLayer {
   constructor() {
     this.pathCache = new Map(); // svgStr -> Path2D instance
-    this.cartographyData = null;
 
     // Layer Visibility Toggles
     this.showWater = true;
     this.showFarmland = true; // Urban footprints
-    this.showForest = true;   // Woodland contours
+    this.showForest = true;   // Raster forest layer toggle
     this.showTowns = true;    // Background towns
     this.showRoads = true;
     this.showStreets = true;
@@ -23,17 +22,6 @@ export class CartographyLayer {
     this.forestOpacity = 0.65;
     this.townsOpacity = 0.50;
     this.forestBlendMode = 'multiply';
-
-    this.init();
-  }
-
-  async init() {
-    try {
-      const res = await fetch('../cartography.json');
-      this.cartographyData = await res.json();
-    } catch {
-      // Graceful fallback
-    }
   }
 
   getPath2D(svgStr) {
@@ -98,25 +86,7 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 3. Woodland & Forest Layer (High-performance clean vector fill)
-    if (this.showForest && this.cartographyData && this.cartographyData.forest && this.cartographyData.forest.length) {
-      ctx.save();
-      ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-
-      // Blend mode allows hillshade shadows & ridges to conform through forest
-      ctx.globalCompositeOperation = this.forestBlendMode || 'multiply';
-      ctx.globalAlpha = this.forestOpacity;
-      ctx.fillStyle = theme.forest || 'rgba(22, 58, 36, 0.65)';
-
-      for (const forestPath of this.cartographyData.forest) {
-        const path = this.getPath2D(forestPath);
-        if (path) ctx.fill(path);
-      }
-
-      ctx.restore();
-    }
-
-    // 4. Background Towns (Independent layer)
+    // 3. Background Towns (Independent layer)
     if (this.showTowns && g.towns && g.towns.length && camera.current.w <= 1000) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
@@ -132,7 +102,7 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 5. Road Networks (Graph Edges with zoom-based LOD width scaling)
+    // 4. Road Networks (Graph Edges with zoom-based LOD width scaling)
     if (this.showRoads && g.adj) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
