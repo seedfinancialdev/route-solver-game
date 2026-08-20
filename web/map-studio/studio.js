@@ -42,7 +42,7 @@ const statTier = document.getElementById('stat-tier');
 presetSelect.addEventListener('change', (e) => {
   mapEngine.themeManager.loadPreset(e.target.value);
   const cur = mapEngine.themeManager.current;
-  sliderTerrain.value = Math.round((cur.terrainOpacity || 0.65) * 100);
+  sliderTerrain.value = Math.round((cur.terrainOpacity || 0.70) * 100);
   valTerrain.textContent = `${sliderTerrain.value}%`;
 });
 

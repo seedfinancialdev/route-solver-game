@@ -2,7 +2,7 @@
 
 Generates pixel-perfect raster water maps (`web/water.webp` and `web/water-detail.webp`)
 using the exact inverse Lambert Conformal Conic coordinate grid, 236 multi-segment river corridors,
-lakes, and Gaussian edge-feathering.
+lakes, and Gaussian edge-feathering tuned for satellite-hybrid aesthetics.
 
   python3 scripts/10-water-raster.py
 """
@@ -21,7 +21,7 @@ raw_map = json.loads((ROOT / 'web' / 'data.json').read_text())
 
 
 def render_water(box, out_w, out_h):
-    """Renders a clean, Gaussian-feathered raster water image."""
+    """Renders a clean, Gaussian-feathered raster water image tuned for satellite-hybrid topo looks."""
     # 1. Create 8-bit alpha mask canvas
     overlay = Image.new('L', (out_w, out_h), 0)
     draw = ImageDraw.Draw(overlay)
@@ -44,7 +44,7 @@ def render_water(box, out_w, out_h):
 
     # 3. Draw River Channels (All 236 sub-segments with flow-tapered widths)
     if 'rivers' in raw_map:
-        base_w = max(float(3.2 * (out_w / 2400.0)), 1.8)
+        base_w = max(float(3.0 * (out_w / 2400.0)), 1.8)
         for river_svg in raw_map['rivers']:
             sub_paths = [p.strip() for p in river_svg.split('M') if p.strip()]
             for sub in sub_paths:
@@ -60,17 +60,17 @@ def render_water(box, out_w, out_h):
     water_mask = np.asarray(overlay_blurred, dtype=np.float32) / 255.0
 
     # 5. Generate RGBA Water Image
-    # Organic River & Lake Blue: RGB(24, 64, 96)
+    # Deep Satellite Water Blue: RGB(16, 38, 56)
     rgba = np.zeros((out_h, out_w, 4), dtype=np.uint8)
-    rgba[..., 0] = 24  # Red
-    rgba[..., 1] = 64  # Green
-    rgba[..., 2] = 96  # Blue
-    rgba[..., 3] = (water_mask * 185.0).astype(np.uint8)  # 72% opacity for translucent hillshade depth
+    rgba[..., 0] = 16  # Red
+    rgba[..., 1] = 38  # Green
+    rgba[..., 2] = 56  # Blue
+    rgba[..., 3] = (water_mask * 195.0).astype(np.uint8)  # 76% opacity for translucent hillshade depth
 
     return rgba
 
 
-print("Generating clean Gaussian-softened Lambert raster water maps...")
+print("Generating satellite-hybrid Lambert raster water maps...")
 for name, out_w, quality in OUTPUTS:
     out_h = round(out_w * view['h'] / view['w'])
     img_rgba = render_water(view, out_w, out_h)
@@ -79,4 +79,4 @@ for name, out_w, quality in OUTPUTS:
     print(f'wrote {out.relative_to(ROOT)}  {out_w}x{out_h}  '
           f'{out.stat().st_size / 1024:.0f} KB')
 
-print("✓ Clean Gaussian-softened Lambert raster water maps generated successfully!")
+print("✓ Satellite-hybrid Lambert raster water maps generated successfully!")

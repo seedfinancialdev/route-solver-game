@@ -1,12 +1,37 @@
 /**
  * Map Engine Theme Configuration & Aesthetic Styling Tokens
- * Sourced & tuned for tactical rally aesthetics: high contrast, deep dark modes,
+ * Sourced & tuned for Satellite-Hybrid Topo aesthetics: high contrast, deep dark modes,
  * organic cartography tones, and crisp vector legibility.
  */
 
 export const THEME_PRESETS = {
+  satelliteTopo: {
+    name: 'Satellite Topo (Default)',
+    bg: '#0c1219',
+    water: '#102638',
+    land: '#181e26',
+    forest: 'rgba(20, 56, 35, 0.75)',
+    farmland: 'rgba(162, 137, 92, 0.35)',
+    meadow: 'rgba(58, 84, 45, 0.40)',
+    terrainOpacity: 0.70,
+    terrainBlend: 'multiply',
+    roadMotorway: '#d94b36',
+    roadTrunk: '#e6a13c',
+    roadPrimary: '#5f6f82',
+    roadSecondary: '#3e4a57',
+    roadWidthMotorway: 2.8,
+    roadWidthTrunk: 2.0,
+    roadWidthPrimary: 1.2,
+    cityNode: '#ffffff',
+    cityNodeBorder: '#0b0f17',
+    cityNodeActive: '#00f0ff',
+    routeLine: '#00f0ff',
+    routeLineGlow: 'rgba(0, 240, 255, 0.35)',
+    hudGlass: 'rgba(12, 18, 25, 0.85)',
+    hudText: '#e1e7ed',
+  },
   tacticalDark: {
-    name: 'Tactical Dark (Default)',
+    name: 'Tactical Dark',
     bg: '#0f141c',
     water: '#12283a',
     land: '#181e26',
@@ -83,7 +108,7 @@ export const THEME_PRESETS = {
 };
 
 export class MapTheme {
-  constructor(initialPreset = 'tacticalDark') {
+  constructor(initialPreset = 'satelliteTopo') {
     this.current = { ...THEME_PRESETS[initialPreset] };
   }
 
