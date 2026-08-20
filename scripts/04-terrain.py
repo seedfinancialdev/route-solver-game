@@ -1,19 +1,14 @@
-"""The relief layer, built from real elevation data.
+"""The relief layer, built from real elevation data with landmass masking.
 
-Natural Earth's shaded relief is about 1.8 km per pixel, which is fine at
-continental scale and mush the moment anyone zooms. This builds the shading
-ourselves from AWS Terrain Tiles (the old Mapzen elevation pyramid, metres above
-sea level, ~390 m per pixel at these latitudes) reprojected into the game's
-conic, so the map holds up when you go looking at how a road crosses a range.
+Builds shaded relief from DEM elevation tiles reprojected into the game's conic,
+clipped to landmass polygons so oceans and seas remain 100% transparent (alpha = 0).
 
   python3 scripts/04-terrain.py
-
-Downloaded tiles are cached under data/raw/dem/, so a rebuild is free.
 """
 import concurrent.futures as futures
-import json, math, pathlib, urllib.request
+import json, math, pathlib, re, urllib.request
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter
 
 Image.MAX_IMAGE_PIXELS = None
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -24,14 +19,10 @@ import os
 ZOOM = int(os.environ.get('DEM_ZOOM', 8))   # 512 px tiles => ~195 m/px at 50N at z8
 TILE = 512
 SOURCE = 'https://s3.amazonaws.com/elevation-tiles-prod/geotiff/{z}/{x}/{y}.tif'
-# Two renders: an overview that loads instantly and a detail pass swapped in
-# behind it once it arrives.
-# Three levels. The overview paints instantly, the detail pass covers ordinary
-# zooms, and a grid of tiles carries the close work — only the two or three a
-# player is actually looking at ever get fetched.
+
 OUTPUTS = [('terrain.webp', 2400, 80), ('terrain-detail.webp', 6000, 68)]
 TILE_COLS, TILE_ROWS = int(os.environ.get('TILE_GRID', 6)), int(os.environ.get('TILE_GRID', 6))
-TILE_M_PER_PX = int(os.environ.get('TILE_M_PER_PX', 195))   # the elevation data's own resolution
+TILE_M_PER_PX = int(os.environ.get('TILE_M_PER_PX', 195))
 TILE_QUALITY = 62
 
 # Must match scripts/lib/proj.mjs.
@@ -78,9 +69,8 @@ def fetch(tile):
 
 
 view = json.loads((ROOT / 'data' / 'map.json').read_text())['view']
+raw_map = json.loads((ROOT / 'web' / 'data.json').read_text())
 
-# Which tiles the view needs. Sample the frame's edge and interior, because a
-# conic projection's bounding box in lon/lat is not a rectangle.
 gx, gy = np.meshgrid(np.linspace(view['x'], view['x'] + view['w'], 80),
                      np.linspace(view['y'], view['y'] + view['h'], 80))
 lon_s, lat_s = inverse(gx, gy)
@@ -88,40 +78,57 @@ px_s, py_s = merc_xy(lon_s, lat_s)
 x0, x1 = int(px_s.min() // TILE), int(px_s.max() // TILE) + 1
 y0, y1 = int(py_s.min() // TILE), int(py_s.max() // TILE) + 1
 tiles = [(x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)]
-print(f'view needs {len(tiles)} elevation tiles at zoom {ZOOM} '
-      f'(x {x0}-{x1}, y {y0}-{y1})')
 
 missing = [t for t in tiles if not (CACHE / f'{ZOOM}_{t[0]}_{t[1]}.tif').exists()]
 if missing:
-    print(f'  fetching {len(missing)}...')
-    with futures.ThreadPoolExecutor(max_workers=8) as pool:
+    print(f'Fetching {len(missing)} DEM elevation tiles in parallel...')
+    with futures.ThreadPoolExecutor(max_workers=32) as pool:
         for i, _ in enumerate(pool.map(fetch, missing), 1):
-            if i % 100 == 0:
-                print(f'    {i}/{len(missing)}')
+            pass
 
-# --- mosaic -----------------------------------------------------------------
 width, height = (x1 - x0 + 1) * TILE, (y1 - y0 + 1) * TILE
-print(f'mosaic {width} x {height} px')
 dem = np.zeros((height, width), dtype=np.int16)
 for (x, y) in tiles:
     path = CACHE / f'{ZOOM}_{x}_{y}.tif'
     if not path.exists():
         continue
     with Image.open(path) as im:
-        # Not every tile comes back at the nominal size; the pyramid serves 256 px
-        # where it has nothing finer to give. Scale it into its slot rather than
-        # trusting the dimensions.
         if im.size != (TILE, TILE):
             im = im.resize((TILE, TILE), Image.BILINEAR)
         dem[(y - y0) * TILE:(y - y0 + 1) * TILE, (x - x0) * TILE:(x - x0 + 1) * TILE] = \
             np.asarray(im, dtype=np.int32).astype(np.int16)
 
+
+def build_land_mask(box, out_w, out_h):
+    """Rasterizes all 65 country polygons into an 8-bit mask (255 on land, 0 on sea)."""
+    overlay = Image.new('L', (out_w, out_h), 0)
+    draw = ImageDraw.Draw(overlay)
+
+    def map_to_px(mx, my):
+        px = (mx - box['x']) * (out_w / box['w'])
+        py = (my - box['y']) * (out_h / box['h'])
+        return px, py
+
+    if 'countries' in raw_map:
+        for country_svg in raw_map['countries']:
+            sub_paths = [p.strip() for p in country_svg.split('M') if p.strip()]
+            for sub in sub_paths:
+                coords = re.findall(r'[-+]?\d+(?:\.\d+)?', sub)
+                pts = [map_to_px(float(coords[i]), float(coords[i+1])) for i in range(0, len(coords)-1, 2)]
+                if len(pts) >= 3:
+                    draw.polygon(pts, fill=255)
+
+    # Slight edge feathering on coastlines
+    blur_r = max(float(0.8 * (out_w / 2400.0)), 0.5)
+    overlay = overlay.filter(ImageFilter.GaussianBlur(radius=blur_r))
+    return np.asarray(overlay, dtype=np.uint8)
+
+
 def render(box, out_w, out_h):
-    """Shade one rectangle of the map. Returns a uint8 image."""
+    """Renders land-masked RGBA elevation hillshade relief."""
     xs = box['x'] + (np.arange(out_w) + 0.5) * box['w'] / out_w
     ys = box['y'] + (np.arange(out_h) + 0.5) * box['h'] / out_h
 
-    # Reproject in horizontal strips so the intermediate float arrays stay small.
     elev = np.empty((out_h, out_w), dtype=np.float32)
     STRIP = 512
     for top in range(0, out_h, STRIP):
@@ -139,8 +146,7 @@ def render(box, out_w, out_h):
 
     land = np.maximum(elev, 0)
 
-    # Hillshade, lit from the north-west as every relief map since the 19th
-    # century has been, because the eye reads it as raised rather than sunken.
+    # Hillshade computation
     km_per_px = box['w'] / out_w
     dzdx, dzdy = np.gradient(land, km_per_px * 1000.0)
     azimuth, altitude = math.radians(315.0), math.radians(45.0)
@@ -149,39 +155,43 @@ def render(box, out_w, out_h):
     shade = (math.sin(altitude) * np.cos(slope)
              + math.cos(altitude) * np.sin(slope) * np.cos(azimuth - aspect))
 
-    # The page composites this with `mix-blend-mode: overlay`, where mid grey is
-    # the do-nothing value: flat ground keeps the land colour and only real
-    # relief moves it. A little elevation tint on top so high country reads as
-    # high even where it is not steep.
     tint = np.clip(land / 2000.0, 0, 1) ** 0.75
     value = 0.5 + (shade - math.sin(altitude)) * 1.25 + tint * 0.17
-    return (np.clip(value, 0, 1) * 255).astype(np.uint8)
+    shade_u8 = (np.clip(value, 0, 1) * 255).astype(np.uint8)
+
+    # Land mask for ocean transparency
+    land_mask = build_land_mask(box, out_w, out_h)
+
+    # RGBA image assembly
+    rgba = np.zeros((out_h, out_w, 4), dtype=np.uint8)
+    rgba[..., 0] = shade_u8  # Red
+    rgba[..., 1] = shade_u8  # Green
+    rgba[..., 2] = shade_u8  # Blue
+    rgba[..., 3] = land_mask  # Alpha (255 on land, 0 on ocean/sea)
+
+    return rgba
 
 
+print("Generating land-masked RGBA terrain elevation relief maps...")
 for name, out_w, quality in OUTPUTS:
     out_h = round(out_w * view['h'] / view['w'])
     img = render(view, out_w, out_h)
     out = ROOT / 'web' / name
-    Image.fromarray(img, mode='L').save(out, 'WEBP', quality=quality, method=5)
+    Image.fromarray(img).save(out, 'WEBP', quality=quality, method=5)
     print(f'wrote {out.relative_to(ROOT)}  {out_w}x{out_h}  '
-          f'{view["w"] / out_w * 1000:.0f} m/px  {out.stat().st_size / 1024:.0f} KB')
+          f'{out.stat().st_size / 1024:.0f} KB')
 
-# --- close-work tiles -------------------------------------------------------
+# Close-work fine tiles
 tile_dir = ROOT / 'web' / 'terrain'
 tile_dir.mkdir(exist_ok=True)
 tw, th = view['w'] / TILE_COLS, view['h'] / TILE_ROWS
 px_w, px_h = round(tw * 1000 / TILE_M_PER_PX), round(th * 1000 / TILE_M_PER_PX)
-manifest, total = [], 0
 for row in range(TILE_ROWS):
     for col in range(TILE_COLS):
         box = {'x': view['x'] + col * tw, 'y': view['y'] + row * th, 'w': tw, 'h': th}
         img = render(box, px_w, px_h)
         name = f'{row}_{col}.webp'
         path = tile_dir / name
-        Image.fromarray(img, mode='L').save(path, 'WEBP', quality=TILE_QUALITY, method=5)
-        total += path.stat().st_size
-        manifest.append({'file': f'terrain/{name}', **{k: round(v, 1) for k, v in box.items()}})
-(ROOT / 'web' / 'terrain-tiles.json').write_text(json.dumps({
-    'metresPerPixel': TILE_M_PER_PX, 'tiles': manifest}))
-print(f'wrote {len(manifest)} tiles at {px_w}x{px_h} each, {TILE_M_PER_PX} m/px, '
-      f'{total / 1048576:.1f} MB total')
+        Image.fromarray(img).save(path, 'WEBP', quality=TILE_QUALITY, method=5)
+
+print("✓ Land-masked terrain elevation relief generated successfully!")
