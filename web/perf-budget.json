@@ -1,0 +1,16 @@
+{
+  "comment": "Payload budgets in KB, seeded from measurement on 2026-08-20. Edit deliberately, in the same commit as the change that needs it. Never raise a budget just to get a green run.",
+  "entryPoints": ["index.html"],
+  "skipDirs": ["map-studio", "road-network-proto"],
+  "budgets": {
+    "eagerTotalKB": 18300,
+    "deferredTotalKB": 31000,
+    "streetTotalKB": 3400,
+    "largestStreetFileKB": 30
+  },
+  "manifests": [
+    { "file": "terrain-tiles.json", "key": "tiles", "pathField": "file" },
+    { "file": "streets/manifest.json", "key": null, "pathField": null }
+  ],
+  "knownOrphans": []
+}

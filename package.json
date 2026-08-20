@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test 'tests/**/*.test.mjs'",
+    "perf": "node scripts/perf-profile.mjs",
     "data:cities": "node scripts/00-cities.mjs",
     "data:graph": "node scripts/01-graph.mjs",
     "data:puzzles": "node scripts/02-puzzles.mjs",
