@@ -164,7 +164,7 @@ export class TerrainLayer {
     if (this.showWaterRaster && (this.waterLoaded || (this.waterImg && this.waterImg.complete && this.waterImg.naturalWidth !== 0))) {
       ctx.save();
       ctx.globalAlpha = waterOpacity;
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalCompositeOperation = 'multiply';
 
       const isWaterDetailAvailable = (this.waterDetailLoaded || (this.waterDetailImg && this.waterDetailImg.complete && this.waterDetailImg.naturalWidth !== 0));
       const wImg = (isWaterDetailAvailable && camera.current.w <= 1400) ? this.waterDetailImg : this.waterImg;
