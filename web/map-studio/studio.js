@@ -22,11 +22,11 @@ const btnNight = document.getElementById('btn-time-night');
 const btnDawn = document.getElementById('btn-time-dawn');
 const timeBtns = [btnNoon, btnDusk, btnNight, btnDawn];
 
-// Vector Layer Toggles
+// Vector & Raster Layer Toggles
 const toggleTerrain = document.getElementById('toggle-terrain');
 const toggleWater = document.getElementById('toggle-water');
 const toggleForest = document.getElementById('toggle-forest');
-const toggleFarmland = document.getElementById('toggle-farmland');
+const toggleUrbanSat = document.getElementById('toggle-urban-sat');
 const toggleRoads = document.getElementById('toggle-roads');
 const toggleShields = document.getElementById('toggle-shields');
 const toggleNodes = document.getElementById('toggle-nodes');
@@ -104,7 +104,7 @@ forestBlendSelect.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.forestBlendMode = e.target.value;
 });
 
-// Bind Vector Toggles
+// Bind Vector & Raster Toggles
 toggleTerrain.addEventListener('change', (e) => {
   mapEngine.terrainLayer.showTerrain = e.target.checked;
 });
@@ -115,7 +115,8 @@ toggleForest.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.showForest = e.target.checked;
   mapEngine.terrainLayer.showForestRaster = e.target.checked;
 });
-toggleFarmland.addEventListener('change', (e) => {
+toggleUrbanSat.addEventListener('change', (e) => {
+  mapEngine.terrainLayer.showUrbanSatellite = e.target.checked;
   mapEngine.cartographyLayer.showFarmland = e.target.checked;
 });
 toggleRoads.addEventListener('change', (e) => {
