@@ -1,15 +1,15 @@
 /**
  * Map Engine Theme Configuration & Aesthetic Styling Tokens
- * Sourced & tuned for Satellite-Hybrid Topo aesthetics: high contrast, deep dark modes,
- * organic cartography tones, and crisp vector legibility.
+ * Sourced & tuned for Tactical Race Navigation & Educational Geographic Realism.
  */
 
 export const THEME_PRESETS = {
   satelliteTopo: {
     name: 'Satellite Topo (Default)',
-    bg: '#0c1219',
-    water: '#102638',
-    land: '#181e26',
+    bg: '#0c1a28',
+    water: '#14344d',
+    land: '#18202a',
+    coastline: 'rgba(100, 180, 240, 0.45)',
     forest: 'rgba(20, 56, 35, 0.75)',
     farmland: 'rgba(162, 137, 92, 0.35)',
     meadow: 'rgba(58, 84, 45, 0.40)',
@@ -32,9 +32,10 @@ export const THEME_PRESETS = {
   },
   tacticalDark: {
     name: 'Tactical Dark',
-    bg: '#0f141c',
-    water: '#12283a',
-    land: '#181e26',
+    bg: '#0c1a28',
+    water: '#14344d',
+    land: '#18202a',
+    coastline: 'rgba(100, 180, 240, 0.45)',
     forest: 'rgba(20, 56, 35, 0.75)',
     farmland: 'rgba(105, 88, 48, 0.52)',
     meadow: 'rgba(58, 84, 45, 0.45)',
@@ -57,9 +58,10 @@ export const THEME_PRESETS = {
   },
   vintageTopo: {
     name: 'Vintage Topo',
-    bg: '#1e1c19',
-    water: '#1b3240',
+    bg: '#1b2c3a',
+    water: '#224259',
     land: '#282420',
+    coastline: 'rgba(200, 160, 100, 0.40)',
     forest: 'rgba(34, 58, 38, 0.70)',
     farmland: 'rgba(120, 95, 50, 0.48)',
     meadow: 'rgba(70, 90, 50, 0.40)',
@@ -82,9 +84,10 @@ export const THEME_PRESETS = {
   },
   nordicSlate: {
     name: 'Nordic Slate',
-    bg: '#0c1015',
-    water: '#0e1d2b',
+    bg: '#0a1724',
+    water: '#102a40',
     land: '#131922',
+    coastline: 'rgba(80, 170, 230, 0.45)',
     forest: 'rgba(15, 48, 36, 0.80)',
     farmland: 'rgba(85, 78, 55, 0.45)',
     meadow: 'rgba(45, 75, 50, 0.40)',

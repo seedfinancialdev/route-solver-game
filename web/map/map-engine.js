@@ -1,7 +1,7 @@
 /**
  * Core Map Engine Orchestrator
- * Integrates Camera, Terrain Relief, Raster Water & Forest Maps, Vector Cartography, Gameplay Overlay,
- * and Theme Engine into a 60fps render loop.
+ * Integrates Camera, Terrain Relief, Raster Forest, Vector Cartography (Coastlines, Lakes, Rivers, Roads),
+ * Gameplay Overlay, and Theme Engine into a 60fps render loop.
  */
 
 import { Camera } from './camera.js';
@@ -29,7 +29,7 @@ export class MapEngine {
 
     // Subsystems
     this.camera = new Camera(this.container, this.worldBounds);
-    this.themeManager = new MapTheme('tacticalDark');
+    this.themeManager = new MapTheme('satelliteTopo');
     this.terrainLayer = new TerrainLayer(this.worldBounds);
     this.cartographyLayer = new CartographyLayer();
     this.gameplayLayer = new GameplayLayer();
@@ -108,23 +108,21 @@ export class MapEngine {
     const dpr = window.devicePixelRatio || 1;
     const theme = this.themeManager.current;
 
-    // Reset Context & Clear Canvas with Background Color
+    // Reset Context & Clear Canvas with Marine Ocean Base
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.ctx.fillStyle = theme.bg;
     this.ctx.fillRect(0, 0, width, height);
 
-    // Render Layers in Order:
-    // 1. Terrain Elevation Relief, Raster Water Maps, & Raster Forest Layer
+    // 1. Terrain Elevation Relief & Pre-Rendered Lambert Raster Forest Layer
     this.terrainLayer.render(
       this.ctx,
       this.camera,
       theme,
       this.cartographyLayer.forestOpacity,
-      this.cartographyLayer.forestBlendMode,
-      this.cartographyLayer.waterOpacity
+      this.cartographyLayer.forestBlendMode
     );
 
-    // 2. Vector Cartography (Lakes, rivers, urban footprints, road networks)
+    // 2. Vector Cartography (Landmass Coastlines, Lakes, Rivers, Urban Footprints, Roads)
     this.cartographyLayer.render(this.ctx, this.camera, theme, this.graphData);
 
     // 3. Tactical Gameplay Overlay (City Nodes, Labels, Active Route)

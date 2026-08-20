@@ -1,7 +1,7 @@
 /**
  * Vector Cartography Canvas Renderer
- * High-performance, clean cartographic rendering for lakes, urban footprints,
- * background towns, and road networks.
+ * High-performance, tactile cartographic rendering for coastlines, landmasses,
+ * lakes, rivers, urban footprints, background towns, and road networks.
  */
 
 export class CartographyLayer {
@@ -9,16 +9,17 @@ export class CartographyLayer {
     this.pathCache = new Map(); // svgStr -> Path2D instance
 
     // Layer Visibility Toggles
-    this.showWater = true;
-    this.showFarmland = true;  // Urban footprints
-    this.showForest = true;    // Raster forest layer toggle
-    this.showTowns = true;     // Background towns
-    this.showRoads = true;
-    this.showShoreline = true; // Shoreline highlight glow
+    this.showCoastlines = true; // Country & coastline boundaries
+    this.showWater = true;      // Lakes & Rivers
+    this.showFarmland = true;   // Urban footprints
+    this.showForest = true;     // Raster forest layer toggle
+    this.showTowns = true;      // Background towns
+    this.showRoads = true;      // Road networks
+    this.showShoreline = true;  // Coastline & Lake shoreline highlights
 
     // Opacity & Width Controls
     this.waterOpacity = 1.0;
-    this.farmlandOpacity = 0.45;
+    this.farmlandOpacity = 0.35;
     this.forestOpacity = 0.65;
     this.townsOpacity = 0.50;
     this.riverWidthScale = 1.0;
@@ -46,29 +47,77 @@ export class CartographyLayer {
     const translateX = -camera.current.x * scaleX;
     const translateY = -camera.current.y * scaleY;
 
-    // 1. Water Bodies (Shoreline Border Highlights & Lake Shading)
+    // 1. Landmass & Coastline Outlines
+    if (this.showCoastlines && g.countries && g.countries.length) {
+      ctx.save();
+      ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
+
+      // Draw Landmass Coastline Stroke
+      ctx.strokeStyle = theme.coastline || 'rgba(100, 180, 240, 0.45)';
+      ctx.lineWidth = 1.2 / scaleX;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+
+      for (const countryPath of g.countries) {
+        const path = this.getPath2D(countryPath);
+        if (path) ctx.stroke(path);
+      }
+      ctx.restore();
+    }
+
+    // 2. Inland Water Bodies (Lakes & Clean Vector Rivers)
     if (this.showWater) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
       ctx.globalAlpha = this.waterOpacity;
 
-      // Lake Shoreline Border Highlights
-      if (this.showShoreline && g.lakes && g.lakes.length) {
-        ctx.strokeStyle = 'rgba(120, 190, 230, 0.40)';
-        ctx.lineWidth = 1.2 / scaleX;
+      // A. Lakes (Core Fill + Shoreline Ring)
+      if (g.lakes && g.lakes.length) {
+        ctx.fillStyle = theme.water || '#14344d';
         for (const lakePath of g.lakes) {
           const path = this.getPath2D(lakePath);
+          if (path) ctx.fill(path);
+        }
+
+        if (this.showShoreline) {
+          ctx.strokeStyle = theme.coastline || 'rgba(100, 180, 240, 0.45)';
+          ctx.lineWidth = 1.0 / scaleX;
+          for (const lakePath of g.lakes) {
+            const path = this.getPath2D(lakePath);
+            if (path) ctx.stroke(path);
+          }
+        }
+      }
+
+      // B. Rivers (Clean 2-tier vector flow lines, zero fuzzy smudges)
+      if (g.rivers && g.rivers.length) {
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Outer Channel Base
+        ctx.strokeStyle = theme.water || '#14344d';
+        ctx.lineWidth = (2.4 * this.riverWidthScale) / scaleX;
+        for (const riverPath of g.rivers) {
+          const path = this.getPath2D(riverPath);
+          if (path) ctx.stroke(path);
+        }
+
+        // Inner Flow Core
+        ctx.strokeStyle = 'rgba(60, 150, 210, 0.75)';
+        ctx.lineWidth = (1.2 * this.riverWidthScale) / scaleX;
+        for (const riverPath of g.rivers) {
+          const path = this.getPath2D(riverPath);
           if (path) ctx.stroke(path);
         }
       }
       ctx.restore();
     }
 
-    // 2. Urban Footprints (Built-up City Footprints)
+    // 3. Urban Footprints (Built-up City Footprints)
     if (this.showFarmland && g.urbanAreas && g.urbanAreas.length) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-      ctx.fillStyle = theme.farmland || 'rgba(162, 137, 92, 0.45)';
+      ctx.fillStyle = theme.farmland || 'rgba(162, 137, 92, 0.35)';
       ctx.globalAlpha = this.farmlandOpacity;
 
       for (const areaPath of g.urbanAreas) {
@@ -78,7 +127,7 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 3. Background Towns (Independent layer)
+    // 4. Background Towns (Independent layer)
     if (this.showTowns && g.towns && g.towns.length && camera.current.w <= 1000) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
@@ -94,7 +143,7 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 4. Road Networks (Graph Edges with zoom-based LOD width scaling)
+    // 5. Road Networks (Graph Edges with zoom-based LOD width scaling)
     if (this.showRoads && g.adj) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
@@ -119,21 +168,21 @@ export class CartographyLayer {
       const isOverview = camera.current.w > 1200;
 
       // Draw Motorways
-      ctx.strokeStyle = isOverview ? 'rgba(217, 75, 54, 0.35)' : (theme.roadMotorway || '#d94b36');
-      ctx.lineWidth = (isOverview ? 0.6 : (theme.roadWidthMotorway || 2.2)) / scaleX;
+      ctx.strokeStyle = isOverview ? 'rgba(217, 75, 54, 0.40)' : (theme.roadMotorway || '#d94b36');
+      ctx.lineWidth = (isOverview ? 0.6 : (theme.roadWidthMotorway || 2.8)) / scaleX;
       this.drawShapeBatch(ctx, motorways);
 
       // Draw Trunks
       if (camera.current.w <= 1400) {
         ctx.strokeStyle = theme.roadTrunk || '#e6a13c';
-        ctx.lineWidth = (theme.roadWidthTrunk || 1.6) / scaleX;
+        ctx.lineWidth = (theme.roadWidthTrunk || 2.0) / scaleX;
         this.drawShapeBatch(ctx, trunks);
       }
 
       // Draw Primaries
       if (camera.current.w <= 800) {
         ctx.strokeStyle = theme.roadPrimary || '#5f6f82';
-        ctx.lineWidth = (theme.roadWidthPrimary || 1.0) / scaleX;
+        ctx.lineWidth = (theme.roadWidthPrimary || 1.2) / scaleX;
         this.drawShapeBatch(ctx, primaries);
       }
 
