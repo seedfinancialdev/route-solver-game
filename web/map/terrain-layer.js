@@ -1,7 +1,7 @@
 /**
- * Multi-Tier Elevation Relief & Raster Forest Layer Renderer
- * Renders Overview, Detail pass, Fine Tile grid (6x6), and pre-rendered Lambert raster forest layer
- * with smooth composite shading.
+ * Multi-Tier Elevation Relief, Raster Forest, & Raster Water Layer Renderer
+ * Renders Overview, Detail pass, Fine Tile grid (6x6), pre-rendered Lambert raster forest layer,
+ * and terrain-carved raster water maps with 1:1 pixel alignment.
  */
 
 export class TerrainLayer {
@@ -9,11 +9,14 @@ export class TerrainLayer {
     this.mapBounds = mapBounds; // { x, y, w, h }
     this.showTerrain = true;
     this.showForestRaster = true;
+    this.showWaterRaster = true;
 
     this.overviewImg = null;
     this.detailImg = null;
     this.forestImg = null;
     this.forestDetailImg = null;
+    this.waterImg = null;
+    this.waterDetailImg = null;
 
     this.tilesManifest = [];
     this.loadedTiles = new Map(); // tile.file -> HTMLImageElement
@@ -22,6 +25,8 @@ export class TerrainLayer {
     this.detailLoaded = false;
     this.forestLoaded = false;
     this.forestDetailLoaded = false;
+    this.waterLoaded = false;
+    this.waterDetailLoaded = false;
 
     this.init();
   }
@@ -57,6 +62,22 @@ export class TerrainLayer {
     this.forestDetailImg.src = '../forest-detail.webp';
     if (this.forestDetailImg.complete && this.forestDetailImg.naturalWidth !== 0) {
       this.forestDetailLoaded = true;
+    }
+
+    // Load Water Overview raster image
+    this.waterImg = new Image();
+    this.waterImg.onload = () => { this.waterLoaded = true; };
+    this.waterImg.src = '../water.webp';
+    if (this.waterImg.complete && this.waterImg.naturalWidth !== 0) {
+      this.waterLoaded = true;
+    }
+
+    // Load Water Detail raster image
+    this.waterDetailImg = new Image();
+    this.waterDetailImg.onload = () => { this.waterDetailLoaded = true; };
+    this.waterDetailImg.src = '../water-detail.webp';
+    if (this.waterDetailImg.complete && this.waterDetailImg.naturalWidth !== 0) {
+      this.waterDetailLoaded = true;
     }
 
     // Load fine tiles manifest
@@ -98,7 +119,7 @@ export class TerrainLayer {
     }
   }
 
-  render(ctx, camera, theme, forestOpacity = 0.65, forestBlendMode = 'multiply') {
+  render(ctx, camera, theme, forestOpacity = 0.65, forestBlendMode = 'multiply', waterOpacity = 1.0) {
     if (!this.showTerrain) return;
 
     // Fallback: If overviewLoaded is not set yet, check img.complete
@@ -137,7 +158,20 @@ export class TerrainLayer {
     }
     ctx.restore();
 
-    // 2. Draw Pre-Rendered Lambert Raster Forest Layer
+    // 2. Draw Pre-Rendered Lambert Raster Water Layer (Ocean, Lakes, & River Valleys)
+    if (this.showWaterRaster && (this.waterLoaded || (this.waterImg && this.waterImg.complete && this.waterImg.naturalWidth !== 0))) {
+      ctx.save();
+      ctx.globalAlpha = waterOpacity;
+      ctx.globalCompositeOperation = 'source-over';
+
+      const isWaterDetailAvailable = (this.waterDetailLoaded || (this.waterDetailImg && this.waterDetailImg.complete && this.waterDetailImg.naturalWidth !== 0));
+      const wImg = (isWaterDetailAvailable && camera.current.w <= 1400) ? this.waterDetailImg : this.waterImg;
+
+      ctx.drawImage(wImg, p1.x, p1.y, screenW, screenH);
+      ctx.restore();
+    }
+
+    // 3. Draw Pre-Rendered Lambert Raster Forest Layer
     if (this.showForestRaster && (this.forestLoaded || (this.forestImg && this.forestImg.complete && this.forestImg.naturalWidth !== 0))) {
       ctx.save();
       ctx.globalAlpha = forestOpacity;

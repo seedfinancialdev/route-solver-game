@@ -1,6 +1,6 @@
 /**
  * Core Map Engine Orchestrator
- * Integrates Camera, Terrain Relief, Raster Forest Maps, Vector Cartography, Gameplay Overlay,
+ * Integrates Camera, Terrain Relief, Raster Water & Forest Maps, Vector Cartography, Gameplay Overlay,
  * and Theme Engine into a 60fps render loop.
  */
 
@@ -114,13 +114,14 @@ export class MapEngine {
     this.ctx.fillRect(0, 0, width, height);
 
     // Render Layers in Order:
-    // 1. Terrain Elevation Relief & Pre-Rendered Lambert Raster Forest Layer
+    // 1. Terrain Elevation Relief, Raster Water Maps, & Raster Forest Layer
     this.terrainLayer.render(
       this.ctx,
       this.camera,
       theme,
       this.cartographyLayer.forestOpacity,
-      this.cartographyLayer.forestBlendMode
+      this.cartographyLayer.forestBlendMode,
+      this.cartographyLayer.waterOpacity
     );
 
     // 2. Vector Cartography (Lakes, rivers, urban footprints, road networks)
