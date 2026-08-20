@@ -23,11 +23,17 @@ export class TerrainLayer {
     this.overviewImg = new Image();
     this.overviewImg.onload = () => { this.overviewLoaded = true; };
     this.overviewImg.src = '../terrain.webp';
+    if (this.overviewImg.complete && this.overviewImg.naturalWidth !== 0) {
+      this.overviewLoaded = true;
+    }
 
     // Load Detail image
     this.detailImg = new Image();
     this.detailImg.onload = () => { this.detailLoaded = true; };
     this.detailImg.src = '../terrain-detail.webp';
+    if (this.detailImg.complete && this.detailImg.naturalWidth !== 0) {
+      this.detailLoaded = true;
+    }
 
     // Load fine tiles manifest
     try {
@@ -60,12 +66,23 @@ export class TerrainLayer {
           const entry = this.loadedTiles.get(t.file);
           if (entry) entry.loaded = true;
         };
+        if (img.complete && img.naturalWidth !== 0) {
+          const entry = this.loadedTiles.get(t.file);
+          if (entry) entry.loaded = true;
+        }
       }
     }
   }
 
   render(ctx, camera, theme) {
-    if (!this.showTerrain || !this.overviewLoaded) return;
+    if (!this.showTerrain) return;
+
+    // Fallback: If overviewLoaded is not set yet, check img.complete
+    if (!this.overviewLoaded && this.overviewImg && this.overviewImg.complete && this.overviewImg.naturalWidth !== 0) {
+      this.overviewLoaded = true;
+    }
+
+    if (!this.overviewLoaded) return;
 
     this.ensureTiles(camera);
 
@@ -80,7 +97,8 @@ export class TerrainLayer {
     const screenH = p2.y - p1.y;
 
     // Draw Overview / Detail base
-    const baseImg = (this.detailLoaded && camera.current.w <= 1400) ? this.detailImg : this.overviewImg;
+    const isDetailAvailable = (this.detailLoaded || (this.detailImg && this.detailImg.complete && this.detailImg.naturalWidth !== 0));
+    const baseImg = (isDetailAvailable && camera.current.w <= 1400) ? this.detailImg : this.overviewImg;
     ctx.drawImage(baseImg, p1.x, p1.y, screenW, screenH);
 
     // Draw Fine Tiles overlay if in close zoom

@@ -132,7 +132,7 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 5. Road Networks (Graph Edges with decoded shape & pace)
+    // 5. Road Networks (Graph Edges with zoom-based LOD width scaling)
     if (this.showRoads && g.adj) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
@@ -154,22 +154,24 @@ export class CartographyLayer {
         }
       }
 
+      const isOverview = camera.current.w > 1200;
+
       // Draw Motorways
-      ctx.strokeStyle = theme.roadMotorway || '#d94b36';
-      ctx.lineWidth = Math.max(theme.roadWidthMotorway || 2.8, 1.2) / scaleX;
+      ctx.strokeStyle = isOverview ? 'rgba(217, 75, 54, 0.35)' : (theme.roadMotorway || '#d94b36');
+      ctx.lineWidth = (isOverview ? 0.6 : (theme.roadWidthMotorway || 2.2)) / scaleX;
       this.drawShapeBatch(ctx, motorways);
 
       // Draw Trunks
       if (camera.current.w <= 1400) {
         ctx.strokeStyle = theme.roadTrunk || '#e6a13c';
-        ctx.lineWidth = Math.max(theme.roadWidthTrunk || 2.0, 1.0) / scaleX;
+        ctx.lineWidth = (theme.roadWidthTrunk || 1.6) / scaleX;
         this.drawShapeBatch(ctx, trunks);
       }
 
       // Draw Primaries
       if (camera.current.w <= 800) {
         ctx.strokeStyle = theme.roadPrimary || '#5f6f82';
-        ctx.lineWidth = Math.max(theme.roadWidthPrimary || 1.2, 0.8) / scaleX;
+        ctx.lineWidth = (theme.roadWidthPrimary || 1.0) / scaleX;
         this.drawShapeBatch(ctx, primaries);
       }
 

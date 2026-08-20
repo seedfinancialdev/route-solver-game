@@ -107,14 +107,21 @@ export class GameplayLayer {
 
     const isClose = camera.current.w <= 1400;
 
-    // 1. Country Labels
+    // 1. Deduplicated Country Labels
     if (g.countryLabels && camera.current.w > 600) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
       ctx.font = '700 12px "Inter", sans-serif';
+      const drawnCountries = new Set();
+
       for (const country of g.countryLabels) {
+        const name = country.name.toUpperCase();
+        if (drawnCountries.has(name)) continue;
+
         const p = camera.worldToScreen(country.x, country.y);
-        if (p.x < 0 || p.x > camera.viewportWidth || p.y < 0 || p.y > camera.viewportHeight) continue;
-        ctx.fillText(country.name.toUpperCase(), p.x, p.y);
+        if (p.x < 20 || p.x > camera.viewportWidth - 20 || p.y < 20 || p.y > camera.viewportHeight - 20) continue;
+
+        ctx.fillText(name, p.x, p.y);
+        drawnCountries.add(name);
       }
     }
 
