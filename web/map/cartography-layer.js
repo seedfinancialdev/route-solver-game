@@ -1,7 +1,7 @@
 /**
  * Multi-Layered Cartography Canvas Renderer
  * Renders lakes, rivers, urban footprints, land cover (forests & farmland),
- * background towns, and real road geometries using HTML5 Canvas Path2D.
+ * background towns, and real road geometries using HTML5 Canvas Path2D with strict LOD.
  */
 
 export class CartographyLayer {
@@ -18,8 +18,8 @@ export class CartographyLayer {
 
     // Opacity Sliders
     this.waterOpacity = 1.0;
-    this.farmlandOpacity = 0.52;
-    this.forestOpacity = 0.75;
+    this.farmlandOpacity = 0.45;
+    this.forestOpacity = 0.55;
 
     this.init();
   }
@@ -29,7 +29,7 @@ export class CartographyLayer {
       const res = await fetch('../cartography.json');
       this.cartographyData = await res.json();
     } catch {
-      // Graceful fallback if cartography.json is not present
+      // Graceful fallback
     }
   }
 
@@ -48,6 +48,8 @@ export class CartographyLayer {
     const scaleY = camera.viewportHeight / camera.current.h;
     const translateX = -camera.current.x * scaleX;
     const translateY = -camera.current.y * scaleY;
+
+    const isZoomedInForLandUse = camera.current.w <= 1200;
 
     // 1. Water Bodies (Lakes & Rivers)
     if (this.showWater) {
@@ -76,12 +78,12 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 2. Land Cover (Farmland / Urban Footprints)
-    if (this.showFarmland) {
+    // 2. Farmland & Urban Footprints (Visible at mid-to-close zoom)
+    if (this.showFarmland && isZoomedInForLandUse) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-      ctx.fillStyle = theme.farmland;
-      ctx.globalAlpha = this.farmlandOpacity;
+      ctx.fillStyle = theme.farmland || 'rgba(90, 78, 46, 0.35)';
+      ctx.globalAlpha = this.farmlandOpacity * (1 - (camera.current.w - 400) / 1000);
 
       // Urban Areas from base graph
       if (g.urbanAreas && g.urbanAreas.length) {
@@ -99,12 +101,12 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 3. Land Cover (Forests & Woods)
-    if (this.showForest) {
+    // 3. Forests & Woods (Visible at mid-to-close zoom)
+    if (this.showForest && isZoomedInForLandUse) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-      ctx.fillStyle = theme.forest;
-      ctx.globalAlpha = this.forestOpacity;
+      ctx.fillStyle = theme.forest || 'rgba(22, 54, 34, 0.45)';
+      ctx.globalAlpha = this.forestOpacity * (1 - (camera.current.w - 400) / 1000);
 
       // Forest Polygons from cartography data
       if (this.cartographyData && this.cartographyData.forest) {
@@ -114,9 +116,9 @@ export class CartographyLayer {
       }
 
       // Background Towns
-      if (g.towns && g.towns.length && camera.current.w <= 1200) {
+      if (g.towns && g.towns.length && camera.current.w <= 800) {
         for (const town of g.towns) {
-          const r = (town.tier === 1 ? 2.5 : 1.5) / scaleX;
+          const r = (town.tier === 1 ? 2.2 : 1.4) / scaleX;
           ctx.beginPath();
           ctx.arc(town.x, town.y, r, 0, Math.PI * 2);
           ctx.fill();
