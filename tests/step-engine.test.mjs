@@ -80,3 +80,58 @@ test('resolveInterrupt throws on an interrupt naming an unregistered module', ()
     /no registered module named "ghost"/,
   );
 });
+
+// --- Multi-module composition: two+ modules registered together. ---
+// Every test above drives a single module; these pin the documented
+// behavior of stepOnce when multiple modules interrupt on the same tick.
+
+/** Same shape as testModule (interrupts on the exact tick its counter hits
+ * `threshold`), parameterized so two instances can be registered under
+ * different names and collide on the same tick. Test-only, not a real module. */
+function makeThresholdModule(name, threshold) {
+  return {
+    name,
+    init: () => ({ n: 0 }),
+    advance(state) {
+      const n = state.n + 1;
+      if (n === threshold) return { state: { n }, interrupt: { choices: ['a', 'b'] } };
+      return { state: { n }, interrupt: null };
+    },
+    resolve: (state, choice) => ({ n: 0, lastChoice: choice }),
+  };
+}
+
+test('stepOnce reports only the first-registered module\'s interrupt when two modules interrupt on the same tick, and the second module still advances', () => {
+  const first = makeThresholdModule('first', 3);
+  const second = makeThresholdModule('second', 3);
+  const modules = [first, second]; // registration order: first, then second
+  let states = new Map([[first.name, first.init()], [second.name, second.init()]]);
+  states = stepOnce(states, modules).moduleStates; // tick 1
+  states = stepOnce(states, modules).moduleStates; // tick 2
+  const third = stepOnce(states, modules);          // tick 3: both would interrupt
+  assert.deepEqual(third.interrupt, { module: 'first', choices: ['a', 'b'] });
+  // second's interrupt was discarded, but its state still advanced past the tick.
+  assert.deepEqual(third.moduleStates.get('second'), { n: 3 });
+});
+
+test('an exact-equality-threshold module whose interrupt collides with an earlier module\'s interrupt never fires again for the rest of the leg', () => {
+  const blocker = makeThresholdModule('blocker', 3);
+  const victim = makeThresholdModule('victim', 3); // same collision tick as blocker
+  const modules = [blocker, victim]; // blocker registered first, so it wins the collision
+  let states = new Map([[blocker.name, blocker.init()], [victim.name, victim.init()]]);
+
+  const reportedInterrupts = [];
+  for (let t = 0; t < 10; t++) {
+    const result = stepOnce(states, modules);
+    states = result.moduleStates;
+    if (result.interrupt) reportedInterrupts.push(result.interrupt);
+  }
+
+  // blocker's interrupt fired (and was reported); victim's identical-tick
+  // interrupt was silently dropped on that same tick and, because its
+  // condition is an exact-equality threshold already passed, never
+  // recurs -- victim never appears as the interrupting module again.
+  assert.ok(reportedInterrupts.length >= 1);
+  assert.ok(reportedInterrupts.every((interrupt) => interrupt.module === 'blocker'));
+  assert.deepEqual(states.get('victim'), { n: 10 });
+});

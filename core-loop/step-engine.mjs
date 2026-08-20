@@ -15,7 +15,17 @@
 // real-world meaning to it (see "Build order: greenfield, not retrofit").
 
 /** Advance every module by one tick. Returns the first interrupt raised, by
- * registration order, or null if none of them raised one this tick. */
+ * registration order, or null if none of them raised one this tick.
+ *
+ * When two or more modules raise an interrupt on the same tick, only the
+ * first (by registration order) is reported here -- every other module
+ * still advances normally on this tick, but its interrupt for this tick is
+ * discarded outright, not queued and not deferred to a later tick. A module
+ * whose interrupt condition is edge-triggered (e.g. an exact-equality
+ * threshold such as `n === 3`) can therefore miss firing permanently if its
+ * one qualifying tick collides with an earlier-registered module's
+ * interrupt: its state keeps advancing past the threshold, so the
+ * condition never becomes true again for the rest of the leg. */
 export function stepOnce(moduleStates, modules) {
   const nextStates = new Map(moduleStates);
   let interrupt = null;
