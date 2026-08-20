@@ -17,10 +17,10 @@ const forestBlendSelect = document.getElementById('forest-blend-select');
 // Vector Layer Toggles
 const toggleTerrain = document.getElementById('toggle-terrain');
 const toggleWater = document.getElementById('toggle-water');
-const toggleShoreline = document.getElementById('toggle-shoreline');
 const toggleForest = document.getElementById('toggle-forest');
 const toggleFarmland = document.getElementById('toggle-farmland');
 const toggleRoads = document.getElementById('toggle-roads');
+const toggleShields = document.getElementById('toggle-shields');
 const toggleNodes = document.getElementById('toggle-nodes');
 
 // Sliders
@@ -63,9 +63,6 @@ toggleTerrain.addEventListener('change', (e) => {
 toggleWater.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.showWater = e.target.checked;
 });
-toggleShoreline.addEventListener('change', (e) => {
-  mapEngine.cartographyLayer.showShoreline = e.target.checked;
-});
 toggleForest.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.showForest = e.target.checked;
   mapEngine.terrainLayer.showForestRaster = e.target.checked;
@@ -75,6 +72,9 @@ toggleFarmland.addEventListener('change', (e) => {
 });
 toggleRoads.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.showRoads = e.target.checked;
+});
+toggleShields.addEventListener('change', (e) => {
+  mapEngine.cartographyLayer.showShields = e.target.checked;
 });
 toggleNodes.addEventListener('change', (e) => {
   mapEngine.gameplayLayer.showNodes = e.target.checked;
