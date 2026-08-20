@@ -1,7 +1,7 @@
 /**
  * Vector Cartography Canvas Renderer
  * High-performance, tactile cartographic rendering for crisp country borders,
- * lakes, rivers, urban footprints, background towns, and proportional road networks.
+ * lakes, rivers, urban footprints, background towns, and dual-cased asphalt road networks.
  */
 
 export class CartographyLayer {
@@ -144,7 +144,7 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 5. Road Networks (Proportionally anchored race tracks across zoom tiers)
+    // 5. Road Networks (Dual-Carriageway Cased Asphalt Highways)
     if (this.showRoads && g.adj) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
@@ -166,40 +166,75 @@ export class CartographyLayer {
         }
       }
 
-      // Proportional width calculation anchored to zoom
-      let mwWidth = 3.0;
-      let trWidth = 2.0;
-      let prWidth = 1.2;
+      // Dynamic width scaling anchored to 3-tier zoom
+      let mwWidth = 3.2;
+      let trWidth = 2.2;
+      let prWidth = 1.4;
 
       if (zoomKm > 2000) {
-        mwWidth = 0.6;
+        mwWidth = 0.8;
       } else if (zoomKm > 1000) {
-        mwWidth = 1.4;
-        trWidth = 1.0;
+        mwWidth = 1.6;
+        trWidth = 1.1;
       } else if (zoomKm <= 400) {
-        mwWidth = 3.6;
-        trWidth = 2.4;
-        prWidth = 1.5;
+        mwWidth = 4.2;
+        trWidth = 2.8;
+        prWidth = 1.6;
       }
 
-      // Draw Motorways
-      const isOverview = zoomKm > 2000;
-      ctx.strokeStyle = isOverview ? 'rgba(217, 75, 54, 0.40)' : (theme.roadMotorway || '#d94b36');
-      ctx.lineWidth = mwWidth / scaleX;
-      this.drawShapeBatch(ctx, motorways);
+      const casingCol = theme.roadCasing || '#080c14';
 
-      // Draw Trunks
+      // ───────────────────────────────────────────────
+      // PASS 1: Dark Asphalt Roadbed Under-Casing
+      // ───────────────────────────────────────────────
+      if (zoomKm <= 1800) {
+        ctx.strokeStyle = casingCol;
+
+        // Primary Casing
+        if (zoomKm <= 900) {
+          ctx.lineWidth = (prWidth + 1.2) / scaleX;
+          this.drawShapeBatch(ctx, primaries);
+        }
+
+        // Trunk Casing
+        ctx.lineWidth = (trWidth + 1.4) / scaleX;
+        this.drawShapeBatch(ctx, trunks);
+
+        // Motorway Casing
+        ctx.lineWidth = (mwWidth + 1.8) / scaleX;
+        this.drawShapeBatch(ctx, motorways);
+      }
+
+      // ───────────────────────────────────────────────
+      // PASS 2: Vibrant Highway Surface Core
+      // ───────────────────────────────────────────────
+      // Primaries
+      if (zoomKm <= 900) {
+        ctx.strokeStyle = theme.roadPrimary || '#6b7c93';
+        ctx.lineWidth = prWidth / scaleX;
+        this.drawShapeBatch(ctx, primaries);
+      }
+
+      // Trunks
       if (zoomKm <= 1800) {
         ctx.strokeStyle = theme.roadTrunk || '#e6a13c';
         ctx.lineWidth = trWidth / scaleX;
         this.drawShapeBatch(ctx, trunks);
       }
 
-      // Draw Primaries
-      if (zoomKm <= 900) {
-        ctx.strokeStyle = theme.roadPrimary || '#5f6f82';
-        ctx.lineWidth = prWidth / scaleX;
-        this.drawShapeBatch(ctx, primaries);
+      // Motorways
+      const isOverview = zoomKm > 2000;
+      ctx.strokeStyle = isOverview ? 'rgba(230, 81, 51, 0.45)' : (theme.roadMotorway || '#e65133');
+      ctx.lineWidth = mwWidth / scaleX;
+      this.drawShapeBatch(ctx, motorways);
+
+      // ───────────────────────────────────────────────
+      // PASS 3: Dual-Lane Centerline Divider (Zoom <= 350 km)
+      // ───────────────────────────────────────────────
+      if (zoomKm <= 350) {
+        ctx.strokeStyle = casingCol;
+        ctx.lineWidth = 0.8 / scaleX;
+        this.drawShapeBatch(ctx, motorways);
       }
 
       ctx.restore();
