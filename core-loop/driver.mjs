@@ -34,3 +34,17 @@ export async function driveRoute(route, modules, chooseFn) {
   }
   return { finalStates: states, log };
 }
+
+/**
+ * Replay a previously recorded run: same route, same modules, but choices
+ * come from the log instead of a live chooseFn. If the engine is
+ * genuinely deterministic, this reproduces byte-identical finalStates and
+ * an identical log to the original run that produced it.
+ */
+export async function replayRoute(route, modules, log) {
+  let i = 0;
+  return driveRoute(route, modules, () => {
+    if (i >= log.length) throw new Error('replayRoute: log ran out of recorded choices');
+    return log[i++].choice;
+  });
+}
