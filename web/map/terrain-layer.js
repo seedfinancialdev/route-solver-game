@@ -1,6 +1,6 @@
 /**
- * Multi-Tier Elevation Relief, Raster Forest, & Satellite Urban Imagery Renderer
- * Renders Overview, Detail pass, Fine Tile grid (6x6), Forest canopy, and Day/Night Satellite City Imagery.
+ * Multi-Tier Elevation Relief & Raster Forest Canopy Renderer
+ * Renders Overview, Detail pass, Fine Tile grid (6x6), and pre-rendered Lambert forest canopy.
  */
 
 export class TerrainLayer {
@@ -8,14 +8,11 @@ export class TerrainLayer {
     this.mapBounds = mapBounds; // { x, y, w, h }
     this.showTerrain = true;
     this.showForestRaster = true;
-    this.showUrbanSatellite = true;
 
     this.overviewImg = null;
     this.detailImg = null;
     this.forestImg = null;
     this.forestDetailImg = null;
-    this.urbanDayImg = null;
-    this.urbanNightImg = null;
 
     this.tilesManifest = [];
     this.loadedTiles = new Map();
@@ -24,8 +21,6 @@ export class TerrainLayer {
     this.detailLoaded = false;
     this.forestLoaded = false;
     this.forestDetailLoaded = false;
-    this.urbanDayLoaded = false;
-    this.urbanNightLoaded = false;
 
     this.init();
   }
@@ -63,22 +58,6 @@ export class TerrainLayer {
     this.forestDetailImg.src = `../forest-detail.webp?v=${v}`;
     if (this.forestDetailImg.complete && this.forestDetailImg.naturalWidth !== 0) {
       this.forestDetailLoaded = true;
-    }
-
-    // Load Satellite Urban Imagery (Daytime)
-    this.urbanDayImg = new Image();
-    this.urbanDayImg.onload = () => { this.urbanDayLoaded = true; };
-    this.urbanDayImg.src = `../urban-day.webp?v=${v}`;
-    if (this.urbanDayImg.complete && this.urbanDayImg.naturalWidth !== 0) {
-      this.urbanDayLoaded = true;
-    }
-
-    // Load Satellite Urban Imagery (Nighttime NASA Black Marble)
-    this.urbanNightImg = new Image();
-    this.urbanNightImg.onload = () => { this.urbanNightLoaded = true; };
-    this.urbanNightImg.src = `../urban-night.webp?v=${v}`;
-    if (this.urbanNightImg.complete && this.urbanNightImg.naturalWidth !== 0) {
-      this.urbanNightLoaded = true;
     }
 
     // Load fine tiles manifest
@@ -135,7 +114,6 @@ export class TerrainLayer {
     const p2 = camera.worldToScreen(b.x + b.w, b.y + b.h);
     const screenW = p2.x - p1.x;
     const screenH = p2.y - p1.y;
-    const nightFactor = theme.nightFactor !== undefined ? theme.nightFactor : 0.0;
 
     // 1. Draw Elevation Hillshade Base
     ctx.save();
@@ -169,27 +147,6 @@ export class TerrainLayer {
 
       ctx.drawImage(fImg, p1.x, p1.y, screenW, screenH);
       ctx.restore();
-    }
-
-    // 3. Draw Satellite Urban Imagery (Daytime Concrete + Nighttime Black Marble Lights)
-    if (this.showUrbanSatellite) {
-      // A. Daytime Satellite Concrete/Asphalt
-      if (nightFactor < 0.9 && (this.urbanDayLoaded || (this.urbanDayImg && this.urbanDayImg.complete && this.urbanDayImg.naturalWidth !== 0))) {
-        ctx.save();
-        ctx.globalAlpha = (1.0 - nightFactor) * 0.85;
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.drawImage(this.urbanDayImg, p1.x, p1.y, screenW, screenH);
-        ctx.restore();
-      }
-
-      // B. Nighttime NASA Black Marble Radiant Lights
-      if (nightFactor > 0.1 && (this.urbanNightLoaded || (this.urbanNightImg && this.urbanNightImg.complete && this.urbanNightImg.naturalWidth !== 0))) {
-        ctx.save();
-        ctx.globalAlpha = nightFactor * 0.95;
-        ctx.globalCompositeOperation = 'screen';
-        ctx.drawImage(this.urbanNightImg, p1.x, p1.y, screenW, screenH);
-        ctx.restore();
-      }
     }
   }
 }
