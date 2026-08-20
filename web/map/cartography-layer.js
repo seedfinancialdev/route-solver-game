@@ -1,7 +1,7 @@
 /**
  * Vector Cartography Canvas Renderer
- * High-performance, clean cartographic rendering for lakes, rivers, urban footprints,
- * background towns, and road networks.
+ * High-performance, tactile cartographic rendering for ocean bathymetry, coastlines,
+ * lakes, smooth tapered rivers, urban footprints, background towns, and road networks.
  */
 
 export class CartographyLayer {
@@ -10,17 +10,18 @@ export class CartographyLayer {
 
     // Layer Visibility Toggles
     this.showWater = true;
-    this.showFarmland = true; // Urban footprints
-    this.showForest = true;   // Raster forest layer toggle
-    this.showTowns = true;    // Background towns
+    this.showFarmland = true;  // Urban footprints
+    this.showForest = true;    // Raster forest layer toggle
+    this.showTowns = true;     // Background towns
     this.showRoads = true;
-    this.showStreets = true;
+    this.showShoreline = true; // Shoreline highlight glow
 
-    // Opacity Sliders & Blending
+    // Opacity & Width Controls
     this.waterOpacity = 1.0;
     this.farmlandOpacity = 0.45;
     this.forestOpacity = 0.65;
     this.townsOpacity = 0.50;
+    this.riverWidthScale = 1.0;
     this.forestBlendMode = 'multiply';
   }
 
@@ -45,25 +46,56 @@ export class CartographyLayer {
     const translateX = -camera.current.x * scaleX;
     const translateY = -camera.current.y * scaleY;
 
-    // 1. Water Bodies (Lakes & Rivers)
+    // 1. Water Bodies (Ocean Coastlines, Lakes, & Tapered River Networks)
     if (this.showWater) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
       ctx.globalAlpha = this.waterOpacity;
 
-      // Lakes (polygons)
+      // A. Lake Polygon Fills & Depth Styling
       if (g.lakes && g.lakes.length) {
+        // Core Lake Fill
         ctx.fillStyle = theme.water || '#12283a';
         for (const lakePath of g.lakes) {
           const path = this.getPath2D(lakePath);
           if (path) ctx.fill(path);
         }
+
+        // Shoreline Highlight Ring
+        if (this.showShoreline) {
+          ctx.strokeStyle = 'rgba(120, 190, 230, 0.40)';
+          ctx.lineWidth = 1.2 / scaleX;
+          for (const lakePath of g.lakes) {
+            const path = this.getPath2D(lakePath);
+            if (path) ctx.stroke(path);
+          }
+        }
       }
 
-      // Rivers (strokes)
+      // B. River Network (Multi-tier tapered width pass for realistic flow)
       if (g.rivers && g.rivers.length) {
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Base Outer River Channel
         ctx.strokeStyle = theme.water || '#12283a';
-        ctx.lineWidth = 1.5 / scaleX;
+        ctx.lineWidth = (3.2 * this.riverWidthScale) / scaleX;
+        for (const riverPath of g.rivers) {
+          const path = this.getPath2D(riverPath);
+          if (path) ctx.stroke(path);
+        }
+
+        // Inner Flow Core
+        ctx.strokeStyle = 'rgba(75, 155, 205, 0.75)';
+        ctx.lineWidth = (1.6 * this.riverWidthScale) / scaleX;
+        for (const riverPath of g.rivers) {
+          const path = this.getPath2D(riverPath);
+          if (path) ctx.stroke(path);
+        }
+
+        // Mountain Spring Highlight
+        ctx.strokeStyle = 'rgba(130, 210, 255, 0.45)';
+        ctx.lineWidth = (0.8 * this.riverWidthScale) / scaleX;
         for (const riverPath of g.rivers) {
           const path = this.getPath2D(riverPath);
           if (path) ctx.stroke(path);

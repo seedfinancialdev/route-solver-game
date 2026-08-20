@@ -16,6 +16,7 @@ const forestBlendSelect = document.getElementById('forest-blend-select');
 // Vector Layer Toggles
 const toggleTerrain = document.getElementById('toggle-terrain');
 const toggleWater = document.getElementById('toggle-water');
+const toggleShoreline = document.getElementById('toggle-shoreline');
 const toggleForest = document.getElementById('toggle-forest');
 const toggleFarmland = document.getElementById('toggle-farmland');
 const toggleRoads = document.getElementById('toggle-roads');
@@ -25,11 +26,13 @@ const toggleNodes = document.getElementById('toggle-nodes');
 const sliderTerrain = document.getElementById('slider-terrain');
 const sliderForest = document.getElementById('slider-forest');
 const sliderWater = document.getElementById('slider-water');
+const sliderRiver = document.getElementById('slider-river');
 const sliderFarmland = document.getElementById('slider-farmland');
 
 const valTerrain = document.getElementById('val-terrain');
 const valForest = document.getElementById('val-forest');
 const valWater = document.getElementById('val-water');
+const valRiver = document.getElementById('val-river');
 const valFarmland = document.getElementById('val-farmland');
 
 const statZoom = document.getElementById('stat-zoom');
@@ -54,6 +57,9 @@ toggleTerrain.addEventListener('change', (e) => {
 });
 toggleWater.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.showWater = e.target.checked;
+});
+toggleShoreline.addEventListener('change', (e) => {
+  mapEngine.cartographyLayer.showShoreline = e.target.checked;
 });
 toggleForest.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.showForest = e.target.checked;
@@ -85,6 +91,11 @@ sliderWater.addEventListener('input', (e) => {
   const val = e.target.value / 100;
   mapEngine.cartographyLayer.waterOpacity = val;
   valWater.textContent = `${e.target.value}%`;
+});
+sliderRiver.addEventListener('input', (e) => {
+  const val = (e.target.value / 10).toFixed(1);
+  mapEngine.cartographyLayer.riverWidthScale = parseFloat(val);
+  valRiver.textContent = `${val}x`;
 });
 sliderFarmland.addEventListener('input', (e) => {
   const val = e.target.value / 100;
