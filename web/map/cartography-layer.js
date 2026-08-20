@@ -20,8 +20,13 @@ export class CartographyLayer {
   }
 
   getPath2D(svgStr) {
+    if (!svgStr || typeof svgStr !== 'string') return null;
     if (!this.pathCache.has(svgStr)) {
-      this.pathCache.set(svgStr, new Path2D(svgStr));
+      try {
+        this.pathCache.set(svgStr, new Path2D(svgStr));
+      } catch {
+        this.pathCache.set(svgStr, null);
+      }
     }
     return this.pathCache.get(svgStr);
   }
@@ -45,7 +50,8 @@ export class CartographyLayer {
       if (g.lakes && g.lakes.length) {
         ctx.fillStyle = theme.water || '#12283a';
         for (const lakePath of g.lakes) {
-          ctx.fill(this.getPath2D(lakePath));
+          const path = this.getPath2D(lakePath);
+          if (path) ctx.fill(path);
         }
       }
 
@@ -54,7 +60,8 @@ export class CartographyLayer {
         ctx.strokeStyle = theme.water || '#12283a';
         ctx.lineWidth = 1.5 / scaleX;
         for (const riverPath of g.rivers) {
-          ctx.stroke(this.getPath2D(riverPath));
+          const path = this.getPath2D(riverPath);
+          if (path) ctx.stroke(path);
         }
       }
       ctx.restore();
@@ -68,7 +75,8 @@ export class CartographyLayer {
       ctx.globalAlpha = this.farmlandOpacity;
 
       for (const areaPath of g.urbanAreas) {
-        ctx.fill(this.getPath2D(areaPath));
+        const path = this.getPath2D(areaPath);
+        if (path) ctx.fill(path);
       }
       ctx.restore();
     }
@@ -111,21 +119,21 @@ export class CartographyLayer {
       }
 
       // Draw Motorways
-      ctx.strokeStyle = theme.roadMotorway;
-      ctx.lineWidth = Math.max(theme.roadWidthMotorway, 1.2) / scaleX;
+      ctx.strokeStyle = theme.roadMotorway || '#d94b36';
+      ctx.lineWidth = Math.max(theme.roadWidthMotorway || 2.8, 1.2) / scaleX;
       this.drawShapeBatch(ctx, motorways);
 
       // Draw Trunks
       if (camera.current.w <= 1400) {
-        ctx.strokeStyle = theme.roadTrunk;
-        ctx.lineWidth = Math.max(theme.roadWidthTrunk, 1.0) / scaleX;
+        ctx.strokeStyle = theme.roadTrunk || '#e6a13c';
+        ctx.lineWidth = Math.max(theme.roadWidthTrunk || 2.0, 1.0) / scaleX;
         this.drawShapeBatch(ctx, trunks);
       }
 
       // Draw Primaries
       if (camera.current.w <= 800) {
-        ctx.strokeStyle = theme.roadPrimary;
-        ctx.lineWidth = Math.max(theme.roadWidthPrimary, 0.8) / scaleX;
+        ctx.strokeStyle = theme.roadPrimary || '#5f6f82';
+        ctx.lineWidth = Math.max(theme.roadWidthPrimary || 1.2, 0.8) / scaleX;
         this.drawShapeBatch(ctx, primaries);
       }
 

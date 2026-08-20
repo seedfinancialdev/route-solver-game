@@ -39,7 +39,7 @@ export class GameplayLayer {
   }
 
   renderActiveRoute(ctx, camera, theme, g) {
-    ctx.strokeStyle = theme.routeLineGlow;
+    ctx.strokeStyle = theme.routeLineGlow || 'rgba(0, 240, 255, 0.35)';
     ctx.lineWidth = 8.0;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -56,7 +56,7 @@ export class GameplayLayer {
     ctx.stroke();
 
     // Inner crisp route line
-    ctx.strokeStyle = theme.routeLine;
+    ctx.strokeStyle = theme.routeLine || '#00f0ff';
     ctx.lineWidth = 3.0;
     ctx.stroke();
   }
@@ -79,7 +79,7 @@ export class GameplayLayer {
 
       // Draw outer glow for hovered node
       if (isHovered || isSelected) {
-        ctx.fillStyle = theme.cityNodeActive;
+        ctx.fillStyle = theme.cityNodeActive || '#00f0ff';
         ctx.globalAlpha = 0.35;
         ctx.beginPath();
         ctx.arc(p.x, p.y, radius * 2.2, 0, Math.PI * 2);
@@ -88,13 +88,13 @@ export class GameplayLayer {
       }
 
       // Border circle
-      ctx.fillStyle = theme.cityNodeBorder;
+      ctx.fillStyle = theme.cityNodeBorder || '#0b0f17';
       ctx.beginPath();
       ctx.arc(p.x, p.y, radius + 1.5, 0, Math.PI * 2);
       ctx.fill();
 
       // Inner fill node
-      ctx.fillStyle = isHovered || isSelected ? theme.cityNodeActive : theme.cityNode;
+      ctx.fillStyle = isHovered || isSelected ? (theme.cityNodeActive || '#00f0ff') : (theme.cityNode || '#ffffff');
       ctx.beginPath();
       ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
       ctx.fill();
@@ -102,11 +102,10 @@ export class GameplayLayer {
   }
 
   renderLabels(ctx, camera, theme, g) {
-    const dpr = window.devicePixelRatio || 1;
     ctx.font = '600 11px "Inter", -apple-system, system-ui, sans-serif';
     ctx.textAlign = 'center';
 
-    const isClose = camera.current.w <= 1200;
+    const isClose = camera.current.w <= 1400;
 
     // 1. Country Labels
     if (g.countryLabels && camera.current.w > 600) {
@@ -132,14 +131,20 @@ export class GameplayLayer {
       const textW = metrics.width + 12;
       const textH = 18;
 
-      // Dark glassmorphism pill background
-      ctx.fillStyle = theme.hudGlass;
+      // Dark glassmorphism pill background with safe roundRect polyfill
+      ctx.fillStyle = theme.hudGlass || 'rgba(15, 20, 28, 0.82)';
       ctx.beginPath();
-      ctx.roundRect(p.x - textW / 2, p.y - 22 - textH / 2, textW, textH, 4);
+      const rx = p.x - textW / 2;
+      const ry = p.y - 22 - textH / 2;
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(rx, ry, textW, textH, 4);
+      } else {
+        ctx.rect(rx, ry, textW, textH);
+      }
       ctx.fill();
 
       // Text label
-      ctx.fillStyle = city.i === this.hoveredCityId ? theme.cityNodeActive : theme.hudText;
+      ctx.fillStyle = city.i === this.hoveredCityId ? (theme.cityNodeActive || '#00f0ff') : (theme.hudText || '#e1e7ed');
       ctx.fillText(labelText, p.x, p.y - 18);
     }
   }
