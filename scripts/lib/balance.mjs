@@ -68,8 +68,8 @@ export function sweepRow(runs, multiplier) {
     const budget = r.optMin * multiplier;
     if (r.short <= budget) shortWins++;
     for (const t of r.reader) {
-      if (!Number.isFinite(t)) continue;
       finished++;
+      if (!Number.isFinite(t)) continue;
       if (t <= budget) { readerWins++; margins.push(budget - t); } else busts.push(t - budget);
     }
   }

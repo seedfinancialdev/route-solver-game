@@ -71,11 +71,11 @@ test('sweepRow counts a shortest-road win only at a generous multiplier', () => 
   assert.equal(sweepRow(runs, 1.10).shortWins, 0);
 });
 
-test('sweepRow counts reader wins over finished runs only', () => {
+test('sweepRow counts a dead-end as a loss, not as excluded', () => {
   const runs = [{ a: 0, b: 1, optMin: 1000, short: 1200, reader: [1050, Infinity] }];
   const row = sweepRow(runs, 1.10);
   assert.equal(row.readerWins, 1);
-  assert.equal(row.readerWinRate, 1);
+  assert.equal(row.readerWinRate, 0.5);
 });
 
 test('findCliff returns the lowest multiplier where the shortest road first wins', () => {
