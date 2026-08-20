@@ -11,6 +11,7 @@ const mapEngine = new MapEngine(viewport, '../data.json');
 // DOM Elements
 const fpsCounter = document.getElementById('fps-counter');
 const presetSelect = document.getElementById('preset-select');
+const forestBlendSelect = document.getElementById('forest-blend-select');
 
 // Vector Layer Toggles
 const toggleTerrain = document.getElementById('toggle-terrain');
@@ -40,6 +41,11 @@ presetSelect.addEventListener('change', (e) => {
   const cur = mapEngine.themeManager.current;
   sliderTerrain.value = Math.round((cur.terrainOpacity || 0.65) * 100);
   valTerrain.textContent = `${sliderTerrain.value}%`;
+});
+
+// Bind Forest Blend Mode Selector
+forestBlendSelect.addEventListener('change', (e) => {
+  mapEngine.cartographyLayer.forestBlendMode = e.target.value;
 });
 
 // Bind Vector Toggles

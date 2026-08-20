@@ -1,38 +1,65 @@
 /**
  * Vector Cartography Canvas Renderer
- * High-performance rendering for lakes, rivers, urban footprints, woodland contours,
- * background towns, and road networks matching Lambert Conformal Conic map projection.
+ * High-performance, tactile cartographic rendering for lakes, rivers, urban footprints,
+ * organic forest canopy textures, background towns, and road networks.
  */
 
 export class CartographyLayer {
   constructor() {
     this.pathCache = new Map(); // svgStr -> Path2D instance
     this.cartographyData = null;
+    this.forestPatternCanvas = null;
 
     // Layer Visibility Toggles
     this.showWater = true;
     this.showFarmland = true; // Urban footprints
-    this.showForest = true;   // Woodland contours
+    this.showForest = true;   // Tactile woodland canopy
     this.showTowns = true;    // Background towns
     this.showRoads = true;
     this.showStreets = true;
 
-    // Opacity Sliders
+    // Opacity Sliders & Blending
     this.waterOpacity = 1.0;
     this.farmlandOpacity = 0.45;
     this.forestOpacity = 0.65;
     this.townsOpacity = 0.50;
+    this.forestBlendMode = 'multiply';
 
     this.init();
   }
 
   async init() {
+    this.forestPatternCanvas = this.createForestTexturePattern();
     try {
       const res = await fetch('../cartography.json');
       this.cartographyData = await res.json();
     } catch {
       // Graceful fallback
     }
+  }
+
+  /** Generates a subtle procedural stipple texture for tactile forest cartography */
+  createForestTexturePattern() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+
+    // Base forest green fill
+    ctx.fillStyle = '#143621';
+    ctx.fillRect(0, 0, 64, 64);
+
+    // Subtle micro-stipple stippling
+    for (let i = 0; i < 180; i++) {
+      const x = Math.random() * 64;
+      const y = Math.random() * 64;
+      const r = 0.5 + Math.random() * 1.2;
+      ctx.fillStyle = Math.random() > 0.5 ? 'rgba(32, 78, 48, 0.4)' : 'rgba(8, 24, 14, 0.35)';
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return canvas;
   }
 
   getPath2D(svgStr) {
@@ -97,17 +124,30 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 3. Woodland & Forests (3,950 vector contours)
+    // 3. Tactile Woodland & Forest Layer (Soft feathered blending over terrain relief)
     if (this.showForest && this.cartographyData && this.cartographyData.forest && this.cartographyData.forest.length) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-      ctx.fillStyle = theme.forest || 'rgba(22, 58, 36, 0.65)';
+
+      // Blend mode allows hillshade shadows & ridges to conform through forest
+      ctx.globalCompositeOperation = this.forestBlendMode || 'multiply';
       ctx.globalAlpha = this.forestOpacity;
+
+      // Apply soft edge feathering filter if supported
+      if ('filter' in ctx && typeof ctx.filter === 'string') {
+        ctx.filter = 'blur(1.2px)';
+      }
+
+      // Fill forest contours using texture pattern or organic theme color
+      const pattern = this.forestPatternCanvas ? ctx.createPattern(this.forestPatternCanvas, 'repeat') : null;
+      ctx.fillStyle = pattern || theme.forest || 'rgba(22, 58, 36, 0.65)';
 
       for (const forestPath of this.cartographyData.forest) {
         const path = this.getPath2D(forestPath);
         if (path) ctx.fill(path);
       }
+
+      ctx.filter = 'none';
       ctx.restore();
     }
 
