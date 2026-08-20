@@ -1,25 +1,33 @@
 /**
- * Multi-Tier Elevation Relief Terrain Renderer
- * Renders Overview, Detail pass, and Fine Tile grid (6x6) with smooth cross-fade opacity.
+ * Multi-Tier Elevation Relief & Raster Forest Layer Renderer
+ * Renders Overview, Detail pass, Fine Tile grid (6x6), and pre-rendered Lambert raster forest layer
+ * with smooth composite shading.
  */
 
 export class TerrainLayer {
   constructor(mapBounds) {
     this.mapBounds = mapBounds; // { x, y, w, h }
     this.showTerrain = true;
+    this.showForestRaster = true;
+
     this.overviewImg = null;
     this.detailImg = null;
+    this.forestImg = null;
+    this.forestDetailImg = null;
+
     this.tilesManifest = [];
     this.loadedTiles = new Map(); // tile.file -> HTMLImageElement
 
     this.overviewLoaded = false;
     this.detailLoaded = false;
+    this.forestLoaded = false;
+    this.forestDetailLoaded = false;
 
     this.init();
   }
 
   async init() {
-    // Load Overview image
+    // Load Terrain Overview image
     this.overviewImg = new Image();
     this.overviewImg.onload = () => { this.overviewLoaded = true; };
     this.overviewImg.src = '../terrain.webp';
@@ -27,12 +35,28 @@ export class TerrainLayer {
       this.overviewLoaded = true;
     }
 
-    // Load Detail image
+    // Load Terrain Detail image
     this.detailImg = new Image();
     this.detailImg.onload = () => { this.detailLoaded = true; };
     this.detailImg.src = '../terrain-detail.webp';
     if (this.detailImg.complete && this.detailImg.naturalWidth !== 0) {
       this.detailLoaded = true;
+    }
+
+    // Load Forest Overview raster image
+    this.forestImg = new Image();
+    this.forestImg.onload = () => { this.forestLoaded = true; };
+    this.forestImg.src = '../forest.webp';
+    if (this.forestImg.complete && this.forestImg.naturalWidth !== 0) {
+      this.forestLoaded = true;
+    }
+
+    // Load Forest Detail raster image
+    this.forestDetailImg = new Image();
+    this.forestDetailImg.onload = () => { this.forestDetailLoaded = true; };
+    this.forestDetailImg.src = '../forest-detail.webp';
+    if (this.forestDetailImg.complete && this.forestDetailImg.naturalWidth !== 0) {
+      this.forestDetailLoaded = true;
     }
 
     // Load fine tiles manifest
@@ -74,7 +98,7 @@ export class TerrainLayer {
     }
   }
 
-  render(ctx, camera, theme) {
+  render(ctx, camera, theme, forestOpacity = 0.65, forestBlendMode = 'multiply') {
     if (!this.showTerrain) return;
 
     // Fallback: If overviewLoaded is not set yet, check img.complete
@@ -86,17 +110,17 @@ export class TerrainLayer {
 
     this.ensureTiles(camera);
 
-    ctx.save();
-    ctx.globalAlpha = theme.terrainOpacity;
-    ctx.globalCompositeOperation = theme.terrainBlend || 'multiply';
-
     const b = this.mapBounds;
     const p1 = camera.worldToScreen(b.x, b.y);
     const p2 = camera.worldToScreen(b.x + b.w, b.y + b.h);
     const screenW = p2.x - p1.x;
     const screenH = p2.y - p1.y;
 
-    // Draw Overview / Detail base
+    // 1. Draw Elevation Hillshade Base
+    ctx.save();
+    ctx.globalAlpha = theme.terrainOpacity;
+    ctx.globalCompositeOperation = theme.terrainBlend || 'multiply';
+
     const isDetailAvailable = (this.detailLoaded || (this.detailImg && this.detailImg.complete && this.detailImg.naturalWidth !== 0));
     const baseImg = (isDetailAvailable && camera.current.w <= 1400) ? this.detailImg : this.overviewImg;
     ctx.drawImage(baseImg, p1.x, p1.y, screenW, screenH);
@@ -111,7 +135,19 @@ export class TerrainLayer {
         ctx.drawImage(entry.img, tp1.x, tp1.y, tp2.x - tp1.x, tp2.y - tp1.y);
       }
     }
-
     ctx.restore();
+
+    // 2. Draw Pre-Rendered Lambert Raster Forest Layer
+    if (this.showForestRaster && (this.forestLoaded || (this.forestImg && this.forestImg.complete && this.forestImg.naturalWidth !== 0))) {
+      ctx.save();
+      ctx.globalAlpha = forestOpacity;
+      ctx.globalCompositeOperation = forestBlendMode || 'multiply';
+
+      const isForestDetailAvailable = (this.forestDetailLoaded || (this.forestDetailImg && this.forestDetailImg.complete && this.forestDetailImg.naturalWidth !== 0));
+      const fImg = (isForestDetailAvailable && camera.current.w <= 1400) ? this.forestDetailImg : this.forestImg;
+
+      ctx.drawImage(fImg, p1.x, p1.y, screenW, screenH);
+      ctx.restore();
+    }
   }
 }

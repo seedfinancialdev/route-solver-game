@@ -57,6 +57,7 @@ toggleWater.addEventListener('change', (e) => {
 });
 toggleForest.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.showForest = e.target.checked;
+  mapEngine.terrainLayer.showForestRaster = e.target.checked;
 });
 toggleFarmland.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.showFarmland = e.target.checked;
