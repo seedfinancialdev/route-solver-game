@@ -9,7 +9,14 @@ const WEB = new URL('../web/', import.meta.url);
 const SOURCE_EXT = new Set(['.js', '.html', '.css']);
 const ASSET_EXT = new Set(['.webp', '.json', '.png', '.js', '.css', '.html']);
 
-const config = JSON.parse(readFileSync(new URL('perf-budget.json', WEB), 'utf8'));
+let config;
+try {
+  config = JSON.parse(readFileSync(new URL('perf-budget.json', WEB), 'utf8'));
+} catch (err) {
+  console.error(`ERROR: could not read web/perf-budget.json: ${err.message}`);
+  process.exit(2);
+}
+
 const skip = new Set(config.skipDirs);
 const ext = (p) => p.slice(p.lastIndexOf('.'));
 
@@ -77,7 +84,13 @@ if (!orphan.length) console.log('  none');
 for (const p of orphan) console.log(`${kb(sizeKB(p))}  ${p}${known.has(p) ? '  (known)' : ''}`);
 
 console.log('\n=== draw-loop inputs ===');
-const data = JSON.parse(readFileSync(new URL('data.json', WEB), 'utf8'));
+let data;
+try {
+  data = JSON.parse(readFileSync(new URL('data.json', WEB), 'utf8'));
+} catch (err) {
+  console.error(`ERROR: could not read web/data.json: ${err.message}`);
+  process.exit(2);
+}
 console.log(`  cities ${data.cities.length}, edges ${data.edges.length}, `
   + `urbanAreas ${data.urbanAreas.length}, towns ${data.towns.length}, `
   + `rivers ${data.rivers.length}, lakes ${data.lakes.length}`);
