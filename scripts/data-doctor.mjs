@@ -3,7 +3,7 @@
 // answers "is what is on disk self-consistent?" fast enough to run before every
 // commit that touches data/.
 
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, statSync, existsSync } from 'node:fs';
 import {
   PIPELINE, stalenessCheck, manifestAgreement, puzzleIndexCheck,
 } from './lib/dag.mjs';
@@ -39,6 +39,10 @@ try {
   console.error(`data-doctor: cannot read data/graph.json or data/puzzles.json: ${e.message}`);
   process.exit(2);
 }
+if (!Array.isArray(pack?.puzzles) || !Array.isArray(graph?.cities)) {
+  console.error('data-doctor: data/puzzles.json or data/graph.json is missing its expected shape');
+  process.exit(2);
+}
 const badIndices = puzzleIndexCheck(pack.puzzles, graph.cities.length);
 if (badIndices.length) {
   fail(`${badIndices.length} city indices referenced by puzzles are not in the graph `
@@ -48,26 +52,31 @@ if (badIndices.length) {
 
 // --- street manifest ---------------------------------------------------------
 console.log('\n=== street manifest vs graph ===');
-try {
-  const { checked, agree, disagree } = manifestAgreement(
-    read('web/streets/manifest.json'), graph.cities,
-  );
-  if (disagree.length) {
-    fail(`${disagree.length} of ${checked} manifest entries point at a different city `
-      + 'than the graph has at that index — the game draws the wrong city\'s streets '
-      + '(web/app.js:286 takes position from the graph, :291 takes geometry from here). '
-      + 'Rebuild with npm run data:streets');
-    for (const d of disagree.slice(0, 5)) {
-      const name = graph.cities[d.index]?.name ?? '(no such city)';
-      console.log(`          index ${d.index}: manifest ${d.manifestGid} vs graph ${name} ${d.graphGid}`);
+const MANIFEST_PATH = 'web/streets/manifest.json';
+if (!existsSync(new URL(MANIFEST_PATH, ROOT))) {
+  console.log(`  warn  no ${MANIFEST_PATH} — street detail not built`);
+} else {
+  try {
+    const { checked, agree, disagree } = manifestAgreement(
+      read(MANIFEST_PATH), graph.cities,
+    );
+    if (disagree.length) {
+      fail(`${disagree.length} of ${checked} manifest entries point at a different city `
+        + 'than the graph has at that index — the game draws the wrong city\'s streets '
+        + '(web/app.js:286 takes position from the graph, :291 takes geometry from here). '
+        + 'Rebuild with npm run data:streets');
+      for (const d of disagree.slice(0, 5)) {
+        const name = graph.cities[d.index]?.name ?? '(no such city)';
+        console.log(`          index ${d.index}: manifest ${d.manifestGid} vs graph ${name} ${d.graphGid}`);
+      }
+    } else ok(`all ${agree} manifest entries agree with the graph`);
+    const missing = graph.cities.length - checked;
+    if (missing > 0) {
+      console.log(`  warn  ${missing} cities have no street data (manifest covers ${checked} of ${graph.cities.length})`);
     }
-  } else ok(`all ${agree} manifest entries agree with the graph`);
-  const missing = graph.cities.length - checked;
-  if (missing > 0) {
-    console.log(`  warn  ${missing} cities have no street data (manifest covers ${checked} of ${graph.cities.length})`);
+  } catch (e) {
+    fail(`${MANIFEST_PATH} exists but could not be parsed: ${e.message}`);
   }
-} catch {
-  console.log('  warn  no web/streets/manifest.json — street detail not built');
 }
 
 // --- output ownership --------------------------------------------------------

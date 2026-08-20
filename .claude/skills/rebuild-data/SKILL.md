@@ -59,5 +59,5 @@ outright. Verify with [[balance-check]] afterwards.
   `09-real-osm-forests` both write it in full and neither reads it back, so
   whichever runs last discards the other's output. Unresolved; `npm run doctor`
   warns.
-- **External services:** OSRM for `01`, `03`, `06`; Overpass for `07` and `09`.
+- **External services:** OSRM for `01` and `06`; Overpass for `07`.
   `07-streets` takes roughly 50 minutes against public mirrors.

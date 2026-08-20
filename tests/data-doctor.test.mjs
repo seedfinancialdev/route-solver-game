@@ -39,6 +39,18 @@ test('a missing file is not reported as stale', () => {
   assert.equal(stale.some((s) => s.output === 'data/graph.json'), false);
 });
 
+test('a duplicate output+input pair is reported only once', () => {
+  // Mirrors web/cartography.json's two real producers, both fed by
+  // web/data.json — PIPELINE legitimately has two stages sharing the same
+  // (output, input) pair, but the staleness report should not repeat it.
+  const stale = stalenessCheck(new Map([
+    ['web/data.json', 200],
+    ['web/cartography.json', 100],
+  ]));
+  const matches = stale.filter((s) => s.output === 'web/cartography.json' && s.input === 'web/data.json');
+  assert.equal(matches.length, 1);
+});
+
 test('manifest agreement catches a shifted index', () => {
   const r = manifestAgreement({ 0: 111, 1: 222 }, [{ geonameid: 111 }, { geonameid: 999 }]);
   assert.equal(r.checked, 2);

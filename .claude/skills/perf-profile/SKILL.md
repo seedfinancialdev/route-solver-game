@@ -25,9 +25,12 @@ move is reviewable. Never raise a budget just to get a green run.
 
 ## Known state
 
-The eager payload is about 17.9 MB, dominated by `forest-detail.webp` at
-9.7 MB. The budget records that rather than endorsing it — the tool's job is
-catching growth. Shrinking that number is worthwhile work in its own right.
+The eager payload is about 6.5 MB across 9 files (`terrain-detail.webp` and
+`data.json` are the largest). `forest-detail.webp` (9.7 MB) and `forest.webp`
+(1.7 MB) are currently orphaned — shipped, but unreachable from
+`web/index.html` — not part of the eager payload. The budget records the
+eager measurement rather than endorsing it — the tool's job is catching
+growth.
 
 ## Scope
 

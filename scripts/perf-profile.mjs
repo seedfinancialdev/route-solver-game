@@ -16,6 +16,10 @@ try {
   console.error(`ERROR: could not read web/perf-budget.json: ${err.message}`);
   process.exit(2);
 }
+if (!config?.entryPoints || !config?.budgets || !config?.manifests) {
+  console.error('perf-profile: web/perf-budget.json is missing entryPoints, budgets, or manifests');
+  process.exit(2);
+}
 
 const skip = new Set(config.skipDirs);
 const ext = (p) => p.slice(p.lastIndexOf('.'));

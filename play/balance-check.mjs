@@ -21,6 +21,10 @@ const TRIALS = 6;
 const CLIFF_MARGIN = 0.02; // docs/SPEC.md:221-224, "one road's worth of margin"
 const MULTIPLIERS = [1.08, 1.09, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15];
 const SPEC_WIN_RATE = 0.52; // docs/SPEC.md:217
+// Must match play/calibrate-hos.mjs's own module-level constants of the same
+// name — those are what the cache was validated against when it was written.
+const CACHE_MIN_PENALTY = 1.12;
+const CACHE_TRIALS = 6;
 
 let pack, g;
 try {
@@ -28,6 +32,10 @@ try {
   g = buildGraph(read('data/graph.json'));
 } catch (e) {
   console.error(`balance-check: cannot read data/puzzles.json or data/graph.json: ${e.message}`);
+  process.exit(2);
+}
+if (!Array.isArray(pack?.puzzles) || !g?.cities) {
+  console.error('balance-check: data/puzzles.json or data/graph.json is missing its expected shape');
   process.exit(2);
 }
 
@@ -81,8 +89,8 @@ let wins = 0, finished = 0, stuck = 0, worstRatio = 0;
 for (const p of sample) {
   for (let t = 0; t < TRIALS; t++) {
     const run = roadReader(g, p.a, p.b, { seed: p.a * 977 + p.b * 13 + t, hos: true });
-    if (run.stuck) { stuck++; continue; }
     finished++;
+    if (run.stuck) { stuck++; continue; }
     if (run.minutes <= p.budgetMin) wins++;
     worstRatio = Math.max(worstRatio, run.minutes / p.optimalMin);
   }
@@ -116,7 +124,16 @@ if (SWEEP) {
     console.log('  no sweep cache — run `npm run calibrate:hos` first (~20 min)');
     process.exit(failed ? 1 : 0);
   }
-  const { runs } = JSON.parse(readFileSync(CACHE, 'utf8'));
+  const cache = JSON.parse(readFileSync(CACHE, 'utf8'));
+  const { runs } = cache;
+  const maxIndex = runs.reduce((max, r) => Math.max(max, r.a, r.b), -1);
+  const cacheValid = cache.minPenalty === CACHE_MIN_PENALTY && cache.trials === CACHE_TRIALS
+    && maxIndex < g.n;
+  if (!cacheValid) {
+    console.log('  cache was built against a different roster or configuration — delete '
+      + 'data/.calibrate-hos-cache.json and re-run npm run calibrate:hos');
+    process.exit(failed ? 1 : 0);
+  }
   console.log(formatSpecTable(MULTIPLIERS.map((m) => sweepRow(runs, m))));
 
   const cliff = findCliff(runs, MULTIPLIERS);

@@ -3,7 +3,7 @@
   "entryPoints": ["index.html"],
   "skipDirs": ["map-studio", "road-network-proto"],
   "budgets": {
-    "eagerTotalKB": 18300,
+    "eagerTotalKB": 6900,
     "deferredTotalKB": 31000,
     "streetTotalKB": 3400,
     "largestStreetFileKB": 30

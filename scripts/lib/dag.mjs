@@ -43,9 +43,16 @@ export const PIPELINE = [
   { script: 'scripts/09-real-osm-forests.mjs', inputs: ['web/data.json'], outputs: ['web/cartography.json'], needs: [] },
 ];
 
-/** Outputs older than something they were built from. */
+/**
+ * Outputs older than something they were built from. Deduped on the
+ * (output, input) pair — two pipeline stages can legitimately declare the
+ * same output+input (e.g. web/cartography.json's two producers, both fed by
+ * web/data.json), but the staleness report should say so once, not once per
+ * stage that happens to share the pair.
+ */
 export function stalenessCheck(mtimes) {
   const stale = [];
+  const seen = new Set();
   for (const stage of PIPELINE) {
     for (const output of stage.outputs) {
       const outAt = mtimes.get(output);
@@ -53,7 +60,12 @@ export function stalenessCheck(mtimes) {
       for (const input of stage.inputs) {
         const inAt = mtimes.get(input);
         if (inAt === undefined) continue;
-        if (outAt < inAt) stale.push({ output, input });
+        if (outAt < inAt) {
+          const key = `${output}::${input}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          stale.push({ output, input });
+        }
       }
     }
   }
