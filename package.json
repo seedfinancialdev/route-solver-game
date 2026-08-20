@@ -4,17 +4,21 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node --test 'tests/**/*.test.mjs'",
+    "doctor": "node scripts/data-doctor.mjs",
+    "perf": "node scripts/perf-profile.mjs",
     "data:cities": "node scripts/00-cities.mjs",
     "data:graph": "node scripts/01-graph.mjs",
     "data:puzzles": "node scripts/02-puzzles.mjs",
-    "data:map": "node scripts/03-map.mjs && python3 scripts/04-terrain.py && node scripts/05-bundle.mjs",
+    "data:map": "node scripts/03-map.mjs && node scripts/05-bundle.mjs && python3 scripts/04-terrain.py",
     "data:streets": "node scripts/07-streets.mjs",
     "data:cartography": "node scripts/08-cartography.mjs",
     "data:real-forests": "node scripts/09-real-osm-forests.mjs",
     "play": "node play/cli.mjs",
     "calibrate": "node play/calibrate.mjs",
     "calibrate:hos": "node play/calibrate-hos.mjs",
-    "serve": "node scripts/serve.mjs"
+    "serve": "node scripts/serve.mjs",
+    "balance": "node play/balance-check.mjs"
   },
   "devDependencies": {
     "d3-delaunay": "^6.0.4",
