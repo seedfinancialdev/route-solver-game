@@ -17,7 +17,8 @@
     "calibrate": "node play/calibrate.mjs",
     "calibrate:hos": "node play/calibrate-hos.mjs",
     "serve": "node scripts/serve.mjs",
-    "balance": "node play/balance-check.mjs"
+    "balance": "node play/balance-check.mjs",
+    "core-loop:play": "node core-loop/play.mjs"
   },
   "devDependencies": {
     "d3-delaunay": "^6.0.4",
