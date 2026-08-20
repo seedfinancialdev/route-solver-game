@@ -72,8 +72,8 @@ sliderTime.addEventListener('input', (e) => {
 });
 
 btnNoon.addEventListener('click', () => {
-  mapEngine.themeManager.loadPreset('satelliteDay');
-  presetSelect.value = 'satelliteDay';
+  mapEngine.themeManager.loadPreset('satelliteTopo');
+  presetSelect.value = 'satelliteTopo';
   setSolarTime(12.0, btnNoon);
 });
 
@@ -95,7 +95,7 @@ btnDawn.addEventListener('click', () => {
 presetSelect.addEventListener('change', (e) => {
   mapEngine.themeManager.loadPreset(e.target.value);
   const cur = mapEngine.themeManager.current;
-  sliderTerrain.value = Math.round((cur.terrainOpacity || 0.70) * 100);
+  sliderTerrain.value = Math.round((cur.terrainOpacity || 0.65) * 100);
   valTerrain.textContent = `${sliderTerrain.value}%`;
 });
 
@@ -160,8 +160,8 @@ sliderFarmland.addEventListener('input', (e) => {
 const KM_INTERVALS = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
 const MI_INTERVALS = [500, 200, 100, 50, 20, 10, 5, 2, 1];
 
-// Initialize 22:00 CET Night Ops
-setSolarTime(22.0, btnNight);
+// Initialize 12:00 CET Natural Full-Color Physical Atlas (High Noon)
+setSolarTime(12.0, btnNoon);
 
 // Update HUD & FPS stats loop (Dynamic Dual-Unit Scale Bar)
 setInterval(() => {

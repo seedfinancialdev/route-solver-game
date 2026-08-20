@@ -1,29 +1,29 @@
 /**
  * Map Engine Theme Configuration & 24-Hour Solar Time-of-Day System
- * Sourced & tuned for Tactical Race Navigation & Cannonball Rally Realism.
+ * Calibrated for Natural Full-Color Physical Atlas Realism & Cannonball Racing.
  */
 
 export const THEME_PRESETS = {
   satelliteTopo: {
-    name: 'Satellite Topo (Default)',
-    bg: '#0c1a28',
-    water: '#14344d',
-    land: '#18202a',
-    coastline: 'rgba(255, 255, 255, 0.65)',
+    name: 'Natural Physical Atlas (Default)',
+    bg: '#184a70',
+    water: '#1f6291',
+    land: '#5a714d',
+    coastline: 'rgba(255, 255, 255, 0.75)',
     borderWidth: 1.6,
-    forest: 'rgba(20, 56, 35, 0.75)',
-    farmland: 'rgba(162, 137, 92, 0.35)',
-    urbanDay: 'rgba(145, 130, 110, 0.40)',
-    urbanNight: 'rgba(255, 175, 55, 0.75)',
-    urbanGlow: 'rgba(255, 150, 30, 0.35)',
-    terrainOpacity: 0.70,
-    terrainBlend: 'multiply',
-    roadCasing: '#080c14',
-    roadDivider: '#080c14',
-    roadMotorway: '#e65133',
-    roadTrunk: '#e6a13c',
-    roadPrimary: '#6b7c93',
-    roadSecondary: '#3e4a57',
+    forest: 'rgba(29, 77, 48, 0.75)',
+    farmland: 'rgba(165, 142, 98, 0.35)',
+    urbanDay: 'rgba(168, 159, 145, 0.35)',
+    urbanNight: 'rgba(255, 185, 60, 0.85)',
+    urbanGlow: 'rgba(255, 160, 35, 0.40)',
+    terrainOpacity: 0.65,
+    terrainBlend: 'overlay',
+    roadCasing: '#1a1d24',
+    roadDivider: '#1a1d24',
+    roadMotorway: '#e64122',
+    roadTrunk: '#f59e0b',
+    roadPrimary: '#4b5563',
+    roadSecondary: '#374151',
     roadWidthMotorway: 3.2,
     roadWidthTrunk: 2.2,
     roadWidthPrimary: 1.4,
@@ -32,17 +32,48 @@ export const THEME_PRESETS = {
     cityNodeActive: '#00f0ff',
     routeLine: '#00f0ff',
     routeLineGlow: 'rgba(0, 240, 255, 0.35)',
-    hudGlass: 'rgba(12, 18, 25, 0.85)',
-    hudText: '#e1e7ed',
+    hudGlass: 'rgba(15, 23, 34, 0.88)',
+    hudText: '#f1f5f9',
+  },
+  satelliteDay: {
+    name: 'Daylight High Noon',
+    bg: '#1e527c',
+    water: '#256d9e',
+    land: '#637a54',
+    coastline: 'rgba(255, 255, 255, 0.80)',
+    borderWidth: 1.8,
+    forest: 'rgba(32, 85, 52, 0.70)',
+    farmland: 'rgba(175, 150, 105, 0.40)',
+    urbanDay: 'rgba(175, 165, 150, 0.40)',
+    urbanNight: 'rgba(255, 200, 90, 0.20)',
+    urbanGlow: 'rgba(255, 180, 50, 0.10)',
+    terrainOpacity: 0.60,
+    terrainBlend: 'overlay',
+    roadCasing: '#141820',
+    roadDivider: '#141820',
+    roadMotorway: '#e64122',
+    roadTrunk: '#f59e0b',
+    roadPrimary: '#4b5563',
+    roadSecondary: '#374151',
+    roadWidthMotorway: 3.2,
+    roadWidthTrunk: 2.2,
+    roadWidthPrimary: 1.4,
+    cityNode: '#ffffff',
+    cityNodeBorder: '#0b0f17',
+    cityNodeActive: '#0284c7',
+    routeLine: '#0284c7',
+    routeLineGlow: 'rgba(2, 132, 199, 0.30)',
+    hudGlass: 'rgba(15, 23, 34, 0.88)',
+    hudText: '#f1f5f9',
   },
   cannonballNight: {
     name: 'Night Ops (Cannonball)',
-    bg: '#060d15',
-    water: '#0a1a27',
-    land: '#0e141d',
-    coastline: 'rgba(255, 255, 255, 0.50)',
+    bg: '#08131e',
+    water: '#0c1f2e',
+    land: '#111822',
+    coastline: 'rgba(255, 255, 255, 0.55)',
     borderWidth: 1.4,
-    forest: 'rgba(10, 35, 22, 0.85)',
+    forest: 'rgba(12, 38, 24, 0.85)',
     farmland: 'rgba(80, 65, 45, 0.30)',
     urbanDay: 'rgba(110, 100, 85, 0.30)',
     urbanNight: 'rgba(255, 185, 60, 0.85)',
@@ -65,37 +96,6 @@ export const THEME_PRESETS = {
     routeLineGlow: 'rgba(0, 240, 255, 0.50)',
     hudGlass: 'rgba(8, 12, 18, 0.90)',
     hudText: '#f8fafc',
-  },
-  satelliteDay: {
-    name: 'Daylight Topo (Noon)',
-    bg: '#122c44',
-    water: '#1b4566',
-    land: '#232b35',
-    coastline: 'rgba(255, 255, 255, 0.70)',
-    borderWidth: 1.8,
-    forest: 'rgba(28, 72, 45, 0.70)',
-    farmland: 'rgba(175, 150, 105, 0.45)',
-    urbanDay: 'rgba(165, 150, 130, 0.50)',
-    urbanNight: 'rgba(255, 200, 90, 0.20)',
-    urbanGlow: 'rgba(255, 180, 50, 0.10)',
-    terrainOpacity: 0.60,
-    terrainBlend: 'multiply',
-    roadCasing: '#10151c',
-    roadDivider: '#10151c',
-    roadMotorway: '#d93b1d',
-    roadTrunk: '#d98e28',
-    roadPrimary: '#58697d',
-    roadSecondary: '#3a4754',
-    roadWidthMotorway: 3.0,
-    roadWidthTrunk: 2.0,
-    roadWidthPrimary: 1.3,
-    cityNode: '#ffffff',
-    cityNodeBorder: '#0b0f17',
-    cityNodeActive: '#0284c7',
-    routeLine: '#0284c7',
-    routeLineGlow: 'rgba(2, 132, 199, 0.30)',
-    hudGlass: 'rgba(15, 23, 34, 0.85)',
-    hudText: '#f1f5f9',
   },
   vintageTopo: {
     name: 'Vintage Topo',
@@ -130,18 +130,18 @@ export const THEME_PRESETS = {
   },
   nordicSlate: {
     name: 'Nordic Slate',
-    bg: '#0a1724',
-    water: '#102a40',
-    land: '#131922',
+    bg: '#0c1c2b',
+    water: '#143149',
+    land: '#182430',
     coastline: 'rgba(255, 255, 255, 0.70)',
     borderWidth: 1.6,
-    forest: 'rgba(15, 48, 36, 0.80)',
+    forest: 'rgba(18, 52, 40, 0.80)',
     farmland: 'rgba(85, 78, 55, 0.45)',
     urbanDay: 'rgba(120, 130, 145, 0.40)',
     urbanNight: 'rgba(255, 190, 80, 0.70)',
     urbanGlow: 'rgba(255, 170, 50, 0.35)',
     terrainOpacity: 0.60,
-    terrainBlend: 'source-over',
+    terrainBlend: 'overlay',
     roadCasing: '#060a0f',
     roadDivider: '#060a0f',
     roadMotorway: '#e63946',
@@ -164,7 +164,7 @@ export const THEME_PRESETS = {
 export class MapTheme {
   constructor(initialPreset = 'satelliteTopo') {
     this.current = { ...THEME_PRESETS[initialPreset] };
-    this.hour = 22.0; // Default: 22:00 (10:00 PM Cannonball Night Rally start)
+    this.hour = 12.0; // Default: 12:00 (Noon Daylight Physical Atlas)
   }
 
   set(key, value) {
@@ -179,16 +179,15 @@ export class MapTheme {
 
   setTimeOfDay(hour) {
     this.hour = Math.max(0, Math.min(24, hour));
-    // Determine night factor: 1.0 at midnight (02:00), 0.0 at noon (12:00)
     let nightFactor = 0;
     if (this.hour >= 20 || this.hour <= 5) {
-      nightFactor = 1.0; // Deep night
+      nightFactor = 1.0;
     } else if (this.hour > 5 && this.hour < 8) {
-      nightFactor = (8 - this.hour) / 3; // Dawn transition
+      nightFactor = (8 - this.hour) / 3;
     } else if (this.hour > 17 && this.hour < 20) {
-      nightFactor = (this.hour - 17) / 3; // Dusk transition
+      nightFactor = (this.hour - 17) / 3;
     } else {
-      nightFactor = 0.0; // Broad daylight
+      nightFactor = 0.0;
     }
 
     this.current.nightFactor = nightFactor;

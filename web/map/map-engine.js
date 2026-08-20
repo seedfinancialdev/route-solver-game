@@ -1,7 +1,8 @@
 /**
  * Core Map Engine Orchestrator
- * Integrates Camera, Terrain Relief, Raster Forest, Vector Cartography (Coastlines, Lakes, Rivers, Roads),
- * Gameplay Overlay, and Theme Engine into a 60fps render loop.
+ * Integrates Camera, Landmass Base, Terrain Elevation Relief, Raster Forest,
+ * Vector Cartography (Coastlines, Lakes, Rivers, Roads, Shields, Alpine Passes),
+ * Gameplay Overlay, and 24-Hour Solar Lighting Engine into a 60fps render loop.
  */
 
 import { Camera } from './camera.js';
@@ -107,13 +108,32 @@ export class MapEngine {
     const height = this.camera.viewportHeight;
     const dpr = window.devicePixelRatio || 1;
     const theme = this.themeManager.current;
+    const g = this.graphData;
 
-    // Reset Context & Clear Canvas with Marine Ocean Base
+    // 1. Reset Context & Clear Canvas with Sapphire Marine Ocean Base
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.ctx.fillStyle = theme.bg;
     this.ctx.fillRect(0, 0, width, height);
 
-    // 1. Terrain Elevation Relief & Pre-Rendered Lambert Raster Forest Layer
+    // 2. Draw Lush Natural Landmass Base Fill (Lowland Plains & Valleys)
+    if (g && g.countries && g.countries.length) {
+      const scaleX = this.camera.viewportWidth / this.camera.current.w;
+      const scaleY = this.camera.viewportHeight / this.camera.current.h;
+      const translateX = -this.camera.current.x * scaleX;
+      const translateY = -this.camera.current.y * scaleY;
+
+      this.ctx.save();
+      this.ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
+      this.ctx.fillStyle = theme.land || '#5a714d';
+
+      for (const countryPath of g.countries) {
+        const path = this.cartographyLayer.getPath2D(countryPath);
+        if (path) this.ctx.fill(path);
+      }
+      this.ctx.restore();
+    }
+
+    // 3. Terrain Elevation Relief & Pre-Rendered Lambert Raster Forest Canopy
     this.terrainLayer.render(
       this.ctx,
       this.camera,
@@ -122,10 +142,10 @@ export class MapEngine {
       this.cartographyLayer.forestBlendMode
     );
 
-    // 2. Vector Cartography (Landmass Coastlines, Lakes, Rivers, Urban Footprints, Roads)
-    this.cartographyLayer.render(this.ctx, this.camera, theme, this.graphData);
+    // 4. Vector Cartography (Coastlines, Lakes, Rivers, Urban Sprawl, Roads, Shields, Alpine Passes)
+    this.cartographyLayer.render(this.ctx, this.camera, theme, g);
 
-    // 3. Tactical Gameplay Overlay (City Nodes, Labels, Active Route)
-    this.gameplayLayer.render(this.ctx, this.camera, theme, this.graphData);
+    // 5. Tactical Gameplay Overlay (City Nodes, Labels, Active Route)
+    this.gameplayLayer.render(this.ctx, this.camera, theme, g);
   }
 }
