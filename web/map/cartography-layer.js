@@ -1,7 +1,7 @@
 /**
  * Vector Cartography Canvas Renderer
  * High-performance, tactile cartographic rendering for crisp country borders,
- * lakes, rivers, razor-sharp vector city footprints, background towns, dual-cased asphalt road networks,
+ * lakes, rivers, razor-sharp vector city footprints, dual-cased asphalt road networks,
  * and European Highway Shields / Alpine Pass Waypoints.
  */
 
@@ -27,7 +27,6 @@ export class CartographyLayer {
     this.showWater = true;      // Lakes & Rivers
     this.showFarmland = true;   // Vector City footprints / Night street lights
     this.showForest = true;     // Raster forest layer toggle
-    this.showTowns = true;      // Background towns
     this.showRoads = true;      // Road networks
     this.showShields = true;    // Highway route shields & Alpine pass badges
     this.showShoreline = true;  // Lake shoreline highlights
@@ -36,7 +35,6 @@ export class CartographyLayer {
     this.waterOpacity = 1.0;
     this.farmlandOpacity = 0.40;
     this.forestOpacity = 0.65;
-    this.townsOpacity = 0.50;
     this.riverWidthScale = 1.0;
     this.forestBlendMode = 'multiply';
   }
@@ -158,23 +156,7 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 4. Background Towns & Night Lights (Visible in Regional/Hub zoom <= 900 km)
-    if (this.showTowns && g.towns && g.towns.length && zoomKm <= 900) {
-      ctx.save();
-      ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-      ctx.fillStyle = nightFactor > 0.5 ? 'rgba(255, 215, 110, 0.85)' : 'rgba(225, 210, 180, 0.65)';
-      ctx.globalAlpha = this.townsOpacity;
-
-      for (const town of g.towns) {
-        const r = (town.tier === 1 ? 2.4 : 1.6) / scaleX;
-        ctx.beginPath();
-        ctx.arc(town.x, town.y, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-
-    // 5. Road Networks (Dual-Carriageway Cased Asphalt Highways)
+    // 4. Road Networks (Dual-Carriageway Cased Asphalt Highways)
     if (this.showRoads && g.adj) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
@@ -256,7 +238,7 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 6. European Highway Route Shields & Strategic Alpine Pass Waypoints (Zoom <= 850 km)
+    // 5. European Highway Route Shields & Strategic Alpine Pass Waypoints (Zoom <= 850 km)
     if (this.showShields && zoomKm <= 850) {
       this.renderHighwayShieldsAndWaypoints(ctx, camera, theme, g, dpr);
     }
