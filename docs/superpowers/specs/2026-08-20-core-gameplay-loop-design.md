@@ -47,6 +47,27 @@ Those all plug into what's designed here without changing its shape. Building
 any of them is not blocked on this spec being "finished" in some larger
 sense — it's finished when the loop itself is sound.
 
+## Build order: greenfield, not retrofit
+
+This gets built the way a professional team would build it new — designed
+from what the game actually needs, not from what the existing repo already
+has. The existing map data, road graph, and driving-hours code are real
+assets and will get pulled in, but only where they earn a place once a
+specific piece is actually being built — never as the starting point a new
+system gets bent to fit.
+
+**The first slice proves the architecture, not any game system.** A single,
+entirely invented, throwaway module — no game-design meaning, an accumulator
+over a made-up sequence of legs, a threshold, a pause, two arbitrary
+player-facing choices, a resume. The only thing under test is the plumbing:
+does the step function stay genuinely ignorant of what it's advancing, does
+pause-and-resume preserve exact state, does a bot policy work as a drop-in
+for a human choice, does recording inputs and replaying them reproduce the
+identical result. No UI, no real content, nothing from the existing codebase
+anywhere near it. Only once that's proven does a real module — fatigue,
+Heat, whatever comes first — get designed on its own merits and dropped into
+an architecture already known to work.
+
 ## The three modes, and why the loop has to be mode-agnostic
 
 - **Practice** (10–30 min): short routes, player chooses which systems run —
@@ -118,9 +139,20 @@ rather than replacing it.
 
 ## Route generation and grading
 
+> **Flagged for a fresh pass.** This section was derived by generalizing
+> `02-puzzles.mjs`'s existing criteria upward — reuse-first, not
+> design-first. Those specific numbers (trap ratio, bust ratio, dead-end
+> rate) were invented for a different problem: whether choosing between a
+> handful of roads is a fair single decision under a budget. What actually
+> makes a good multi-leg outlaw route is a genuinely open question — real
+> strategic variety at multiple points, a real mix of high-Heat and safe
+> stretches, matching the scale of an actual cross-country run — and hasn't
+> been asked fresh yet. Treat what follows as a strawman worth comparing
+> against when this slice is actually reached, not a settled decision.
+
 Career and multiplayer content is not hand-picked or randomly assigned from
 a fixed pool — it's generated, then graded, and only what clears a bar
-becomes a real route. This isn't new work, either: `scripts/02-puzzles.mjs`
+becomes a real route. The existing `scripts/02-puzzles.mjs`
 already does exactly this today, at the scale of one hop-chain — generate
 every candidate city pair, simulate a bot (`roadReader`) against it, keep
 only pairs where the shortest route is a genuine trap
@@ -187,6 +219,16 @@ specific system — it only knows how to advance whatever modules are
 currently registered and check their thresholds. This is what makes
 practice mode's per-system toggles free instead of requiring a second,
 simplified engine: an unregistered module simply never fires.
+
+> **Flagged for a fresh pass, same as route grading above.** What follows
+> started from `hosCost`'s existing accumulator shape and patched its
+> consequence once the mandatory-break framing broke — reuse-first again,
+> not design-first. It landed somewhere defensible, but the actual question
+> — what should fatigue mean when the player is orchestrating a driver
+> remotely rather than being one — hasn't been asked from a blank page.
+> Whether a single scalar accumulator is even the right shape (versus, say,
+> per-driver state in a real multi-driver crew system) is still open. Revisit
+> fresh when this slice is reached.
 
 **Fatigue's accumulator is reused from the existing HOS mechanic; its
 consequence is not.** `hosCost` (`scripts/lib/graph.mjs:57-61`) models EU
