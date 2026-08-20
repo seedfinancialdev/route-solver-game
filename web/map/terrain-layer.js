@@ -1,7 +1,7 @@
 /**
  * Multi-Tier Elevation Relief, Raster Forest, & Raster Water Layer Renderer
  * Renders Overview, Detail pass, Fine Tile grid (6x6), pre-rendered Lambert raster forest layer,
- * and terrain-carved raster water maps with 1:1 pixel alignment.
+ * and terrain-carved raster water maps with 1:1 pixel alignment and cache-busting asset loading.
  */
 
 export class TerrainLayer {
@@ -32,10 +32,12 @@ export class TerrainLayer {
   }
 
   async init() {
+    const v = Date.now();
+
     // Load Terrain Overview image
     this.overviewImg = new Image();
     this.overviewImg.onload = () => { this.overviewLoaded = true; };
-    this.overviewImg.src = '../terrain.webp';
+    this.overviewImg.src = `../terrain.webp?v=${v}`;
     if (this.overviewImg.complete && this.overviewImg.naturalWidth !== 0) {
       this.overviewLoaded = true;
     }
@@ -43,7 +45,7 @@ export class TerrainLayer {
     // Load Terrain Detail image
     this.detailImg = new Image();
     this.detailImg.onload = () => { this.detailLoaded = true; };
-    this.detailImg.src = '../terrain-detail.webp';
+    this.detailImg.src = `../terrain-detail.webp?v=${v}`;
     if (this.detailImg.complete && this.detailImg.naturalWidth !== 0) {
       this.detailLoaded = true;
     }
@@ -51,7 +53,7 @@ export class TerrainLayer {
     // Load Forest Overview raster image
     this.forestImg = new Image();
     this.forestImg.onload = () => { this.forestLoaded = true; };
-    this.forestImg.src = '../forest.webp';
+    this.forestImg.src = `../forest.webp?v=${v}`;
     if (this.forestImg.complete && this.forestImg.naturalWidth !== 0) {
       this.forestLoaded = true;
     }
@@ -59,7 +61,7 @@ export class TerrainLayer {
     // Load Forest Detail raster image
     this.forestDetailImg = new Image();
     this.forestDetailImg.onload = () => { this.forestDetailLoaded = true; };
-    this.forestDetailImg.src = '../forest-detail.webp';
+    this.forestDetailImg.src = `../forest-detail.webp?v=${v}`;
     if (this.forestDetailImg.complete && this.forestDetailImg.naturalWidth !== 0) {
       this.forestDetailLoaded = true;
     }
@@ -67,7 +69,7 @@ export class TerrainLayer {
     // Load Water Overview raster image
     this.waterImg = new Image();
     this.waterImg.onload = () => { this.waterLoaded = true; };
-    this.waterImg.src = '../water.webp';
+    this.waterImg.src = `../water.webp?v=${v}`;
     if (this.waterImg.complete && this.waterImg.naturalWidth !== 0) {
       this.waterLoaded = true;
     }
@@ -75,7 +77,7 @@ export class TerrainLayer {
     // Load Water Detail raster image
     this.waterDetailImg = new Image();
     this.waterDetailImg.onload = () => { this.waterDetailLoaded = true; };
-    this.waterDetailImg.src = '../water-detail.webp';
+    this.waterDetailImg.src = `../water-detail.webp?v=${v}`;
     if (this.waterDetailImg.complete && this.waterDetailImg.naturalWidth !== 0) {
       this.waterDetailLoaded = true;
     }
