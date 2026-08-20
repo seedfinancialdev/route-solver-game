@@ -1,7 +1,7 @@
 /**
  * Vector Cartography Canvas Renderer
  * High-performance, tactile cartographic rendering for crisp country borders,
- * lakes, rivers, 24-hour day/night urban night lights, dual-cased asphalt road networks,
+ * lakes, rivers, background towns, dual-cased asphalt road networks,
  * and European Highway Shields / Alpine Pass Waypoints.
  */
 
@@ -20,12 +20,11 @@ const STRATEGIC_WAYPOINTS = [
 
 export class CartographyLayer {
   constructor() {
-    this.pathCache = new Map(); // svgStr -> Path2D instance
+    this.pathCache = new Map();
 
     // Layer Visibility Toggles
     this.showCoastlines = true; // Country & coastline boundaries
     this.showWater = true;      // Lakes & Rivers
-    this.showFarmland = true;   // Urban footprints / Night Lights
     this.showForest = true;     // Raster forest layer toggle
     this.showTowns = true;      // Background towns
     this.showRoads = true;      // Road networks
@@ -34,7 +33,6 @@ export class CartographyLayer {
 
     // Opacity & Width Controls
     this.waterOpacity = 1.0;
-    this.farmlandOpacity = 0.40;
     this.forestOpacity = 0.65;
     this.townsOpacity = 0.50;
     this.riverWidthScale = 1.0;
@@ -62,15 +60,14 @@ export class CartographyLayer {
     const translateX = -camera.current.x * scaleX;
     const translateY = -camera.current.y * scaleY;
     const zoomKm = camera.current.w;
-    const nightFactor = theme.nightFactor !== undefined ? theme.nightFactor : 0.85;
+    const nightFactor = theme.nightFactor !== undefined ? theme.nightFactor : 0.0;
 
     // 1. National Country Boundaries & Coastlines (Crisp Tactical White)
     if (this.showCoastlines && g.countries && g.countries.length) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
 
-      // Draw National Country Border Stroke (Crisp White)
-      ctx.strokeStyle = theme.coastline || 'rgba(255, 255, 255, 0.65)';
+      ctx.strokeStyle = theme.coastline || 'rgba(255, 255, 255, 0.75)';
       ctx.lineWidth = (theme.borderWidth || 1.6) / scaleX;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
@@ -88,16 +85,16 @@ export class CartographyLayer {
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
       ctx.globalAlpha = this.waterOpacity;
 
-      // A. Lakes (Core Fill + Shoreline Ring)
+      // A. Lakes
       if (g.lakes && g.lakes.length) {
-        ctx.fillStyle = theme.water || '#14344d';
+        ctx.fillStyle = theme.water || '#1f6291';
         for (const lakePath of g.lakes) {
           const path = this.getPath2D(lakePath);
           if (path) ctx.fill(path);
         }
 
         if (this.showShoreline) {
-          ctx.strokeStyle = 'rgba(80, 170, 230, 0.35)';
+          ctx.strokeStyle = 'rgba(100, 180, 240, 0.35)';
           ctx.lineWidth = 1.0 / scaleX;
           for (const lakePath of g.lakes) {
             const path = this.getPath2D(lakePath);
@@ -112,7 +109,7 @@ export class CartographyLayer {
         ctx.lineJoin = 'round';
 
         // Outer Channel Base
-        ctx.strokeStyle = theme.water || '#14344d';
+        ctx.strokeStyle = theme.water || '#1f6291';
         ctx.lineWidth = (2.4 * this.riverWidthScale) / scaleX;
         for (const riverPath of g.rivers) {
           const path = this.getPath2D(riverPath);
@@ -120,7 +117,7 @@ export class CartographyLayer {
         }
 
         // Inner Flow Core
-        ctx.strokeStyle = 'rgba(60, 150, 210, 0.75)';
+        ctx.strokeStyle = 'rgba(90, 190, 240, 0.75)';
         ctx.lineWidth = (1.2 * this.riverWidthScale) / scaleX;
         for (const riverPath of g.rivers) {
           const path = this.getPath2D(riverPath);
@@ -130,49 +127,11 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 3. Day/Night Dynamic Urban Sprawl & Metropolitan Night Lights
-    if (this.showFarmland && g.urbanAreas && g.urbanAreas.length) {
-      ctx.save();
-      ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-
-      // Daytime Base Concrete
-      if (nightFactor < 0.9) {
-        ctx.fillStyle = theme.urbanDay || 'rgba(145, 130, 110, 0.40)';
-        ctx.globalAlpha = this.farmlandOpacity * (1.0 - nightFactor);
-        for (const areaPath of g.urbanAreas) {
-          const path = this.getPath2D(areaPath);
-          if (path) ctx.fill(path);
-        }
-      }
-
-      // Nighttime Glowing Streetlights (NASA Black Marble Sprawl)
-      if (nightFactor > 0.1) {
-        ctx.globalCompositeOperation = 'screen';
-        ctx.fillStyle = theme.urbanNight || 'rgba(255, 175, 55, 0.75)';
-        ctx.globalAlpha = this.farmlandOpacity * nightFactor * (zoomKm <= 600 ? 1.0 : 0.75);
-
-        for (const areaPath of g.urbanAreas) {
-          const path = this.getPath2D(areaPath);
-          if (path) ctx.fill(path);
-        }
-
-        // Outer Urban Radiance
-        ctx.fillStyle = theme.urbanGlow || 'rgba(255, 150, 30, 0.35)';
-        ctx.globalAlpha = 0.25 * nightFactor;
-        ctx.lineWidth = 4.0 / scaleX;
-        for (const areaPath of g.urbanAreas) {
-          const path = this.getPath2D(areaPath);
-          if (path) ctx.stroke(path);
-        }
-      }
-      ctx.restore();
-    }
-
-    // 4. Background Towns (Visible in Regional/Hub zoom <= 900 km)
+    // 3. Background Towns (Visible in Regional/Hub zoom <= 900 km)
     if (this.showTowns && g.towns && g.towns.length && zoomKm <= 900) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-      ctx.fillStyle = nightFactor > 0.5 ? 'rgba(255, 210, 120, 0.75)' : 'rgba(215, 195, 155, 0.65)';
+      ctx.fillStyle = nightFactor > 0.5 ? 'rgba(255, 220, 140, 0.85)' : 'rgba(225, 210, 180, 0.65)';
       ctx.globalAlpha = this.townsOpacity;
 
       for (const town of g.towns) {
@@ -184,7 +143,7 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 5. Road Networks (Dual-Carriageway Cased Asphalt Highways)
+    // 4. Road Networks (Dual-Carriageway Cased Asphalt Highways)
     if (this.showRoads && g.adj) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
@@ -220,7 +179,7 @@ export class CartographyLayer {
         prWidth = 1.6;
       }
 
-      const casingCol = theme.roadCasing || '#080c14';
+      const casingCol = theme.roadCasing || '#1a1d24';
 
       // PASS 1: Dark Asphalt Roadbed Under-Casing
       if (zoomKm <= 1800) {
@@ -240,19 +199,19 @@ export class CartographyLayer {
 
       // PASS 2: Vibrant Highway Surface Core
       if (zoomKm <= 900) {
-        ctx.strokeStyle = theme.roadPrimary || '#6b7c93';
+        ctx.strokeStyle = theme.roadPrimary || '#4b5563';
         ctx.lineWidth = prWidth / scaleX;
         this.drawShapeBatch(ctx, primaries);
       }
 
       if (zoomKm <= 1800) {
-        ctx.strokeStyle = theme.roadTrunk || '#e6a13c';
+        ctx.strokeStyle = theme.roadTrunk || '#f59e0b';
         ctx.lineWidth = trWidth / scaleX;
         this.drawShapeBatch(ctx, trunks);
       }
 
       const isOverview = zoomKm > 2000;
-      ctx.strokeStyle = isOverview ? 'rgba(230, 81, 51, 0.45)' : (theme.roadMotorway || '#e65133');
+      ctx.strokeStyle = isOverview ? 'rgba(230, 65, 34, 0.45)' : (theme.roadMotorway || '#e64122');
       ctx.lineWidth = mwWidth / scaleX;
       this.drawShapeBatch(ctx, motorways);
 
@@ -266,7 +225,7 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 6. European Highway Route Shields & Strategic Alpine Pass Waypoints (Zoom <= 850 km)
+    // 5. European Highway Route Shields & Strategic Alpine Pass Waypoints (Zoom <= 850 km)
     if (this.showShields && zoomKm <= 850) {
       this.renderHighwayShieldsAndWaypoints(ctx, camera, theme, g, dpr);
     }
@@ -297,7 +256,6 @@ export class CartographyLayer {
         const label = edge.road.label.trim();
         if (renderedShields.has(label)) continue;
 
-        // Find midpoint along shape
         const midIdx = Math.floor(edge.shape.length / 2);
         const pt = edge.shape[midIdx];
         const screenPos = camera.worldToScreen(pt[0], pt[1]);
@@ -359,7 +317,6 @@ export class CartographyLayer {
       const bw = tw + 12;
       const bh = 18;
 
-      // Draw Pass/Tunnel Badge
       ctx.fillStyle = isTunnel ? 'rgba(12, 74, 110, 0.90)' : 'rgba(15, 23, 42, 0.90)';
       ctx.strokeStyle = isTunnel ? '#38bdf8' : '#f59e0b';
       ctx.lineWidth = 1.5;
