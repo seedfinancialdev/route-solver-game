@@ -1,36 +1,22 @@
 /**
- * Multi-Layered Cartography Canvas Renderer
- * Renders high-density woodland polygons, lakes, rivers, urban footprints,
- * background towns, and real road geometries using HTML5 Canvas Path2D with strict LOD.
+ * Vector Cartography Canvas Renderer
+ * High-performance rendering for lakes, rivers, urban footprints, background towns,
+ * and road networks matching Lambert Conformal Conic map projection.
  */
 
 export class CartographyLayer {
   constructor() {
     this.pathCache = new Map(); // svgStr -> Path2D instance
-    this.cartographyData = null;
 
     // Layer Visibility Toggles
     this.showWater = true;
-    this.showFarmland = true; // Urban footprints / land cover
-    this.showForest = true;   // High-density woodland contours
+    this.showFarmland = true; // Urban footprints
     this.showRoads = true;
     this.showStreets = true;
 
     // Opacity Sliders
     this.waterOpacity = 1.0;
     this.farmlandOpacity = 0.45;
-    this.forestOpacity = 0.60;
-
-    this.init();
-  }
-
-  async init() {
-    try {
-      const res = await fetch('../cartography.json');
-      this.cartographyData = await res.json();
-    } catch {
-      // Graceful fallback
-    }
   }
 
   getPath2D(svgStr) {
@@ -49,8 +35,6 @@ export class CartographyLayer {
     const translateX = -camera.current.x * scaleX;
     const translateY = -camera.current.y * scaleY;
 
-    const isZoomedInForWoodland = camera.current.w <= 1400;
-
     // 1. Water Bodies (Lakes & Rivers)
     if (this.showWater) {
       ctx.save();
@@ -59,7 +43,7 @@ export class CartographyLayer {
 
       // Lakes (polygons)
       if (g.lakes && g.lakes.length) {
-        ctx.fillStyle = theme.water;
+        ctx.fillStyle = theme.water || '#12283a';
         for (const lakePath of g.lakes) {
           ctx.fill(this.getPath2D(lakePath));
         }
@@ -67,7 +51,7 @@ export class CartographyLayer {
 
       // Rivers (strokes)
       if (g.rivers && g.rivers.length) {
-        ctx.strokeStyle = theme.water;
+        ctx.strokeStyle = theme.water || '#12283a';
         ctx.lineWidth = 1.5 / scaleX;
         for (const riverPath of g.rivers) {
           ctx.stroke(this.getPath2D(riverPath));
@@ -76,44 +60,30 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 2. Farmland & Urban Footprints
-    if (this.showFarmland && camera.current.w <= 1200) {
+    // 2. Urban Footprints (Built-up City Footprints)
+    if (this.showFarmland && g.urbanAreas && g.urbanAreas.length) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-      ctx.fillStyle = theme.farmland || 'rgba(90, 78, 46, 0.35)';
+      ctx.fillStyle = theme.farmland || 'rgba(162, 137, 92, 0.45)';
       ctx.globalAlpha = this.farmlandOpacity;
 
-      // Urban Areas from base graph
-      if (g.urbanAreas && g.urbanAreas.length) {
-        for (const areaPath of g.urbanAreas) {
-          ctx.fill(this.getPath2D(areaPath));
-        }
+      for (const areaPath of g.urbanAreas) {
+        ctx.fill(this.getPath2D(areaPath));
       }
       ctx.restore();
     }
 
-    // 3. High-Density Woodland & Forests (5,000+ detailed contours)
-    if (this.showForest && isZoomedInForWoodland) {
+    // 3. Background Towns
+    if (g.towns && g.towns.length && camera.current.w <= 1000) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-      ctx.fillStyle = theme.forest || 'rgba(22, 58, 36, 0.60)';
-      ctx.globalAlpha = this.forestOpacity;
+      ctx.fillStyle = 'rgba(200, 180, 140, 0.5)';
 
-      if (this.cartographyData && this.cartographyData.forest) {
-        for (const forestPath of this.cartographyData.forest) {
-          ctx.fill(this.getPath2D(forestPath));
-        }
-      }
-
-      // Background Towns
-      if (g.towns && g.towns.length && camera.current.w <= 800) {
-        ctx.fillStyle = 'rgba(200, 180, 140, 0.5)';
-        for (const town of g.towns) {
-          const r = (town.tier === 1 ? 2.2 : 1.4) / scaleX;
-          ctx.beginPath();
-          ctx.arc(town.x, town.y, r, 0, Math.PI * 2);
-          ctx.fill();
-        }
+      for (const town of g.towns) {
+        const r = (town.tier === 1 ? 2.2 : 1.4) / scaleX;
+        ctx.beginPath();
+        ctx.arc(town.x, town.y, r, 0, Math.PI * 2);
+        ctx.fill();
       }
       ctx.restore();
     }

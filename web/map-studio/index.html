@@ -34,7 +34,7 @@
     /* Floating Studio Control Panel */
     .studio-panel {
       position: absolute; top: 20px; right: 20px;
-      width: 350px; max-height: calc(100vh - 40px);
+      width: 340px; max-height: calc(100vh - 40px);
       background: var(--panel-bg);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
@@ -140,37 +140,9 @@
         </select>
       </div>
 
-      <!-- Real Cartographic Layer Provider -->
-      <div class="control-group">
-        <div class="group-label">Real Cartography & Forest Layer</div>
-        <div class="toggle-row">
-          <span>Enable Real Cartography Tiles</span>
-          <label class="switch"><input type="checkbox" id="toggle-realtiles" checked><span class="slider"></span></label>
-        </div>
-        <select id="tile-provider-select">
-          <option value="openTopo">OpenTopoMap (Real Forests & Topo)</option>
-          <option value="esriTopo">Esri World Topo Map</option>
-          <option value="esriImagery">Esri World Satellite Imagery</option>
-          <option value="cartoVoyager">CartoDB Voyager</option>
-        </select>
-        <div class="slider-row">
-          <div class="slider-header"><span>Tile Layer Opacity</span><span id="val-realtiles">65%</span></div>
-          <input type="range" id="slider-realtiles" min="0" max="100" value="65">
-        </div>
-        <div class="slider-row">
-          <div class="slider-header"><span>Tile Blend Mode</span></div>
-          <select id="tile-blend-select">
-            <option value="multiply">Multiply (Blend with Terrain)</option>
-            <option value="overlay">Overlay</option>
-            <option value="source-over">Normal (Opaque)</option>
-            <option value="screen">Screen</option>
-          </select>
-        </div>
-      </div>
-
       <!-- Layer Toggles -->
       <div class="control-group">
-        <div class="group-label">Vector Overlays</div>
+        <div class="group-label">Vector Map Overlays</div>
         
         <div class="toggle-row">
           <span>Terrain Elevation Relief</span>
@@ -210,6 +182,11 @@
         <div class="slider-row">
           <div class="slider-header"><span>Water Opacity</span><span id="val-water">100%</span></div>
           <input type="range" id="slider-water" min="0" max="100" value="100">
+        </div>
+
+        <div class="slider-row">
+          <div class="slider-header"><span>Urban Footprint Opacity</span><span id="val-farmland">45%</span></div>
+          <input type="range" id="slider-farmland" min="0" max="100" value="45">
         </div>
       </div>
 
