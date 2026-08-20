@@ -37,9 +37,6 @@ export const PIPELINE = [
     outputs: ['web/urban-day.webp', 'web/urban-night.webp'],
     needs: [],
   },
-  // Both write web/cartography.json in full and neither reads it back, so
-  // whichever runs last discards the other's output. Recorded, not resolved.
-  { script: 'scripts/08-cartography.mjs', inputs: ['web/data.json'], outputs: ['web/cartography.json'], needs: [] },
   { script: 'scripts/09-real-osm-forests.mjs', inputs: ['web/data.json'], outputs: ['web/cartography.json'], needs: [] },
 ];
 

@@ -40,9 +40,13 @@ test('a missing file is not reported as stale', () => {
 });
 
 test('a duplicate output+input pair is reported only once', () => {
-  // Mirrors web/cartography.json's two real producers, both fed by
-  // web/data.json — PIPELINE legitimately has two stages sharing the same
-  // (output, input) pair, but the staleness report should not repeat it.
+  // Historical regression test: web/cartography.json used to have two real
+  // producers (08-cartography.mjs and 09-real-osm-forests.mjs), both fed by
+  // web/data.json, which meant PIPELINE had two stages sharing the same
+  // (output, input) pair and the staleness report repeated the line. 08 was
+  // retired once 09 became the sole producer, so PIPELINE no longer has a
+  // live duplicate to trigger this — the dedup logic in stalenessCheck stays
+  // as a safeguard for the next time two stages legitimately share an output.
   const stale = stalenessCheck(new Map([
     ['web/data.json', 200],
     ['web/cartography.json', 100],
