@@ -38,7 +38,10 @@ shortest-vs-optimal trap per city pair, not for the multiple genuinely
 distinct strategic paths — highway vs. backroad, storm detour, burned-corridor
 reroute — this design assumes exist); the practice-mode system-toggle UI;
 multiplayer server infrastructure (accounts, live sync, push notifications,
-overnight fallback answers).
+overnight fallback answers); the exact route-generation grading criteria and
+per-road-class record-calibration parameters; the star-tier threshold values;
+a US dataset (a real, deferred future project — see Route generation and
+grading, below — not assumed here).
 
 Those all plug into what's designed here without changing its shape. Building
 any of them is not blocked on this spec being "finished" in some larger
@@ -113,6 +116,68 @@ switched off behaves exactly like a hop in the shipped game does now.
 screen (both routes driven side by side, `docs/SPEC.md`'s described replay)
 rather than replacing it.
 
+## Route generation and grading
+
+Career and multiplayer content is not hand-picked or randomly assigned from
+a fixed pool — it's generated, then graded, and only what clears a bar
+becomes a real route. This isn't new work, either: `scripts/02-puzzles.mjs`
+already does exactly this today, at the scale of one hop-chain — generate
+every candidate city pair, simulate a bot (`roadReader`) against it, keep
+only pairs where the shortest route is a genuine trap
+(`MIN_SHORTEST_PENALTY` ≥ 1.12), losing is a near-miss (`MAX_WORST_RATIO`
+≤ 1.45), dead-ends are rare (`MAX_STUCK_RATE` ≤ 0.15). Generalizing this
+from a single hop-chain to a full multi-leg route is a scale change to an
+existing, working pattern, not a new architecture.
+
+Grading runs on two axes:
+
+- **Shape and scale** — does a candidate route feel like a real cross-country
+  run (distance, leg count, regional mix), measured against the real
+  Cannonball route's own statistics as a reference.
+- **Difficulty and fairness** — the same style of trap/bust/dead-end bounds
+  already in use today, scaled to a full route, verified the same way: bot
+  simulation, not hand-tuning.
+
+Practice routes fall out of the same pipeline at shorter length — either
+literal subsections of a graded longer route, or independently generated
+short routes matching the statistical character of a typical subsection.
+One generation-and-grading pipeline, three output grains, not three separate
+content systems.
+
+**Europe-only for now.** A US dataset — recreating the real route this game
+pays homage to — is real, deferred future work. The pipeline this project
+already built (`scripts/00-cities.mjs` through `scripts/09-real-osm-forests.mjs`,
+the whole `scripts/lib/` toolkit) is written generically enough to point at a
+different region's source data. But generating and curating it is its own
+project on the scale of everything already built for Europe — not something
+this spec assumes happens alongside it.
+
+**A route's record time is not a flat ratio applied to its legal-optimal
+time.** Two reasons a single global multiplier would be the wrong model:
+
+1. Real record-setting isn't achieved by ignoring risk — it's a policy under
+   the same enforcement and fatigue tradeoffs a player faces. So a route's
+   record should come from running a simulated optimal, risk-aware policy
+   (the same `roadReader`-style approach, extended to read the new module
+   system) through it, not from a static formula.
+2. How much a driver can beat the legal limit isn't uniform across a route —
+   it's dominated by road design. A straight, well-engineered motorway has
+   far more headroom between "legal" and "physically achievable" than a
+   technical secondary road, where the limit is often already close to what
+   the road can physically support. The game's existing pace-tier data
+   already measures this, road class by road class — the same signal, reused
+   for a new purpose. Record calibration works **per road class**, not as
+   one number for the whole trip.
+
+The real, documented Cannonball record (Ed Bolian's widely-publicized
+cross-country run) is used to **sanity-check** those per-road-class
+parameters, not to calibrate them outright — it's one real, verified data
+point, useful for confirming the model lands in a plausible range, not
+sufficient on its own the way the existing puzzle criteria were calibrated
+(a sweep across thousands of simulated candidates, not one anchor). Its
+precise, sourced figures, and the exact per-class parameters they inform, are
+follow-on work.
+
 ## Module composition
 
 Heat, fatigue, fuel, tires, weather: each registers its own accumulators
@@ -160,6 +225,28 @@ harder than building it in from the start, and without it, Heat/fatigue/fuel
 thresholds can only ever be tuned by feel — never swept and calibrated the
 way the current game's 1.11 budget multiplier was.
 
+## Scoring: a star ladder, not a pass/fail budget
+
+The shipped game's score is a single binary threshold —
+`budget = optimal × 1.11` (`docs/SPEC.md:209`), hours-to-spare against it.
+That fits a fiction where the player is a legal driver clearing a compliance
+bar. It doesn't fit record-chasing.
+
+Replace the threshold with a tiered ladder — Bronze / Silver / Gold /
+Record — closer to a time-trial grading than a pass/fail. The underlying
+math doesn't change, only the count: still margin against a threshold, just
+several thresholds instead of one. "Record" is a live ceiling — whoever
+currently holds the best verified time on that route — not a fixed
+design-time number.
+
+This is the direct payoff of route grading, above: a route's Bronze/Silver/
+Gold thresholds come from the same bot-simulated optimal-policy performance
+already used to decide whether the route is worth keeping at all, not
+invented as a separate step. What happens for whoever currently holds a
+route's record — the actual reward, the recognition — is deferred to its
+own spec; the mechanism that makes a record claim trustworthy is not (see
+below).
+
 ## Determinism as a feature, not just an implementation detail
 
 Because the step function is pure and given-state deterministic, a full run
@@ -169,9 +256,10 @@ anyone can re-run the identical simulation from the same inputs and get the
 identical result. This is not a new subsystem to build — it is a direct
 consequence of the architecture above, and it pays for itself several ways:
 
-- **Leaderboard integrity.** A claimed record is a replayable proof, not a
-  trusted number in a database — the server (or anyone) can re-simulate the
-  input log and verify it produces the claimed result.
+- **Leaderboard integrity.** A claimed record — the top of the star ladder
+  above — is a replayable proof, not a trusted number in a database — the
+  server (or anyone) can re-simulate the input log and verify it produces
+  the claimed result.
 - **Spectating and sharing.** Watching a multiplayer race live, or watching
   your own run back to see exactly where a call went wrong, falls out of
   the same recording for free.
@@ -212,3 +300,10 @@ spec once this loop is validated:
   "the step function must be portable enough to run there," not how
   accounts, matchmaking, or notification delivery work).
 - The progression/XP economy's actual numbers.
+- The procedural route-generation algorithm itself, its exact shape/scale
+  and difficulty grading thresholds, and the per-road-class record-headroom
+  parameters (including the real Cannonball record's precise, sourced
+  figures once they're needed for calibration).
+- Star-tier threshold values, and what (if anything) is awarded for holding
+  a route's record.
+- The US dataset — real, wanted, explicitly not started.
