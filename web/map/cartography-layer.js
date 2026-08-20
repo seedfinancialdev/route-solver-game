@@ -1,6 +1,6 @@
 /**
  * Multi-Layered Cartography Canvas Renderer
- * Renders lakes, rivers, urban footprints, land cover (forests & farmland),
+ * Renders high-density woodland polygons, lakes, rivers, urban footprints,
  * background towns, and real road geometries using HTML5 Canvas Path2D with strict LOD.
  */
 
@@ -11,15 +11,15 @@ export class CartographyLayer {
 
     // Layer Visibility Toggles
     this.showWater = true;
-    this.showFarmland = true; // Farmland & urban land cover
-    this.showForest = true;   // Forest land cover
+    this.showFarmland = true; // Urban footprints / land cover
+    this.showForest = true;   // High-density woodland contours
     this.showRoads = true;
     this.showStreets = true;
 
     // Opacity Sliders
     this.waterOpacity = 1.0;
     this.farmlandOpacity = 0.45;
-    this.forestOpacity = 0.55;
+    this.forestOpacity = 0.60;
 
     this.init();
   }
@@ -49,7 +49,7 @@ export class CartographyLayer {
     const translateX = -camera.current.x * scaleX;
     const translateY = -camera.current.y * scaleY;
 
-    const isZoomedInForLandUse = camera.current.w <= 1200;
+    const isZoomedInForWoodland = camera.current.w <= 1400;
 
     // 1. Water Bodies (Lakes & Rivers)
     if (this.showWater) {
@@ -61,8 +61,7 @@ export class CartographyLayer {
       if (g.lakes && g.lakes.length) {
         ctx.fillStyle = theme.water;
         for (const lakePath of g.lakes) {
-          const path = this.getPath2D(lakePath);
-          ctx.fill(path);
+          ctx.fill(this.getPath2D(lakePath));
         }
       }
 
@@ -71,19 +70,18 @@ export class CartographyLayer {
         ctx.strokeStyle = theme.water;
         ctx.lineWidth = 1.5 / scaleX;
         for (const riverPath of g.rivers) {
-          const path = this.getPath2D(riverPath);
-          ctx.stroke(path);
+          ctx.stroke(this.getPath2D(riverPath));
         }
       }
       ctx.restore();
     }
 
-    // 2. Farmland & Urban Footprints (Visible at mid-to-close zoom)
-    if (this.showFarmland && isZoomedInForLandUse) {
+    // 2. Farmland & Urban Footprints
+    if (this.showFarmland && camera.current.w <= 1200) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
       ctx.fillStyle = theme.farmland || 'rgba(90, 78, 46, 0.35)';
-      ctx.globalAlpha = this.farmlandOpacity * (1 - (camera.current.w - 400) / 1000);
+      ctx.globalAlpha = this.farmlandOpacity;
 
       // Urban Areas from base graph
       if (g.urbanAreas && g.urbanAreas.length) {
@@ -91,24 +89,16 @@ export class CartographyLayer {
           ctx.fill(this.getPath2D(areaPath));
         }
       }
-
-      // Farmland Polygons from cartography data
-      if (this.cartographyData && this.cartographyData.farmland) {
-        for (const farmPath of this.cartographyData.farmland) {
-          ctx.fill(this.getPath2D(farmPath));
-        }
-      }
       ctx.restore();
     }
 
-    // 3. Forests & Woods (Visible at mid-to-close zoom)
-    if (this.showForest && isZoomedInForLandUse) {
+    // 3. High-Density Woodland & Forests (5,000+ detailed contours)
+    if (this.showForest && isZoomedInForWoodland) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-      ctx.fillStyle = theme.forest || 'rgba(22, 54, 34, 0.45)';
-      ctx.globalAlpha = this.forestOpacity * (1 - (camera.current.w - 400) / 1000);
+      ctx.fillStyle = theme.forest || 'rgba(22, 58, 36, 0.60)';
+      ctx.globalAlpha = this.forestOpacity;
 
-      // Forest Polygons from cartography data
       if (this.cartographyData && this.cartographyData.forest) {
         for (const forestPath of this.cartographyData.forest) {
           ctx.fill(this.getPath2D(forestPath));
@@ -117,6 +107,7 @@ export class CartographyLayer {
 
       // Background Towns
       if (g.towns && g.towns.length && camera.current.w <= 800) {
+        ctx.fillStyle = 'rgba(200, 180, 140, 0.5)';
         for (const town of g.towns) {
           const r = (town.tier === 1 ? 2.2 : 1.4) / scaleX;
           ctx.beginPath();
