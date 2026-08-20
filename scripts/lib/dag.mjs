@@ -7,7 +7,7 @@ export const PIPELINE = [
   { script: 'scripts/00-cities.mjs', inputs: ['data/raw/cities15000.txt'], outputs: ['data/cities.json'], needs: [] },
   { script: 'scripts/01-graph.mjs', inputs: ['data/cities.json'], outputs: ['data/graph.json'], needs: ['OSRM'] },
   { script: 'scripts/02-puzzles.mjs', inputs: ['data/graph.json'], outputs: ['data/puzzles.json'], needs: [] },
-  { script: 'scripts/03-map.mjs', inputs: ['data/graph.json'], outputs: ['data/map.json'], needs: ['OSRM'] },
+  { script: 'scripts/03-map.mjs', inputs: ['data/graph.json'], outputs: ['data/map.json'], needs: [] },
   { script: 'scripts/06-road-names.mjs', inputs: ['data/graph.json'], outputs: ['data/road-names.json'], needs: ['OSRM'] },
   { script: 'scripts/07-streets.mjs', inputs: ['data/graph.json'], outputs: ['web/streets/manifest.json'], needs: ['Overpass'] },
   {
@@ -40,7 +40,7 @@ export const PIPELINE = [
   // Both write web/cartography.json in full and neither reads it back, so
   // whichever runs last discards the other's output. Recorded, not resolved.
   { script: 'scripts/08-cartography.mjs', inputs: ['web/data.json'], outputs: ['web/cartography.json'], needs: [] },
-  { script: 'scripts/09-real-osm-forests.mjs', inputs: ['web/data.json'], outputs: ['web/cartography.json'], needs: ['Overpass'] },
+  { script: 'scripts/09-real-osm-forests.mjs', inputs: ['web/data.json'], outputs: ['web/cartography.json'], needs: [] },
 ];
 
 /** Outputs older than something they were built from. */
