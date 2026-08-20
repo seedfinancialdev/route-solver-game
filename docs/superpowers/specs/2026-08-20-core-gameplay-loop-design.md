@@ -115,14 +115,39 @@ rather than replacing it.
 
 ## Module composition
 
-Heat, fatigue (the existing HOS mechanic, unchanged — just now one module
-among several instead of the only one), fuel, tires, weather: each
-registers its own accumulators and interrupt conditions with the step
-function rather than being hardcoded into it. The step function has no
-built-in knowledge of any specific system — it only knows how to advance
-whatever modules are currently registered and check their thresholds. This
-is what makes practice mode's per-system toggles free instead of requiring
-a second, simplified engine: an unregistered module simply never fires.
+Heat, fatigue, fuel, tires, weather: each registers its own accumulators
+and interrupt conditions with the step function rather than being
+hardcoded into it. The step function has no built-in knowledge of any
+specific system — it only knows how to advance whatever modules are
+currently registered and check their thresholds. This is what makes
+practice mode's per-system toggles free instead of requiring a second,
+simplified engine: an unregistered module simply never fires.
+
+**Fatigue's accumulator is reused from the existing HOS mechanic; its
+consequence is not.** `hosCost` (`scripts/lib/graph.mjs:57-61`) models EU
+professional-driver hours law — 4.5 hours of continuous driving forces a
+45-minute break, no player choice. That framing is a real-world commercial
+compliance rule; it has no reason to bind a crew already ignoring speed
+limits and evading enforcement, and it contradicts the actual history of
+this kind of driving — real record-run crews carry multiple drivers
+specifically so the car never has to stop. So the accumulator (time since
+rest) carries forward unchanged, but the threshold no longer forces
+anything. Instead, rising fatigue **degrades what the player can see and
+how fast they can act on it**: the driver's own reported telemetry gets
+noisier and more delayed, and the response window on interrupts (a recon
+crisis, a Heat decision) shrinks. Resting, or swapping to a second driver
+mid-route — itself a real Cannonball-era tactic, and a natural extension of
+the pit-stop concept — clears it. Never forced. This is a stronger fit for
+the design's own "no RNG, every failure is attributable to a choice"
+principle than the mechanic it replaces: the original gave the player no
+choice at all; this makes pushing a tired driver a visible, continuous risk
+the player owns, not a rule the game enforces on them.
+
+Fatigue is also a useful first module for a second reason: because it feeds
+*other* modules' output quality (degraded telemetry) rather than only
+gating itself, it's the natural proving ground for whether the module
+system genuinely composes — modules reading each other's state, not just
+running independent, unrelated accumulators in parallel.
 
 Each module's interface must also accept a policy function in place of a
 human — i.e., be drivable by a bot, not only by UI interaction. This
