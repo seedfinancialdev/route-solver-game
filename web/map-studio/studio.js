@@ -103,16 +103,15 @@ sliderFarmland.addEventListener('input', (e) => {
   valFarmland.textContent = `${e.target.value}%`;
 });
 
-// Update HUD & FPS stats loop
+// Update HUD & FPS stats loop (3-Tier Zoom Hierarchy)
 setInterval(() => {
   fpsCounter.textContent = `${mapEngine.fps} FPS`;
 
   const zoomKm = Math.round(mapEngine.camera.current.w);
   statZoom.textContent = `${zoomKm.toLocaleString()} km`;
 
-  let tier = 'Overview (2400px)';
-  if (zoomKm <= 14) tier = 'City Street Level (900m)';
-  else if (zoomKm <= 850) tier = 'Fine 6x6 Tile Grid';
-  else if (zoomKm <= 1400) tier = 'Detail Pass (6000px)';
+  let tier = 'Tier 1: Continental (>1,400 km)';
+  if (zoomKm <= 400) tier = 'Tier 3: Tactical Hub (140–400 km)';
+  else if (zoomKm <= 1400) tier = 'Tier 2: Regional Stage (400–1,400 km)';
   statTier.textContent = tier;
 }, 250);

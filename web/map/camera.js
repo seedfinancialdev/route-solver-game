@@ -21,8 +21,11 @@ export class Camera {
     this.dragStart = { x: 0, y: 0 };
     this.velocity = { x: 0, y: 0 };
 
-    this.minZoomKm = 3.0; // close city street zoom (3 km across)
-    this.maxZoomKm = worldBounds.w * 1.2; // continent view
+    // Zoom Bounds:
+    // Min zoom locked to 140 km (Tactical Interchange Hub scale) to prevent raster pixel blur
+    // Max zoom locked to continental stage view
+    this.minZoomKm = 140.0;
+    this.maxZoomKm = worldBounds.w * 1.05;
 
     this.initEvents();
   }
@@ -51,8 +54,9 @@ export class Camera {
 
   setFrame(x, y, w) {
     const aspect = this.viewportWidth / this.viewportHeight;
-    const h = w / aspect;
-    this.target = { x: x - w / 2, y: y - h / 2, w, h };
+    const clampedW = Math.min(Math.max(w, this.minZoomKm), this.maxZoomKm);
+    const h = clampedW / aspect;
+    this.target = { x: x - clampedW / 2, y: y - h / 2, w: clampedW, h };
     this.clampTarget();
   }
 
@@ -84,7 +88,7 @@ export class Camera {
   }
 
   clampTarget() {
-    const SLACK = 800;
+    const SLACK = 400;
     const minX = this.worldBounds.x - SLACK;
     const maxX = this.worldBounds.x + this.worldBounds.w + SLACK - this.target.w;
     const minY = this.worldBounds.y - SLACK;
@@ -96,7 +100,7 @@ export class Camera {
 
   update(dt = 0.016) {
     // Smooth interpolation towards target (lerp)
-    const lerpFactor = 0.2;
+    const lerpFactor = 0.22;
     this.current.x += (this.target.x - this.current.x) * lerpFactor;
     this.current.y += (this.target.y - this.current.y) * lerpFactor;
     this.current.w += (this.target.w - this.current.w) * lerpFactor;
@@ -104,27 +108,27 @@ export class Camera {
   }
 
   worldToScreen(worldX, worldY) {
-    const screenX = ((worldX - this.current.x) / this.current.w) * this.viewportWidth;
-    const screenY = ((worldY - this.current.y) / this.current.h) * this.viewportHeight;
-    return { x: screenX, y: screenY };
+    const scaleX = this.viewportWidth / this.current.w;
+    const scaleY = this.viewportHeight / this.current.h;
+    return {
+      x: (worldX - this.current.x) * scaleX,
+      y: (worldY - this.current.y) * scaleY,
+    };
   }
 
   screenToWorld(screenX, screenY) {
-    const worldX = this.current.x + (screenX / this.viewportWidth) * this.current.w;
-    const worldY = this.current.y + (screenY / this.viewportHeight) * this.current.h;
-    return { x: worldX, y: worldY };
+    const scaleX = this.current.w / this.viewportWidth;
+    const scaleY = this.current.h / this.viewportHeight;
+    return {
+      x: this.current.x + screenX * scaleX,
+      y: this.current.y + screenY * scaleY,
+    };
   }
 
   initEvents() {
-    const el = this.container;
-
-    el.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const zoomFactor = e.deltaY > 0 ? 1.15 : 0.85;
-      this.zoomAt(e.clientX, e.clientY, zoomFactor);
-    }, { passive: false });
-
-    el.addEventListener('mousedown', (e) => {
+    // Mouse drag pan
+    this.container.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
       this.isDragging = true;
       this.dragStart = { x: e.clientX, y: e.clientY };
     });
@@ -133,16 +137,20 @@ export class Camera {
       if (!this.isDragging) return;
       const dx = e.clientX - this.dragStart.x;
       const dy = e.clientY - this.dragStart.y;
-      this.dragStart = { x: e.clientX, y: e.clientY };
       this.pan(dx, dy);
+      this.dragStart = { x: e.clientX, y: e.clientY };
     });
 
     window.addEventListener('mouseup', () => {
       this.isDragging = false;
     });
 
-    el.addEventListener('dblclick', (e) => {
-      this.zoomAt(e.clientX, e.clientY, 0.5);
-    });
+    // Wheel zoom with exponential easing
+    this.container.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 1.15 : 0.87;
+      const rect = this.container.getBoundingClientRect();
+      this.zoomAt(e.clientX - rect.left, e.clientY - rect.top, factor);
+    }, { passive: false });
   }
 }

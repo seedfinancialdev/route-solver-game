@@ -1,7 +1,7 @@
 /**
  * Vector Cartography Canvas Renderer
  * High-performance, tactile cartographic rendering for coastlines, landmasses,
- * lakes, rivers, urban footprints, background towns, and road networks.
+ * lakes, rivers, urban footprints, background towns, and proportional road networks.
  */
 
 export class CartographyLayer {
@@ -46,6 +46,7 @@ export class CartographyLayer {
     const scaleY = camera.viewportHeight / camera.current.h;
     const translateX = -camera.current.x * scaleX;
     const translateY = -camera.current.y * scaleY;
+    const zoomKm = camera.current.w;
 
     // 1. Landmass & Coastline Outlines
     if (this.showCoastlines && g.countries && g.countries.length) {
@@ -54,7 +55,7 @@ export class CartographyLayer {
 
       // Draw Landmass Coastline Stroke
       ctx.strokeStyle = theme.coastline || 'rgba(100, 180, 240, 0.45)';
-      ctx.lineWidth = 1.2 / scaleX;
+      ctx.lineWidth = Math.max(1.0, 1.2 * (camera.viewportWidth / 1400)) / scaleX;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
 
@@ -113,12 +114,12 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 3. Urban Footprints (Built-up City Footprints)
+    // 3. Urban Footprints (Built-up City Footprints - Enhanced inside 140–800 km)
     if (this.showFarmland && g.urbanAreas && g.urbanAreas.length) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
       ctx.fillStyle = theme.farmland || 'rgba(162, 137, 92, 0.35)';
-      ctx.globalAlpha = this.farmlandOpacity;
+      ctx.globalAlpha = this.farmlandOpacity * (zoomKm <= 600 ? 1.0 : 0.7);
 
       for (const areaPath of g.urbanAreas) {
         const path = this.getPath2D(areaPath);
@@ -127,15 +128,15 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 4. Background Towns (Independent layer)
-    if (this.showTowns && g.towns && g.towns.length && camera.current.w <= 1000) {
+    // 4. Background Towns (Visible in Regional/Hub zoom <= 900 km)
+    if (this.showTowns && g.towns && g.towns.length && zoomKm <= 900) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-      ctx.fillStyle = 'rgba(200, 180, 140, 0.5)';
+      ctx.fillStyle = 'rgba(215, 195, 155, 0.65)';
       ctx.globalAlpha = this.townsOpacity;
 
       for (const town of g.towns) {
-        const r = (town.tier === 1 ? 2.2 : 1.4) / scaleX;
+        const r = (town.tier === 1 ? 2.4 : 1.6) / scaleX;
         ctx.beginPath();
         ctx.arc(town.x, town.y, r, 0, Math.PI * 2);
         ctx.fill();
@@ -143,7 +144,7 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 5. Road Networks (Graph Edges with zoom-based LOD width scaling)
+    // 5. Road Networks (Proportionally anchored race tracks across zoom tiers)
     if (this.showRoads && g.adj) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
@@ -165,24 +166,39 @@ export class CartographyLayer {
         }
       }
 
-      const isOverview = camera.current.w > 1200;
+      // Proportional width calculation anchored to zoom
+      let mwWidth = 3.0;
+      let trWidth = 2.0;
+      let prWidth = 1.2;
+
+      if (zoomKm > 2000) {
+        mwWidth = 0.6;
+      } else if (zoomKm > 1000) {
+        mwWidth = 1.4;
+        trWidth = 1.0;
+      } else if (zoomKm <= 400) {
+        mwWidth = 3.6;
+        trWidth = 2.4;
+        prWidth = 1.5;
+      }
 
       // Draw Motorways
+      const isOverview = zoomKm > 2000;
       ctx.strokeStyle = isOverview ? 'rgba(217, 75, 54, 0.40)' : (theme.roadMotorway || '#d94b36');
-      ctx.lineWidth = (isOverview ? 0.6 : (theme.roadWidthMotorway || 2.8)) / scaleX;
+      ctx.lineWidth = mwWidth / scaleX;
       this.drawShapeBatch(ctx, motorways);
 
       // Draw Trunks
-      if (camera.current.w <= 1400) {
+      if (zoomKm <= 1800) {
         ctx.strokeStyle = theme.roadTrunk || '#e6a13c';
-        ctx.lineWidth = (theme.roadWidthTrunk || 2.0) / scaleX;
+        ctx.lineWidth = trWidth / scaleX;
         this.drawShapeBatch(ctx, trunks);
       }
 
       // Draw Primaries
-      if (camera.current.w <= 800) {
+      if (zoomKm <= 900) {
         ctx.strokeStyle = theme.roadPrimary || '#5f6f82';
-        ctx.lineWidth = (theme.roadWidthPrimary || 1.2) / scaleX;
+        ctx.lineWidth = prWidth / scaleX;
         this.drawShapeBatch(ctx, primaries);
       }
 
