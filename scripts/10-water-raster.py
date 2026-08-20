@@ -36,7 +36,7 @@ def render_water(box, out_w, out_h):
         for lake_svg in raw_map['lakes']:
             sub_paths = [p.strip() for p in lake_svg.split('M') if p.strip()]
             for sub in sub_paths:
-                coords = re.findall(r'[-+]?\d*\.\d+|\d+', sub)
+                coords = re.findall(r'[-+]?\d+(?:\.\d+)?', sub)
                 pts = [map_to_px(float(coords[i]), float(coords[i+1])) for i in range(0, len(coords)-1, 2)]
                 if len(pts) >= 3:
                     draw.polygon(pts, fill=255)
@@ -47,7 +47,7 @@ def render_water(box, out_w, out_h):
         for river_svg in raw_map['rivers']:
             sub_paths = [p.strip() for p in river_svg.split('M') if p.strip()]
             for sub in sub_paths:
-                coords = re.findall(r'[-+]?\d*\.\d+|\d+', sub)
+                coords = re.findall(r'[-+]?\d+(?:\.\d+)?', sub)
                 pts = [map_to_px(float(coords[i]), float(coords[i+1])) for i in range(0, len(coords)-1, 2)]
                 if len(pts) >= 2:
                     draw.line(pts, fill=255, width=stroke_w)
