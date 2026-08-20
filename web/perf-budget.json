@@ -12,5 +12,20 @@
     { "file": "terrain-tiles.json", "key": "tiles", "pathField": "file" },
     { "file": "streets/manifest.json", "key": null, "pathField": null }
   ],
-  "knownOrphans": []
+  "knownOrphans": [
+    "cartography.json",
+    "forest.webp",
+    "forest-detail.webp",
+    "water.webp",
+    "water-detail.webp",
+    "map/camera.js",
+    "map/cartography-layer.js",
+    "map/gameplay-layer.js",
+    "map/map-engine.js",
+    "map/proj.js",
+    "map/terrain-layer.js",
+    "map/theme-config.js",
+    "map/tile-layer.js"
+  ],
+  "knownOrphansNote": "This is the next-gen canvas map engine (web/map/) and its data/raster layers, actively developed via web/map-studio/ (see docs/MAP-SPEC.md: 'the active direction... not shipped'). Not dead code -- just not wired into index.html yet. When it ships, remove these entries; perf-profile will then correctly track its real payload cost."
 }
