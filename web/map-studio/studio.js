@@ -15,16 +15,19 @@ const presetSelect = document.getElementById('preset-select');
 // Vector Layer Toggles
 const toggleTerrain = document.getElementById('toggle-terrain');
 const toggleWater = document.getElementById('toggle-water');
+const toggleForest = document.getElementById('toggle-forest');
 const toggleFarmland = document.getElementById('toggle-farmland');
 const toggleRoads = document.getElementById('toggle-roads');
 const toggleNodes = document.getElementById('toggle-nodes');
 
 // Sliders
 const sliderTerrain = document.getElementById('slider-terrain');
+const sliderForest = document.getElementById('slider-forest');
 const sliderWater = document.getElementById('slider-water');
 const sliderFarmland = document.getElementById('slider-farmland');
 
 const valTerrain = document.getElementById('val-terrain');
+const valForest = document.getElementById('val-forest');
 const valWater = document.getElementById('val-water');
 const valFarmland = document.getElementById('val-farmland');
 
@@ -46,6 +49,9 @@ toggleTerrain.addEventListener('change', (e) => {
 toggleWater.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.showWater = e.target.checked;
 });
+toggleForest.addEventListener('change', (e) => {
+  mapEngine.cartographyLayer.showForest = e.target.checked;
+});
 toggleFarmland.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.showFarmland = e.target.checked;
 });
@@ -62,6 +68,11 @@ sliderTerrain.addEventListener('input', (e) => {
   const val = e.target.value / 100;
   mapEngine.themeManager.set('terrainOpacity', val);
   valTerrain.textContent = `${e.target.value}%`;
+});
+sliderForest.addEventListener('input', (e) => {
+  const val = e.target.value / 100;
+  mapEngine.cartographyLayer.forestOpacity = val;
+  valForest.textContent = `${e.target.value}%`;
 });
 sliderWater.addEventListener('input', (e) => {
   const val = e.target.value / 100;

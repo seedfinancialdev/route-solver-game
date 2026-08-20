@@ -1,22 +1,36 @@
 /**
  * Vector Cartography Canvas Renderer
- * High-performance rendering for lakes, rivers, urban footprints, background towns,
- * and road networks matching Lambert Conformal Conic map projection.
+ * High-performance rendering for lakes, rivers, urban footprints, woodland contours,
+ * background towns, and road networks matching Lambert Conformal Conic map projection.
  */
 
 export class CartographyLayer {
   constructor() {
     this.pathCache = new Map(); // svgStr -> Path2D instance
+    this.cartographyData = null;
 
     // Layer Visibility Toggles
     this.showWater = true;
     this.showFarmland = true; // Urban footprints
+    this.showForest = true;   // Woodland contours
     this.showRoads = true;
     this.showStreets = true;
 
     // Opacity Sliders
     this.waterOpacity = 1.0;
     this.farmlandOpacity = 0.45;
+    this.forestOpacity = 0.60;
+
+    this.init();
+  }
+
+  async init() {
+    try {
+      const res = await fetch('../cartography.json');
+      this.cartographyData = await res.json();
+    } catch {
+      // Graceful fallback
+    }
   }
 
   getPath2D(svgStr) {
@@ -68,7 +82,7 @@ export class CartographyLayer {
     }
 
     // 2. Urban Footprints (Built-up City Footprints)
-    if (this.showFarmland && g.urbanAreas && g.urbanAreas.length) {
+    if (this.showFarmland && g.urbanAreas && g.urbanAreas.length && camera.current.w <= 1400) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
       ctx.fillStyle = theme.farmland || 'rgba(162, 137, 92, 0.45)';
@@ -81,17 +95,27 @@ export class CartographyLayer {
       ctx.restore();
     }
 
-    // 3. Background Towns
-    if (g.towns && g.towns.length && camera.current.w <= 1000) {
+    // 3. Woodland & Forests (3,950+ detailed vector contours)
+    if (this.showForest && this.cartographyData && this.cartographyData.forest && camera.current.w <= 1400) {
       ctx.save();
       ctx.setTransform(scaleX * dpr, 0, 0, scaleY * dpr, translateX * dpr, translateY * dpr);
-      ctx.fillStyle = 'rgba(200, 180, 140, 0.5)';
+      ctx.fillStyle = theme.forest || 'rgba(22, 58, 36, 0.60)';
+      ctx.globalAlpha = this.forestOpacity;
 
-      for (const town of g.towns) {
-        const r = (town.tier === 1 ? 2.2 : 1.4) / scaleX;
-        ctx.beginPath();
-        ctx.arc(town.x, town.y, r, 0, Math.PI * 2);
-        ctx.fill();
+      for (const forestPath of this.cartographyData.forest) {
+        const path = this.getPath2D(forestPath);
+        if (path) ctx.fill(path);
+      }
+
+      // Background Towns
+      if (g.towns && g.towns.length && camera.current.w <= 800) {
+        ctx.fillStyle = 'rgba(200, 180, 140, 0.5)';
+        for (const town of g.towns) {
+          const r = (town.tier === 1 ? 2.2 : 1.4) / scaleX;
+          ctx.beginPath();
+          ctx.arc(town.x, town.y, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       ctx.restore();
     }
