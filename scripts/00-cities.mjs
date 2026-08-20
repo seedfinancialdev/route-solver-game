@@ -3,18 +3,23 @@
 // Input:  data/raw/cities15000.txt (GeoNames tab-separated dump)
 // Output: data/cities.json
 //
-// Rules: European countries only, top N by population, but no two cities
-// closer than MIN_SPACING_KM. Without the spacing rule you get the Ruhr,
-// Randstad and Upper Silesia eating half the budget and no Iberia.
+// Rules: European countries only, top N by population, with MIN_SPACING_KM
+// spacing rule to balance metropolitan density with geographic spread.
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { haversineKm } from './lib/geo.mjs';
 import { inGameEurope, parseRow } from './lib/cities.mjs';
 
-const TARGET_COUNT = 500;
-const MIN_SPACING_KM = 75;
+const TARGET_COUNT = 850;
+const MIN_SPACING_KM = 45;
 
-const raw = readFileSync(new URL('../data/raw/cities15000.txt', import.meta.url), 'utf8');
+const rawPath = new URL('../data/raw/cities15000.txt', import.meta.url);
+if (!existsSync(rawPath)) {
+  console.error('Error: data/raw/cities15000.txt not found. Run download step first.');
+  process.exit(1);
+}
+
+const raw = readFileSync(rawPath, 'utf8');
 
 const candidates = [];
 for (const line of raw.split('\n')) {
