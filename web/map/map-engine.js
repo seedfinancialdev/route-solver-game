@@ -1,10 +1,12 @@
 /**
  * Core Map Engine Orchestrator
- * Integrates Camera, Terrain, Cartography, Gameplay Overlay, and Theme Engine into a 60fps render loop.
+ * Integrates Camera, Terrain, Real Cartographic Tile Layer, Vector Cartography,
+ * Gameplay Overlay, and Theme Engine into a 60fps render loop.
  */
 
 import { Camera } from './camera.js';
 import { TerrainLayer } from './terrain-layer.js';
+import { RealTileLayer } from './tile-layer.js';
 import { CartographyLayer } from './cartography-layer.js';
 import { GameplayLayer } from './gameplay-layer.js';
 import { MapTheme } from './theme-config.js';
@@ -30,6 +32,7 @@ export class MapEngine {
     this.camera = new Camera(this.container, this.worldBounds);
     this.themeManager = new MapTheme('tacticalDark');
     this.terrainLayer = new TerrainLayer(this.worldBounds);
+    this.realTileLayer = new RealTileLayer();
     this.cartographyLayer = new CartographyLayer();
     this.gameplayLayer = new GameplayLayer();
 
@@ -113,13 +116,16 @@ export class MapEngine {
     this.ctx.fillRect(0, 0, width, height);
 
     // Render Layers in Order:
-    // 1. Terrain Elevation Relief
+    // 1. Terrain Elevation Relief (Hillshade)
     this.terrainLayer.render(this.ctx, this.camera, theme);
 
-    // 2. Cartography (Lakes, rivers, urban footprints, road shapes)
+    // 2. Real Cartographic Tile Layer (OpenTopoMap / Esri Topo / Satellite Imagery)
+    this.realTileLayer.render(this.ctx, this.camera);
+
+    // 3. Vector Cartography (Lakes, rivers, urban footprints, road shapes)
     this.cartographyLayer.render(this.ctx, this.camera, theme, this.graphData);
 
-    // 3. Tactical Gameplay Overlay (Nodes, Labels, Active Route)
+    // 4. Tactical Gameplay Overlay (Nodes, Labels, Active Route)
     this.gameplayLayer.render(this.ctx, this.camera, theme, this.graphData);
   }
 }

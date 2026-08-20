@@ -1,6 +1,6 @@
 /**
  * Map Studio Interactive Controller
- * Binds control panel sliders, theme selectors, and layer toggles directly to MapEngine.
+ * Binds control panel sliders, theme selectors, real tile providers, and layer toggles directly to MapEngine.
  */
 
 import { MapEngine } from '../map/map-engine.js';
@@ -12,22 +12,26 @@ const mapEngine = new MapEngine(viewport, '../data.json');
 const fpsCounter = document.getElementById('fps-counter');
 const presetSelect = document.getElementById('preset-select');
 
+// Real Tile Layer Controls
+const toggleRealtiles = document.getElementById('toggle-realtiles');
+const tileProviderSelect = document.getElementById('tile-provider-select');
+const sliderRealtiles = document.getElementById('slider-realtiles');
+const valRealtiles = document.getElementById('val-realtiles');
+const tileBlendSelect = document.getElementById('tile-blend-select');
+
+// Vector Layer Toggles
 const toggleTerrain = document.getElementById('toggle-terrain');
 const toggleWater = document.getElementById('toggle-water');
 const toggleFarmland = document.getElementById('toggle-farmland');
-const toggleForest = document.getElementById('toggle-forest');
 const toggleRoads = document.getElementById('toggle-roads');
 const toggleNodes = document.getElementById('toggle-nodes');
 
+// Sliders
 const sliderTerrain = document.getElementById('slider-terrain');
 const sliderWater = document.getElementById('slider-water');
-const sliderFarmland = document.getElementById('slider-farmland');
-const sliderForest = document.getElementById('slider-forest');
 
 const valTerrain = document.getElementById('val-terrain');
 const valWater = document.getElementById('val-water');
-const valFarmland = document.getElementById('val-farmland');
-const valForest = document.getElementById('val-forest');
 
 const statZoom = document.getElementById('stat-zoom');
 const statTier = document.getElementById('stat-tier');
@@ -40,7 +44,23 @@ presetSelect.addEventListener('change', (e) => {
   valTerrain.textContent = `${sliderTerrain.value}%`;
 });
 
-// Bind Toggles
+// Bind Real Cartography Tile Controls
+toggleRealtiles.addEventListener('change', (e) => {
+  mapEngine.realTileLayer.showTiles = e.target.checked;
+});
+tileProviderSelect.addEventListener('change', (e) => {
+  mapEngine.realTileLayer.setProvider(e.target.value);
+});
+sliderRealtiles.addEventListener('input', (e) => {
+  const val = e.target.value / 100;
+  mapEngine.realTileLayer.opacity = val;
+  valRealtiles.textContent = `${e.target.value}%`;
+});
+tileBlendSelect.addEventListener('change', (e) => {
+  mapEngine.realTileLayer.blendMode = e.target.value;
+});
+
+// Bind Vector Toggles
 toggleTerrain.addEventListener('change', (e) => {
   mapEngine.terrainLayer.showTerrain = e.target.checked;
 });
@@ -49,9 +69,6 @@ toggleWater.addEventListener('change', (e) => {
 });
 toggleFarmland.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.showFarmland = e.target.checked;
-});
-toggleForest.addEventListener('change', (e) => {
-  mapEngine.cartographyLayer.showForest = e.target.checked;
 });
 toggleRoads.addEventListener('change', (e) => {
   mapEngine.cartographyLayer.showRoads = e.target.checked;
@@ -71,16 +88,6 @@ sliderWater.addEventListener('input', (e) => {
   const val = e.target.value / 100;
   mapEngine.cartographyLayer.waterOpacity = val;
   valWater.textContent = `${e.target.value}%`;
-});
-sliderFarmland.addEventListener('input', (e) => {
-  const val = e.target.value / 100;
-  mapEngine.cartographyLayer.farmlandOpacity = val;
-  valFarmland.textContent = `${e.target.value}%`;
-});
-sliderForest.addEventListener('input', (e) => {
-  const val = e.target.value / 100;
-  mapEngine.cartographyLayer.forestOpacity = val;
-  valForest.textContent = `${e.target.value}%`;
 });
 
 // Update HUD & FPS stats loop
