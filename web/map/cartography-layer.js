@@ -5,6 +5,8 @@
  * and European Highway Shields / Alpine Pass Waypoints.
  */
 
+import { bucketRoadRuns } from './road-tiers.js';
+
 // Iconic Alpine Passes & Cannonball Strategic Chokepoints (Real Lambert Proj Coordinates)
 const STRATEGIC_WAYPOINTS = [
   { name: 'St. Gotthard Pass', alt: '2,106m', x: -487.7, y: 576.1, kind: 'pass' },
@@ -163,19 +165,10 @@ export class CartographyLayer {
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      const motorways = [];
-      const trunks = [];
-      const primaries = [];
-
-      for (const cityEdges of g.adj) {
-        for (const edge of cityEdges) {
-          if (!edge.shape || edge.shape.length < 2) continue;
-          const pace = edge.pace[0] ?? 1;
-          if (pace === 0) motorways.push(edge.shape);
-          else if (pace === 1) trunks.push(edge.shape);
-          else primaries.push(edge.shape);
-        }
-      }
+      // Split along each road's length: a city-to-city road is routinely
+      // motorway in the middle and slow at both ends, and the difference is the
+      // whole tell. Tier 2 is the fastest and draws heaviest — see road-tiers.js.
+      const { motorways, trunks, primaries } = bucketRoadRuns(g.adj);
 
       let mwWidth = 3.2;
       let trWidth = 2.2;

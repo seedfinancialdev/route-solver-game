@@ -106,6 +106,21 @@ the contract is ready when it ships.
 `cityNode`, `cityNodeActive`, `cityNodeBorder` (scenery versus actionable);
 `routeLine`, `routeLineGlow`.
 
+**The canvas pace tell.** `web/map/road-tiers.js` splits every road into runs of
+a single pace tier and buckets them, the same way the shipped SVG engine does via
+`roadRuns`. Both renderers share one definition — `splitPaceRuns` in
+`web/engine.js` — so they cannot drift apart on the signal the game is built on.
+
+**Tier 2 is the fastest stretch and draws heaviest. Tier 0 is the slowest and
+draws thinnest.** `scripts/05-bundle.mjs:44` is the authority. The canvas
+previously inverted this *and* classified each road by its first segment alone —
+the slow exit from a city — which put 99.6% of the network into one bucket and
+deleted the tell entirely. `tests/road-tiers.test.mjs` guards both failures.
+
+The canvas ratio (about 2.3:1) is still narrower than the shipped SVG's 2.8:1.
+Closing that gap is a difficulty change and needs `npm run balance`, so it is
+deliberately left open rather than adjusted in passing.
+
 **Would be scenery:** `bg`, `water`, `land`, `coastline`, `borderWidth`,
 `forest`, `farmland`, `urbanDay`, `urbanNight`, `urbanGlow`, `terrainOpacity`,
 `terrainBlend`, `roadCasing`, `roadDivider`, `hudGlass`, `hudText`.
