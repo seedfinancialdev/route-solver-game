@@ -100,16 +100,28 @@ scenery colour; automate only if it proves to bite.
 `web/map-studio/` drives. None of it reaches a player today. Recorded here so
 the contract is ready when it ships.
 
-**Would be load-bearing:** `roadMotorway`, `roadTrunk`, `roadPrimary`,
-`roadSecondary`, `roadWidthMotorway`, `roadWidthTrunk`, `roadWidthPrimary`
-(pace tier, colour and width together — currently 3.2 : 1.4, about 2.3:1);
+**Would be load-bearing:** `roadMotorway`, `roadTrunk`, `roadPrimary` — pace
+tier colour, actually read by `web/map/cartography-layer.js:224-236`;
 `cityNode`, `cityNodeActive`, `cityNodeBorder` (scenery versus actionable);
 `routeLine`, `routeLineGlow`.
+
+**Currently inert:** `roadWidthMotorway`, `roadWidthTrunk`, `roadWidthPrimary`
+and `roadSecondary` are defined in all five presets (one sets 3.4 : 2.4 : 1.5,
+`web/map/theme-config.js:89-91`), but no renderer reads them — the widths
+`cartography-layer.js` actually draws are the hardcoded literals in
+`roadWidthsFor()` (`cartography-layer.js:30-51`), not a theme lookup.
+Retuning these four tokens today changes nothing. They'd be load-bearing once
+wired up; until then, don't tune them expecting an effect.
 
 **The canvas pace tell.** `web/map/road-tiers.js` splits every road into runs of
 a single pace tier and buckets them, the same way the shipped SVG engine does via
 `roadRuns`. Both renderers share one definition — `splitPaceRuns` in
-`web/engine.js` — so they cannot drift apart on the signal the game is built on.
+`web/engine.js` — for the tier itself, so a run's *tier* cannot drift between
+them. The exact *boundary* between two runs can differ by one segment (~1.6km
+average): `splitPaceRuns` attributes the shared boundary point to the earlier
+run, and the SVG path orients by direction of travel (`oriented()` in
+`web/engine.js`) while the canvas always walks the stored a→b order.
+Pre-existing, visually negligible, not a difficulty question.
 
 **Tier 2 is the fastest stretch and draws heaviest. Tier 0 is the slowest and
 draws thinnest.** `scripts/05-bundle.mjs:44` is the authority. The canvas
@@ -117,9 +129,32 @@ previously inverted this *and* classified each road by its first segment alone �
 the slow exit from a city — which put 99.6% of the network into one bucket and
 deleted the tell entirely. `tests/road-tiers.test.mjs` guards both failures.
 
-The canvas ratio (about 2.3:1) is still narrower than the shipped SVG's 2.8:1.
-Closing that gap is a difficulty change and needs `npm run balance`, so it is
-deliberately left open rather than adjusted in passing.
+The canvas width ratio varies by zoom band (`cartography-layer.js:30-51`,
+`roadWidthsFor()`) and is narrower than the shipped SVG's fixed 2.8:1 in every
+band where all three tiers draw at once — the only bands the ratio means
+anything in, since a thinner or absent bucket isn't a comparison:
+
+| zoomKm band | mwWidth | trWidth | prWidth | mw:pr |
+| --- | --- | --- | --- | --- |
+| ≤ 400 | 4.2 | 2.8 | 1.6 | 2.6:1 |
+| 400–900 | 3.2 | 2.2 | 1.4 | 2.3:1 |
+| 900–1000 | 3.2 | 2.2 | not drawn | — |
+| 1000–2000 | 1.6 | 1.1 | not drawn | — |
+| > 2000 | 0.8 | not drawn | not drawn | — |
+
+(Trunks stop drawing at 1800, not 2000, but their width doesn't change again
+before then — the width breakpoints are 400/1000/2000, the draw-gate
+breakpoints are 900/1800; `tests/road-width-ordering.test.mjs` checks both
+against `roadWidthsFor()` directly, band by band.)
+
+Closing the ratio gap is a difficulty change and would normally need
+`npm run balance` before and after — except that gate is blind to this: it
+drives `play/bots.mjs`'s `roadReader`, whose legibility model is an abstract
+sigma/nearSigma guess-bias pair, and its inputs are `data/puzzles.json` and
+`data/graph.json` (`play/balance-check.mjs`). None of that reads anything
+under `web/`. `npm run balance` gates the shipped SVG game's difficulty only;
+a canvas width change today has no automated gate at all and needs a human
+read-test until legibility is wired into the balance model.
 
 **Would be scenery:** `bg`, `water`, `land`, `coastline`, `borderWidth`,
 `forest`, `farmland`, `urbanDay`, `urbanNight`, `urbanGlow`, `terrainOpacity`,
