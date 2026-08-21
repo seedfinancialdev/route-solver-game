@@ -39,7 +39,14 @@ export function bucketRoadRuns(adj) {
       for (const run of splitPaceRuns(edge.shape, edge.pace)) {
         if (run.tier === TIER_MOTORWAY) motorways.push(run.pts);
         else if (run.tier === TIER_TRUNK) trunks.push(run.pts);
-        else primaries.push(run.pts);
+        else if (run.tier === TIER_PRIMARY) primaries.push(run.pts);
+        else {
+          throw new Error(
+            `bucketRoadRuns: unexpected pace tier ${run.tier} — expected `
+            + `${TIER_MOTORWAY} (motorway), ${TIER_TRUNK} (trunk), or ${TIER_PRIMARY} (primary). `
+            + 'Malformed tier data must not fall through and draw as a primary.',
+          );
+        }
       }
     }
   }

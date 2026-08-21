@@ -53,6 +53,22 @@ test('roads too short to draw are skipped', () => {
   assert.deepEqual([empty.motorways, empty.trunks, empty.primaries], [[], [], []]);
 });
 
+test('a malformed tier value throws instead of silently drawing as a primary', () => {
+  // Any tier that isn't 2 (motorway), 1 (trunk), or 0 (primary) is malformed
+  // data. It must fail loudly, not fall through a bare `else` into primaries —
+  // that's exactly how the map would silently lie about the whole network.
+  const graph = twoCityGraph([[0, 0], [1, 0]], [5, 5]);
+  assert.throws(
+    () => bucketRoadRuns(graph),
+    /unexpected pace tier 5/,
+  );
+});
+
+test('a short pace array is not swallowed either — it propagates as a thrown error', () => {
+  const graph = twoCityGraph([[0, 0], [1, 0], [2, 0]], [TIER_MOTORWAY, TIER_MOTORWAY]);
+  assert.throws(() => bucketRoadRuns(graph), /pace has 2 entries but pts has 3/);
+});
+
 test('on the real network no single bucket swallows the map', () => {
   // The defect this module replaces put 99.6% of edges in one bucket by reading
   // only each road's first segment, which is the slow exit from a city.

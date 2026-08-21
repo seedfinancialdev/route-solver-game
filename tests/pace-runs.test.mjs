@@ -36,6 +36,14 @@ test('degenerate input yields no runs', () => {
   assert.deepEqual(splitPaceRuns(null, null), []);
 });
 
+test('a pace array shorter than pts throws instead of tiering the rest as undefined', () => {
+  const pts = [[0, 0], [1, 0], [2, 0], [3, 0]];
+  assert.throws(
+    () => splitPaceRuns(pts, [2, 2]),
+    /pace has 2 entries but pts has 4/,
+  );
+});
+
 test('roadRuns still returns SVG path strings, oriented from the given city', () => {
   const edge = { shape: [[0, 0], [1, 0], [2, 0], [3, 0]], pace: [2, 2, 0, 0] };
   const a = { x: 0, y: 0 };

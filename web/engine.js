@@ -81,6 +81,12 @@ export function roadPath(edge, from, to) {
  */
 export function splitPaceRuns(pts, pace) {
   if (!pts || !pace || pts.length < 2) return [];
+  if (pace.length < pts.length) {
+    throw new Error(
+      `splitPaceRuns: pace has ${pace.length} entries but pts has ${pts.length} — `
+      + 'a short pace array silently tiers the remainder as undefined, which must fail loudly instead',
+    );
+  }
   const runs = [];
   let start = 0;
   for (let i = 1; i <= pts.length; i++) {
