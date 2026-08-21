@@ -20,6 +20,36 @@ const STRATEGIC_WAYPOINTS = [
   { name: 'Col de Turini', alt: '1,604m', x: -606.1, y: 851.3, kind: 'pass' },
 ];
 
+/**
+ * Road stroke widths and draw gates for a given zoom, factored out of render()
+ * so the width-ordering constraint (tier 2 fastest, draws heaviest — see
+ * road-tiers.js) is testable in Node without a canvas: `render()` below is the
+ * only caller, so this must stay byte-identical to the inline logic it
+ * replaced. See tests/road-width-ordering.test.mjs.
+ */
+export function roadWidthsFor(zoomKm) {
+  let mwWidth = 3.2;
+  let trWidth = 2.2;
+  let prWidth = 1.4;
+
+  if (zoomKm > 2000) {
+    mwWidth = 0.8;
+  } else if (zoomKm > 1000) {
+    mwWidth = 1.6;
+    trWidth = 1.1;
+  } else if (zoomKm <= 400) {
+    mwWidth = 4.2;
+    trWidth = 2.8;
+    prWidth = 1.6;
+  }
+
+  return {
+    mwWidth, trWidth, prWidth,
+    drawPrimaries: zoomKm <= 900,
+    drawTrunks: zoomKm <= 1800,
+  };
+}
+
 export class CartographyLayer {
   constructor() {
     this.pathCache = new Map();
@@ -169,29 +199,15 @@ export class CartographyLayer {
       // motorway in the middle and slow at both ends, and the difference is the
       // whole tell. Tier 2 is the fastest and draws heaviest — see road-tiers.js.
       const { motorways, trunks, primaries } = bucketRoadRuns(g.adj);
-
-      let mwWidth = 3.2;
-      let trWidth = 2.2;
-      let prWidth = 1.4;
-
-      if (zoomKm > 2000) {
-        mwWidth = 0.8;
-      } else if (zoomKm > 1000) {
-        mwWidth = 1.6;
-        trWidth = 1.1;
-      } else if (zoomKm <= 400) {
-        mwWidth = 4.2;
-        trWidth = 2.8;
-        prWidth = 1.6;
-      }
+      const { mwWidth, trWidth, prWidth, drawPrimaries, drawTrunks } = roadWidthsFor(zoomKm);
 
       const casingCol = theme.roadCasing || '#1a1d24';
 
       // PASS 1: Dark Asphalt Roadbed Under-Casing
-      if (zoomKm <= 1800) {
+      if (drawTrunks) {
         ctx.strokeStyle = casingCol;
 
-        if (zoomKm <= 900) {
+        if (drawPrimaries) {
           ctx.lineWidth = (prWidth + 1.2) / scaleX;
           this.drawShapeBatch(ctx, primaries);
         }
@@ -204,13 +220,13 @@ export class CartographyLayer {
       }
 
       // PASS 2: Vibrant Highway Surface Core
-      if (zoomKm <= 900) {
+      if (drawPrimaries) {
         ctx.strokeStyle = theme.roadPrimary || '#4b5563';
         ctx.lineWidth = prWidth / scaleX;
         this.drawShapeBatch(ctx, primaries);
       }
 
-      if (zoomKm <= 1800) {
+      if (drawTrunks) {
         ctx.strokeStyle = theme.roadTrunk || '#f59e0b';
         ctx.lineWidth = trWidth / scaleX;
         this.drawShapeBatch(ctx, trunks);
