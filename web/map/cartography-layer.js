@@ -5,6 +5,8 @@
  * and European Highway Shields / Alpine Pass Waypoints.
  */
 
+import { bucketRoadRuns } from './road-tiers.js';
+
 // Iconic Alpine Passes & Cannonball Strategic Chokepoints (Real Lambert Proj Coordinates)
 const STRATEGIC_WAYPOINTS = [
   { name: 'St. Gotthard Pass', alt: '2,106m', x: -487.7, y: 576.1, kind: 'pass' },
@@ -17,6 +19,36 @@ const STRATEGIC_WAYPOINTS = [
   { name: 'Großglockner Pass', alt: '2,504m', x: -161.9, y: 538.8, kind: 'pass' },
   { name: 'Col de Turini', alt: '1,604m', x: -606.1, y: 851.3, kind: 'pass' },
 ];
+
+/**
+ * Road stroke widths and draw gates for a given zoom, factored out of render()
+ * so the width-ordering constraint (tier 2 fastest, draws heaviest — see
+ * road-tiers.js) is testable in Node without a canvas: `render()` below is the
+ * only caller, so this must stay byte-identical to the inline logic it
+ * replaced. See tests/road-width-ordering.test.mjs.
+ */
+export function roadWidthsFor(zoomKm) {
+  let mwWidth = 3.2;
+  let trWidth = 2.2;
+  let prWidth = 1.4;
+
+  if (zoomKm > 2000) {
+    mwWidth = 0.8;
+  } else if (zoomKm > 1000) {
+    mwWidth = 1.6;
+    trWidth = 1.1;
+  } else if (zoomKm <= 400) {
+    mwWidth = 4.2;
+    trWidth = 2.8;
+    prWidth = 1.6;
+  }
+
+  return {
+    mwWidth, trWidth, prWidth,
+    drawPrimaries: zoomKm <= 900,
+    drawTrunks: zoomKm <= 1800,
+  };
+}
 
 export class CartographyLayer {
   constructor() {
@@ -163,42 +195,19 @@ export class CartographyLayer {
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      const motorways = [];
-      const trunks = [];
-      const primaries = [];
-
-      for (const cityEdges of g.adj) {
-        for (const edge of cityEdges) {
-          if (!edge.shape || edge.shape.length < 2) continue;
-          const pace = edge.pace[0] ?? 1;
-          if (pace === 0) motorways.push(edge.shape);
-          else if (pace === 1) trunks.push(edge.shape);
-          else primaries.push(edge.shape);
-        }
-      }
-
-      let mwWidth = 3.2;
-      let trWidth = 2.2;
-      let prWidth = 1.4;
-
-      if (zoomKm > 2000) {
-        mwWidth = 0.8;
-      } else if (zoomKm > 1000) {
-        mwWidth = 1.6;
-        trWidth = 1.1;
-      } else if (zoomKm <= 400) {
-        mwWidth = 4.2;
-        trWidth = 2.8;
-        prWidth = 1.6;
-      }
+      // Split along each road's length: a city-to-city road is routinely
+      // motorway in the middle and slow at both ends, and the difference is the
+      // whole tell. Tier 2 is the fastest and draws heaviest — see road-tiers.js.
+      const { motorways, trunks, primaries } = bucketRoadRuns(g.adj);
+      const { mwWidth, trWidth, prWidth, drawPrimaries, drawTrunks } = roadWidthsFor(zoomKm);
 
       const casingCol = theme.roadCasing || '#1a1d24';
 
       // PASS 1: Dark Asphalt Roadbed Under-Casing
-      if (zoomKm <= 1800) {
+      if (drawTrunks) {
         ctx.strokeStyle = casingCol;
 
-        if (zoomKm <= 900) {
+        if (drawPrimaries) {
           ctx.lineWidth = (prWidth + 1.2) / scaleX;
           this.drawShapeBatch(ctx, primaries);
         }
@@ -211,13 +220,13 @@ export class CartographyLayer {
       }
 
       // PASS 2: Vibrant Highway Surface Core
-      if (zoomKm <= 900) {
+      if (drawPrimaries) {
         ctx.strokeStyle = theme.roadPrimary || '#4b5563';
         ctx.lineWidth = prWidth / scaleX;
         this.drawShapeBatch(ctx, primaries);
       }
 
-      if (zoomKm <= 1800) {
+      if (drawTrunks) {
         ctx.strokeStyle = theme.roadTrunk || '#f59e0b';
         ctx.lineWidth = trWidth / scaleX;
         this.drawShapeBatch(ctx, trunks);
