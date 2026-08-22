@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "test": "node --test 'tests/**/*.test.mjs'",
+    "test:legacy": "node --test 'legacy/tests/**/*.test.mjs'",
     "doctor": "node scripts/data-doctor.mjs",
-    "perf": "node scripts/perf-profile.mjs",
+    "perf": "node legacy/scripts/perf-profile.mjs",
     "data:cities": "node scripts/00-cities.mjs",
     "data:graph": "node scripts/01-graph.mjs",
     "data:puzzles": "node scripts/02-puzzles.mjs",
@@ -16,7 +17,7 @@
     "play": "node play/cli.mjs",
     "calibrate": "node play/calibrate.mjs",
     "calibrate:hos": "node play/calibrate-hos.mjs",
-    "serve": "node scripts/serve.mjs",
+    "serve": "node legacy/scripts/serve.mjs",
     "balance": "node play/balance-check.mjs",
     "core-loop:play": "node core-loop/play.mjs"
   },

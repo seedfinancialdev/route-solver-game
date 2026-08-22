@@ -73,7 +73,7 @@ test('sweepRow counts a shortest-road win only at a generous multiplier', () => 
 
 // play/balance-check.mjs's own sampling loop must use this same convention —
 // a dead-ended run counts toward the denominator as a loss, not excluded from
-// it — since both numbers are compared against the same docs/SPEC.md:217
+// it — since both numbers are compared against the same legacy/docs/SPEC.md:217
 // reference figure.
 test('sweepRow counts a dead-end as a loss, not as excluded', () => {
   const runs = [{ a: 0, b: 1, optMin: 1000, short: 1200, reader: [1050, Infinity] }];

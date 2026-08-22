@@ -20,16 +20,21 @@ being true silently.
 **"the shortest road wins outright on N puzzles"** — the most serious result.
 Those pairs are not puzzles: a player wins with zero judgement. Fix by
 reselecting (`npm run data:puzzles`), never by lowering the budget multiplier.
-docs/SPEC.md:226-233 measured patching budgets in place as leaving 8.5% of a
-set broken.
+legacy/docs/SPEC.md:226-233 measured patching budgets in place as leaving
+8.5% of a set broken.
 
 **"margin under the 0.02 minimum"** — the multiplier has drifted too close to
 where the shortest road starts winning. Lower it and reselect.
 
 **"win rate has moved more than 3 points"** — a warning. If the move is real
 and intended, regenerate the table with `--sweep` and paste it at
-docs/SPEC.md:213. Never let a script write that table: the prose around it
-carries reasoning that cannot be regenerated.
+legacy/docs/SPEC.md:213. Never let a script write that table: the prose
+around it carries reasoning that cannot be regenerated.
+
+This tool verifies the legacy puzzle set's own difficulty criteria
+(legacy/docs/SPEC.md). Core-loop's route generation & grading is its own,
+not-yet-designed system (issue #8) that will generalize this measurement
+technique, not this exact criteria.
 
 ## The rule that matters
 

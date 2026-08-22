@@ -7,9 +7,10 @@
 // One query per city (radius below), real geometry, real road classes —
 // never routing data, decoration only, same footing as the urban-footprint
 // blobs and background towns this map already draws. Output ships as one
-// small file per city (web/streets/<cityIndex>.json), fetched on demand the
-// way terrain tiles already are — not bundled into web/data.json, since a
-// single puzzle only ever visits 7-16 of the 479 cities.
+// small file per city (legacy/web/streets/<cityIndex>.json), fetched on
+// demand the way terrain tiles already are — not bundled into
+// legacy/web/data.json, since a single puzzle only ever visits 7-16 of the
+// 479 cities. Feeds the legacy shipped game; see legacy/README.md.
 //
 // Run: node scripts/07-streets.mjs
 // Rebuild a subset only: node scripts/07-streets.mjs --only=Bergen,Prague
@@ -24,7 +25,7 @@ const SIMPLIFY_KM = 0.02; // tighter than the inter-city roads (0.12) — this i
 const QUANT = 40; // 25 m grid
 
 const graph = JSON.parse(readFileSync(new URL('../data/graph.json', import.meta.url), 'utf8'));
-const OUT_DIR = new URL('../web/streets/', import.meta.url);
+const OUT_DIR = new URL('../legacy/web/streets/', import.meta.url);
 mkdirSync(OUT_DIR, { recursive: true });
 
 const onlyArg = process.argv.find((a) => a.startsWith('--only='));

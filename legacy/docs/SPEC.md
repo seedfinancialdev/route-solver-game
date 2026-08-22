@@ -1,3 +1,11 @@
+> **Retired 2026-08-22.** This spec describes the shipped driving-hours
+> puzzle — the game this repo built before the core-loop redesign. It's kept
+> here for reference and possible reuse, not as the current direction. The
+> active spec is `/docs/superpowers/specs/2026-08-20-core-gameplay-loop-design.md`;
+> see `/README.md` for the full picture. Paths below still say `web/` /
+> `docs/` as they did when this was live — read them as `legacy/web/` /
+> `legacy/docs/` now.
+
 # Route — spec
 
 One page. Everything here is settled by measurement; `npm run calibrate`

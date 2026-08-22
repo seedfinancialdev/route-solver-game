@@ -149,7 +149,7 @@ print("Generating pre-rendered Lambert raster forest maps...")
 for name, out_w, quality in OUTPUTS:
     out_h = round(out_w * view['h'] / view['w'])
     img_rgba = render_forest(view, out_w, out_h)
-    out = ROOT / 'web' / name
+    out = ROOT / 'legacy' / 'web' / name
     Image.fromarray(img_rgba).save(out, 'WEBP', quality=quality, method=5)
     print(f'wrote {out.relative_to(ROOT)}  {out_w}x{out_h}  '
           f'{out.stat().st_size / 1024:.0f} KB')
