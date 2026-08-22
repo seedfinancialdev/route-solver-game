@@ -100,11 +100,83 @@ scenery colour; automate only if it proves to bite.
 `web/map-studio/` drives. None of it reaches a player today. Recorded here so
 the contract is ready when it ships.
 
-**Would be load-bearing:** `roadMotorway`, `roadTrunk`, `roadPrimary`,
-`roadSecondary`, `roadWidthMotorway`, `roadWidthTrunk`, `roadWidthPrimary`
-(pace tier, colour and width together — currently 3.2 : 1.4, about 2.3:1);
+**Would be load-bearing:** `road` — the one hue every road on the canvas draws
+in, read via `roadDrawPlan()` (`web/map/cartography-layer.js`);
 `cityNode`, `cityNodeActive`, `cityNodeBorder` (scenery versus actionable);
 `routeLine`, `routeLineGlow`.
+
+**Hue does not encode pace, and is deliberately unspent.** The canvas briefly
+gave each pace tier its own hue under the tokens `roadMotorway` / `roadTrunk` /
+`roadPrimary` — red, amber, slate. That was wrong three ways: it made `--road`
+red mean "a road you can take" in the SVG and "the fastest tier" in the canvas;
+it made hue the loudest tier signal, breaking **Never hue alone** above, which
+wants width as the arbiter; and it spent the road-*class* vocabulary on pace
+data, so a slow mountain stretch of a real motorway drew as a "primary".
+
+Pace is now width and opacity only, exactly as the shipped SVG does it. Hue is
+held for real OSM road class — a different variable from pace, and the gap
+between what a road *is* and how it actually drives is the thing the player is
+meant to learn to read. `tests/road-palette.test.mjs` stops pace creeping back
+into hue.
+
+**Opacity is the second pace channel.** `PACE_ALPHA`
+(`web/map/cartography-layer.js`) is `.95 / .74 / .56` for fast / ordinary /
+slow — deliberately the shipped SVG's own values (`web/app.css:228-230`), so
+both renderers state the tell at the same strength. It must stay ordered the
+same way as width; `tests/road-palette.test.mjs` checks the two channels agree
+over the buckets each zoom band actually draws. Above 2000 km the fastest
+network is held back to `0.45` because it is the only thing drawn.
+
+**Currently inert:** `roadWidthMotorway`, `roadWidthTrunk`, `roadWidthPrimary`
+and `roadSecondary` are defined in all five presets (one sets 3.4 : 2.4 : 1.5,
+`web/map/theme-config.js:89-91`), but no renderer reads them — the widths
+`cartography-layer.js` actually draws are the hardcoded literals in
+`roadWidthsFor()` (`cartography-layer.js:30-51`), not a theme lookup.
+Retuning these four tokens today changes nothing. They'd be load-bearing once
+wired up; until then, don't tune them expecting an effect.
+
+**The canvas pace tell.** `web/map/road-tiers.js` splits every road into runs of
+a single pace tier and buckets them, the same way the shipped SVG engine does via
+`roadRuns`. Both renderers share one definition — `splitPaceRuns` in
+`web/engine.js` — for the tier itself, so a run's *tier* cannot drift between
+them. The exact *boundary* between two runs can differ by one segment (~1.6km
+average): `splitPaceRuns` attributes the shared boundary point to the earlier
+run, and the SVG path orients by direction of travel (`oriented()` in
+`web/engine.js`) while the canvas always walks the stored a→b order.
+Pre-existing, visually negligible, not a difficulty question.
+
+**Tier 2 is the fastest stretch and draws heaviest. Tier 0 is the slowest and
+draws thinnest.** `scripts/05-bundle.mjs:44` is the authority. The canvas
+previously inverted this *and* classified each road by its first segment alone —
+the slow exit from a city — which put 99.6% of the network into one bucket and
+deleted the tell entirely. `tests/road-tiers.test.mjs` guards both failures.
+
+The canvas width ratio varies by zoom band (`cartography-layer.js:30-51`,
+`roadWidthsFor()`) and is narrower than the shipped SVG's fixed 2.8:1 in every
+band where all three tiers draw at once — the only bands the ratio means
+anything in, since a thinner or absent bucket isn't a comparison:
+
+| zoomKm band | mwWidth | trWidth | prWidth | mw:pr |
+| --- | --- | --- | --- | --- |
+| ≤ 400 | 4.2 | 2.8 | 1.6 | 2.6:1 |
+| 400–900 | 3.2 | 2.2 | 1.4 | 2.3:1 |
+| 900–1000 | 3.2 | 2.2 | not drawn | — |
+| 1000–2000 | 1.6 | 1.1 | not drawn | — |
+| > 2000 | 0.8 | not drawn | not drawn | — |
+
+(Trunks stop drawing at 1800, not 2000, but their width doesn't change again
+before then — the width breakpoints are 400/1000/2000, the draw-gate
+breakpoints are 900/1800; `tests/road-width-ordering.test.mjs` checks both
+against `roadWidthsFor()` directly, band by band.)
+
+Closing the ratio gap is a difficulty change and would normally need
+`npm run balance` before and after — except that gate is blind to this: it
+drives `play/bots.mjs`'s `roadReader`, whose legibility model is an abstract
+sigma/nearSigma guess-bias pair, and its inputs are `data/puzzles.json` and
+`data/graph.json` (`play/balance-check.mjs`). None of that reads anything
+under `web/`. `npm run balance` gates the shipped SVG game's difficulty only;
+a canvas width change today has no automated gate at all and needs a human
+read-test until legibility is wired into the balance model.
 
 **Would be scenery:** `bg`, `water`, `land`, `coastline`, `borderWidth`,
 `forest`, `farmland`, `urbanDay`, `urbanNight`, `urbanGlow`, `terrainOpacity`,

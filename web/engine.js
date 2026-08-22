@@ -71,25 +71,43 @@ export function roadPath(edge, from, to) {
 }
 
 /**
- * The road broken into runs of one pace, so it can be drawn the way a road
- * atlas draws it: the motorway stretches heavy, the slow ones hairline.
- * Runs overlap by a point so the line stays unbroken.
+ * A polyline split into runs of a single pace tier, so a road can be drawn the
+ * way an atlas draws it: the motorway stretches heavy, the slow ones hairline.
+ * Runs overlap by a point so the drawn line stays unbroken.
+ *
+ * Renderer-agnostic on purpose — `roadRuns` wraps this for the SVG game and
+ * `web/map/road-tiers.js` uses it directly for the canvas. One definition, so
+ * the two renderers cannot drift apart on the game's load-bearing signal.
  */
-export function roadRuns(edge, from, to) {
-  const o = oriented(edge, from, to);
-  if (!o) return [];
+export function splitPaceRuns(pts, pace) {
+  if (!pts || !pace || pts.length < 2) return [];
+  if (pace.length < pts.length) {
+    throw new Error(
+      `splitPaceRuns: pace has ${pace.length} entries but pts has ${pts.length} — `
+      + 'a short pace array silently tiers the remainder as undefined, which must fail loudly instead',
+    );
+  }
   const runs = [];
   let start = 0;
-  for (let i = 1; i <= o.pts.length; i++) {
-    if (i === o.pts.length || o.pace[i] !== o.pace[start]) {
-      const slice = o.pts.slice(start, Math.min(i + 1, o.pts.length));
-      if (slice.length > 1) {
-        runs.push({ tier: o.pace[start], d: `M${slice.map(([x, y]) => `${x} ${y}`).join('L')}` });
-      }
+  for (let i = 1; i <= pts.length; i++) {
+    if (i === pts.length || pace[i] !== pace[start]) {
+      const slice = pts.slice(start, Math.min(i + 1, pts.length));
+      if (slice.length > 1) runs.push({ tier: pace[start], pts: slice });
       start = i;
     }
   }
   return runs;
+}
+
+/**
+ * The road broken into runs of one pace, as SVG path strings.
+ */
+export function roadRuns(edge, from, to) {
+  const o = oriented(edge, from, to);
+  if (!o) return [];
+  return splitPaceRuns(o.pts, o.pace).map(({ tier, pts }) => (
+    { tier, d: `M${pts.map(([x, y]) => `${x} ${y}`).join('L')}` }
+  ));
 }
 
 /** What a hop is made of, for explaining afterwards why it went the way it did. */
