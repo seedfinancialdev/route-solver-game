@@ -13,7 +13,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const r5 = (v) => Math.round(v * 1e5) / 1e5;
 
 // ---- playable cities -------------------------------------------------------
-const graph = JSON.parse(readFileSync(new URL('../../data/graph.json', import.meta.url), 'utf8'));
+const graph = JSON.parse(readFileSync(new URL('../data/graph.json', import.meta.url), 'utf8'));
 const cities = {
   type: 'FeatureCollection',
   features: graph.cities.map((c) => ({
@@ -26,7 +26,7 @@ writeFileSync(new URL('./cities.geojson', import.meta.url), JSON.stringify(citie
 console.log(`${cities.features.length} cities`);
 
 // ---- career run endpoints --------------------------------------------------
-const runs = JSON.parse(readFileSync(new URL('../../data/runs.json', import.meta.url), 'utf8'));
+const runs = JSON.parse(readFileSync(new URL('../data/runs.json', import.meta.url), 'utf8'));
 const endpoints = { type: 'FeatureCollection', features: [] };
 for (const r of runs.runs) {
   for (const [role, p] of [['start', r.from], ['finish', r.to]]) {

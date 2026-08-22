@@ -4,18 +4,18 @@ import {
   PIPELINE, stalenessCheck, manifestAgreement, puzzleIndexCheck,
 } from '../scripts/lib/dag.mjs';
 
-test('the DAG records the fan-in through web/data.json', () => {
+test('the DAG records the fan-in through legacy/web/data.json', () => {
   const bundle = PIPELINE.find((s) => s.script === 'scripts/05-bundle.mjs');
   assert.ok(bundle, '05-bundle must be in the pipeline');
-  assert.deepEqual(bundle.outputs, ['web/data.json']);
+  assert.deepEqual(bundle.outputs, ['legacy/web/data.json']);
   for (const i of ['data/graph.json', 'data/map.json', 'data/puzzles.json', 'data/road-names.json']) {
     assert.ok(bundle.inputs.includes(i), `05-bundle must consume ${i}`);
   }
 });
 
-test('04-terrain consumes web/data.json, so it must run after 05-bundle', () => {
+test('04-terrain consumes legacy/web/data.json, so it must run after 05-bundle', () => {
   const terrain = PIPELINE.find((s) => s.script === 'scripts/04-terrain.py');
-  assert.ok(terrain.inputs.includes('web/data.json'));
+  assert.ok(terrain.inputs.includes('legacy/web/data.json'));
 });
 
 test('staleness is reported when an output predates its input', () => {
@@ -40,18 +40,18 @@ test('a missing file is not reported as stale', () => {
 });
 
 test('a duplicate output+input pair is reported only once', () => {
-  // Historical regression test: web/cartography.json used to have two real
-  // producers (08-cartography.mjs and 09-real-osm-forests.mjs), both fed by
-  // web/data.json, which meant PIPELINE had two stages sharing the same
-  // (output, input) pair and the staleness report repeated the line. 08 was
-  // retired once 09 became the sole producer, so PIPELINE no longer has a
+  // Historical regression test: legacy/web/cartography.json used to have two
+  // real producers (08-cartography.mjs and 09-real-osm-forests.mjs), both fed
+  // by legacy/web/data.json, which meant PIPELINE had two stages sharing the
+  // same (output, input) pair and the staleness report repeated the line. 08
+  // was retired once 09 became the sole producer, so PIPELINE no longer has a
   // live duplicate to trigger this — the dedup logic in stalenessCheck stays
   // as a safeguard for the next time two stages legitimately share an output.
   const stale = stalenessCheck(new Map([
-    ['web/data.json', 200],
-    ['web/cartography.json', 100],
+    ['legacy/web/data.json', 200],
+    ['legacy/web/cartography.json', 100],
   ]));
-  const matches = stale.filter((s) => s.output === 'web/cartography.json' && s.input === 'web/data.json');
+  const matches = stale.filter((s) => s.output === 'legacy/web/cartography.json' && s.input === 'legacy/web/data.json');
   assert.equal(matches.length, 1);
 });
 

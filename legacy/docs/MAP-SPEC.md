@@ -1,10 +1,16 @@
+> **Retired 2026-08-22.** This canvas map engine never shipped and won't —
+> the game it was built for (`legacy/docs/SPEC.md`) has been superseded by
+> the core-loop redesign. Kept here for reference, not as a direction anyone
+> is building toward. See `/README.md`.
+
 # Map spec: terrain + real cartography + gameplay overlay
 
-Not shipped. This is the spec for the active direction, written after a full
-session of prototyping, mistakes, and real measurement — kept separately from
-`docs/SPEC.md` so it can be handed to whoever builds it without needing this
-session's full history. Everything below is either a real, measured fact or
-explicitly flagged as an open question. Nothing here is invented.
+Not shipped. This is the spec for the direction this prototype was chasing,
+written after a full session of prototyping, mistakes, and real measurement —
+kept separately from `docs/SPEC.md` so it can be handed to whoever builds it
+without needing this session's full history. Everything below is either a
+real, measured fact or explicitly flagged as an open question. Nothing here
+is invented.
 
 ## The goal, precisely
 

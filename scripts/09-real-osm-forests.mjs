@@ -2,14 +2,15 @@
  * Real Woodland Cartography Generator
  * Builds high-density, intricate, multi-branched vector forest contours across European mountain ranges,
  * valleys, and physical relief features.
- * Output: web/cartography.json
+ * Output: legacy/web/cartography.json — fed the never-shipped canvas map
+ * engine, retired along with it. See legacy/README.md.
  */
 
 import { writeFileSync, readFileSync } from 'node:fs';
 import { simplify } from './lib/simplify.mjs';
 
-const DATA_FILE = new URL('../web/data.json', import.meta.url);
-const OUTPUT_FILE = new URL('../web/cartography.json', import.meta.url);
+const DATA_FILE = new URL('../legacy/web/data.json', import.meta.url);
+const OUTPUT_FILE = new URL('../legacy/web/cartography.json', import.meta.url);
 
 console.log('Building high-detail woodland cartography...');
 
@@ -93,5 +94,5 @@ writeFileSync(OUTPUT_FILE, JSON.stringify(cartographyData));
 console.log(`\n==================================================`);
 console.log(`High-detail woodland cartography built successfully!`);
 console.log(`Total woodland vector contours: ${forestPaths.length}`);
-console.log(`Saved to: web/cartography.json`);
+console.log(`Saved to: legacy/web/cartography.json`);
 console.log(`==================================================\n`);
