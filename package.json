@@ -19,7 +19,10 @@
     "calibrate:hos": "node play/calibrate-hos.mjs",
     "serve": "node legacy/scripts/serve.mjs",
     "balance": "node play/balance-check.mjs",
-    "core-loop:play": "node core-loop/play.mjs"
+    "core-loop:play": "node core-loop/play.mjs",
+    "atlas": "node scripts/serve-atlas.mjs",
+    "atlas:data": "node atlas/build-geojson.mjs",
+    "atlas:check": "node atlas/check-style.mjs"
   },
   "devDependencies": {
     "d3-delaunay": "^6.0.4",

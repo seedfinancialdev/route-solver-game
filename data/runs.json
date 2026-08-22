@@ -1,0 +1,54 @@
+{
+  "generated": "2026-08-22",
+  "note": "Career runs. Endpoints are hand-picked terminal points — see docs/superpowers/specs/2026-08-22-run-criteria.md section A. Both are real, findable places; neither can be meaningfully extended in the same direction.",
+  "runs": [
+    {
+      "id": "cape-to-cape",
+      "name": "Cape to Cape",
+      "from": {
+        "name": "Punta de Tarifa",
+        "detail": "Southernmost point of continental Europe",
+        "country": "ES",
+        "lat": 36.0018,
+        "lon": -5.6089
+      },
+      "to": {
+        "name": "Nordkapp",
+        "detail": "North Cape, Magerøya — northernmost road-reachable point of Europe",
+        "country": "NO",
+        "lat": 71.1694,
+        "lon": 25.7833
+      },
+      "tests": [
+        "raw distance — the longest run in the set",
+        "fuel scarcity above the Arctic Circle",
+        "the Øresund crossing: bridge or ferry",
+        "a long high-speed German section where derestricted autobahn matters"
+      ]
+    },
+    {
+      "id": "roca-to-bosphorus",
+      "name": "Roca to the Bosphorus",
+      "from": {
+        "name": "Cabo da Roca",
+        "detail": "Westernmost point of continental Europe",
+        "country": "PT",
+        "lat": 38.7803,
+        "lon": -9.4989
+      },
+      "to": {
+        "name": "Sultanahmet, Istanbul",
+        "detail": "Across the Bosphorus — the eastern edge of Europe",
+        "country": "TR",
+        "lat": 41.0055,
+        "lon": 28.9769
+      },
+      "tests": [
+        "the big corridor fork: northern Italy and Austria, or the Balkans",
+        "non-Schengen border crossings on a competitive corridor",
+        "the widest jurisdiction spread of any European route",
+        "thin OSM speed-limit coverage in Spain (51%) on the opening leg"
+      ]
+    }
+  ]
+}
