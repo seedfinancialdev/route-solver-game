@@ -1,0 +1,58 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Atlas — MapLibre spike</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="./vendor/maplibre-gl.css">
+<style>
+  html, body { margin: 0; height: 100%; background: #0a1119; }
+  #map { position: absolute; inset: 0; }
+  .panel { position: absolute; z-index: 2; background: rgba(12,18,26,.90); color: #eef2f6;
+    border: 1px solid rgba(255,255,255,.09); border-radius: 10px; backdrop-filter: blur(12px);
+    font: 13px/1.45 ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  #legend { right: 12px; top: 12px; padding: 11px 13px; width: 236px; }
+  #legend h2 { margin: 0 0 8px; font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+    color: #93a1b0; font-weight: 600; }
+  #legend .k { display: flex; align-items: center; gap: 9px; padding: 2.5px 0; }
+  #legend .sw { width: 26px; height: 0; border-radius: 2px; flex: none; }
+  #legend .sub { margin: 10px 0 6px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,.09);
+    font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: #93a1b0; font-weight: 600; }
+  #legend label { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; }
+  #legend input { accent-color: #e2503a; }
+  #note { margin-top: 9px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.09);
+    color: #93a1b0; font-size: 11px; }
+  #hud { left: 12px; bottom: 12px; padding: 9px 12px; font-variant-numeric: tabular-nums; }
+  #hud b { font-weight: 600; }
+  .maplibregl-ctrl-attrib { font-size: 10px; }
+  #err { display: none; position: absolute; z-index: 9; left: 12px; top: 12px; right: 260px;
+    padding: 11px 13px; border-radius: 10px; background: #45161a; color: #ffd9d2;
+    border: 1px solid #7d2a2a; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+
+<div id="map"></div>
+
+<div class="panel" id="legend">
+  <h2>Road type — real OSM class</h2>
+  <div class="k"><span class="sw" style="border-top:4px solid #e8503a"></span> Motorway</div>
+  <div class="k"><span class="sw" style="border-top:3.4px solid #ef8a3c"></span> Trunk</div>
+  <div class="k"><span class="sw" style="border-top:2.8px solid #f0b357"></span> Primary</div>
+  <div class="k"><span class="sw" style="border-top:2.2px solid #ddc79a"></span> Secondary</div>
+  <div class="k"><span class="sw" style="border-top:1.6px solid #c4bda6"></span> Tertiary</div>
+  <div class="k"><span class="sw" style="border-top:1.2px solid #b9b39f"></span> Minor</div>
+
+  <div class="sub">Layers</div>
+  <label><input type="checkbox" id="t-hill" checked> Terrain relief</label>
+  <label><input type="checkbox" id="t-osm" checked> Real road network</label>
+  <label><input type="checkbox" id="t-labels" checked> Place names</label>
+
+  <div id="note">Every road is playable, so the map is the network. Class and
+    width are real OSM data. <b>Pace is not shown</b> — the tiles carry no speed
+    limits, and inventing one from class would only repeat the colour.</div>
+</div>
+
+<div id="err"></div>
+
+<div class="panel" id="hud">view <b id="km">—</b> · <b id="fps">—</b> fps</div>
+
+<script src="./vendor/maplibre-gl.js"></script>
+<script src="./style.js"></script>
+<script src="./atlas-gl.js"></script>
