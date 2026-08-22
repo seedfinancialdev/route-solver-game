@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Is this still the game docs/SPEC.md describes?
+// Is this still the game legacy/docs/SPEC.md describes?
 //
 //   npm run balance             the shipped set plus a bot sample — seconds
 //   npm run balance -- --sweep  also the multiplier cliff — needs the cache
@@ -18,9 +18,9 @@ const read = (p) => JSON.parse(readFileSync(new URL(p, ROOT), 'utf8'));
 const SWEEP = process.argv.includes('--sweep');
 const SAMPLE = 200;
 const TRIALS = 6;
-const CLIFF_MARGIN = 0.02; // docs/SPEC.md:221-224, "one road's worth of margin"
+const CLIFF_MARGIN = 0.02; // legacy/docs/SPEC.md:221-224, "one road's worth of margin"
 const MULTIPLIERS = [1.08, 1.09, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15];
-const SPEC_WIN_RATE = 0.52; // docs/SPEC.md:217
+const SPEC_WIN_RATE = 0.52; // legacy/docs/SPEC.md:217
 // Must match play/calibrate-hos.mjs's own module-level constants of the same
 // name — those are what the cache was validated against when it was written.
 const CACHE_MIN_PENALTY = 1.12;
@@ -109,7 +109,7 @@ if (stuckRate > pack.criteria.MAX_STUCK_RATE) {
 if (winRate < 0.30) fail(`win rate ${pct(winRate)} — the game is unwinnable, not merely hard`);
 if (winRate > 0.75) fail(`win rate ${pct(winRate)} — the budget is no longer binding`);
 if (Math.abs(winRate - SPEC_WIN_RATE) > 0.03) {
-  console.log(`  warn  win rate has moved more than 3 points from the ${pct(SPEC_WIN_RATE)} at docs/SPEC.md:217`);
+  console.log(`  warn  win rate has moved more than 3 points from the ${pct(SPEC_WIN_RATE)} at legacy/docs/SPEC.md:217`);
 }
 if (worstRatio > pack.criteria.MAX_WORST_RATIO) {
   console.log(`  warn  worst finishing ratio exceeds the selection cap — expected on a `
@@ -144,10 +144,10 @@ if (SWEEP) {
     console.log(`\n  cliff at ${cliff.toFixed(2)}, shipped multiplier ${pack.budgetMultiplier}, `
       + `margin ${margin.toFixed(2)}`);
     if (margin < CLIFF_MARGIN) {
-      fail(`margin ${margin.toFixed(2)} is under the ${CLIFF_MARGIN} minimum (docs/SPEC.md:221-224)`);
+      fail(`margin ${margin.toFixed(2)} is under the ${CLIFF_MARGIN} minimum (legacy/docs/SPEC.md:221-224)`);
     } else ok(`margin clears the ${CLIFF_MARGIN} minimum`);
   }
-  console.log('\n  paste the table at docs/SPEC.md:213 if these numbers have moved.');
+  console.log('\n  paste the table at legacy/docs/SPEC.md:213 if these numbers have moved.');
 }
 
 process.exit(failed ? 1 : 0);
