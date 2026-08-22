@@ -1,0 +1,30 @@
+{
+  "generated": "2026-08-22",
+  "source": "OpenStreetMap via Overpass",
+  "method": "3 sampled ~9km boxes per country, centred on real routed edge geometry",
+  "caveat": "Counts are per sample, not national totals. Compare countries, not absolutes.",
+  "countries": {
+    "DE": {
+      "cities": 83,
+      "samples": 3,
+      "major": 513,
+      "maxspeed": 455,
+      "toll": 0,
+      "fuel": 20,
+      "services": 0,
+      "border": 0,
+      "maxspeedPct": 88.7
+    },
+    "RS": {
+      "cities": 16,
+      "samples": 3,
+      "major": 188,
+      "maxspeed": 169,
+      "toll": 28,
+      "fuel": 3,
+      "services": 0,
+      "border": 0,
+      "maxspeedPct": 89.9
+    }
+  }
+}
