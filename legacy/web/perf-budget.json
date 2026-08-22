@@ -27,5 +27,5 @@
     "map/theme-config.js",
     "map/tile-layer.js"
   ],
-  "knownOrphansNote": "This is the next-gen canvas map engine (web/map/) and its data/raster layers, actively developed via web/map-studio/ (see docs/MAP-SPEC.md: 'the active direction... not shipped'). Not dead code -- just not wired into index.html yet. When it ships, remove these entries; perf-profile will then correctly track its real payload cost."
+  "knownOrphansNote": "This is the canvas map engine (web/map/) and its data/raster layers, previously developed via web/map-studio/ toward MAP-SPEC.md's direction. Retired along with the rest of this legacy/ tree when the project reset onto the core-loop redesign (see /README.md and /docs/superpowers/specs/2026-08-20-core-gameplay-loop-design.md) rather than shipped."
 }

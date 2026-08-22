@@ -22,7 +22,7 @@ CACHE_NIGHT.mkdir(parents=True, exist_ok=True)
 CACHE_DAY.mkdir(parents=True, exist_ok=True)
 
 MAP_PATH = ROOT / 'data' / 'map.json'
-DATA_PATH = ROOT / 'web' / 'data.json'
+DATA_PATH = ROOT / 'legacy' / 'web' / 'data.json'
 
 view = json.loads(MAP_PATH.read_text())['view']
 raw_map = json.loads(DATA_PATH.read_text())
@@ -204,13 +204,13 @@ def reproject_mosaic(mosaic, is_night=False):
 # Render and save real satellite outputs
 print("Reprojecting real NASA Black Marble night lights...")
 night_rgba = reproject_mosaic(mosaic_night, is_night=True)
-night_out = ROOT / 'web' / 'urban-night.webp'
+night_out = ROOT / 'legacy' / 'web' / 'urban-night.webp'
 Image.fromarray(night_rgba).save(night_out, 'WEBP', quality=80, method=5)
 print(f"✓ Wrote {night_out.relative_to(ROOT)} ({night_out.stat().st_size / 1024:.0f} KB)")
 
 print("Reprojecting real True-Color daytime satellite imagery...")
 day_rgba = reproject_mosaic(mosaic_day, is_night=False)
-day_out = ROOT / 'web' / 'urban-day.webp'
+day_out = ROOT / 'legacy' / 'web' / 'urban-day.webp'
 Image.fromarray(day_rgba).save(day_out, 'WEBP', quality=75, method=5)
 print(f"✓ Wrote {day_out.relative_to(ROOT)} ({day_out.stat().st_size / 1024:.0f} KB)")
 

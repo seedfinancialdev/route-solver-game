@@ -69,7 +69,7 @@ def fetch(tile):
 
 
 view = json.loads((ROOT / 'data' / 'map.json').read_text())['view']
-raw_map = json.loads((ROOT / 'web' / 'data.json').read_text())
+raw_map = json.loads((ROOT / 'legacy' / 'web' / 'data.json').read_text())
 
 gx, gy = np.meshgrid(np.linspace(view['x'], view['x'] + view['w'], 80),
                      np.linspace(view['y'], view['y'] + view['h'], 80))
@@ -176,13 +176,13 @@ print("Generating land-masked RGBA terrain elevation relief maps...")
 for name, out_w, quality in OUTPUTS:
     out_h = round(out_w * view['h'] / view['w'])
     img = render(view, out_w, out_h)
-    out = ROOT / 'web' / name
+    out = ROOT / 'legacy' / 'web' / name
     Image.fromarray(img).save(out, 'WEBP', quality=quality, method=5)
     print(f'wrote {out.relative_to(ROOT)}  {out_w}x{out_h}  '
           f'{out.stat().st_size / 1024:.0f} KB')
 
 # Close-work fine tiles
-tile_dir = ROOT / 'web' / 'terrain'
+tile_dir = ROOT / 'legacy' / 'web' / 'terrain'
 tile_dir.mkdir(exist_ok=True)
 tw, th = view['w'] / TILE_COLS, view['h'] / TILE_ROWS
 px_w, px_h = round(tw * 1000 / TILE_M_PER_PX), round(th * 1000 / TILE_M_PER_PX)

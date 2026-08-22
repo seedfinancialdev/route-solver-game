@@ -2,7 +2,7 @@
 //
 // Thresholds are never hardcoded: they come from the puzzle pack's own
 // `criteria` block, which is what generated the set. That makes this check
-// incapable of drifting from the data it checks. See docs/SPEC.md:157-194.
+// incapable of drifting from the data it checks. See legacy/docs/SPEC.md:157-194.
 
 /** The criteria block, or an explicit failure. Never a silent default. */
 export function readCriteria(pack) {
@@ -29,7 +29,7 @@ export function checkShippedSet(pack, cityCount) {
   pack.puzzles.forEach((p, index) => {
     // Criterion 1, the load-bearing one: the shortest road is a free,
     // deterministic strategy. If it comes in under budget, the puzzle is not a
-    // puzzle. docs/SPEC.md:161-173.
+    // puzzle. legacy/docs/SPEC.md:161-173.
     if (p.shortestMin <= p.budgetMin) {
       shortestRoadWins.push({ index, reason: `shortest ${p.shortestMin} <= budget ${p.budgetMin}` });
     }
@@ -86,7 +86,7 @@ export function sweepRow(runs, multiplier) {
 
 /**
  * The lowest swept multiplier at which the shortest road starts getting away
- * with it. docs/SPEC.md:221-224 requires the shipped multiplier to sit below
+ * with it. legacy/docs/SPEC.md:221-224 requires the shipped multiplier to sit below
  * this by "one road's worth of margin", made numeric by the caller.
  */
 export function findCliff(runs, multipliers) {
@@ -99,7 +99,7 @@ export function findCliff(runs, multipliers) {
 const pct = (x) => `${(x * 100).toFixed(0)}%`;
 const hrs = (m) => `${(m / 60).toFixed(1)}h`;
 
-/** The markdown table for pasting into docs/SPEC.md at line 213. */
+/** The markdown table for pasting into legacy/docs/SPEC.md at line 213. */
 export function formatSpecTable(rows) {
   const head = '| multiplier | shortest-road player wins | road-reader wins | median win margin | median bust |\n'
     + '| --- | --- | --- | --- | --- |';

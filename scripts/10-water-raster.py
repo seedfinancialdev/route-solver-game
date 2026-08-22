@@ -17,7 +17,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUTPUTS = [('water.webp', 2400, 80), ('water-detail.webp', 6000, 68)]
 
 view = json.loads((ROOT / 'data' / 'map.json').read_text())['view']
-raw_map = json.loads((ROOT / 'web' / 'data.json').read_text())
+raw_map = json.loads((ROOT / 'legacy' / 'web' / 'data.json').read_text())
 
 
 def render_water(box, out_w, out_h):
@@ -74,7 +74,7 @@ print("Generating satellite-hybrid Lambert raster water maps...")
 for name, out_w, quality in OUTPUTS:
     out_h = round(out_w * view['h'] / view['w'])
     img_rgba = render_water(view, out_w, out_h)
-    out = ROOT / 'web' / name
+    out = ROOT / 'legacy' / 'web' / name
     Image.fromarray(img_rgba).save(out, 'WEBP', quality=quality, method=5)
     print(f'wrote {out.relative_to(ROOT)}  {out_w}x{out_h}  '
           f'{out.stat().st_size / 1024:.0f} KB')

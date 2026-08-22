@@ -9,43 +9,48 @@ export const PIPELINE = [
   { script: 'scripts/02-puzzles.mjs', inputs: ['data/graph.json'], outputs: ['data/puzzles.json'], needs: [] },
   { script: 'scripts/03-map.mjs', inputs: ['data/graph.json'], outputs: ['data/map.json'], needs: [] },
   { script: 'scripts/06-road-names.mjs', inputs: ['data/graph.json'], outputs: ['data/road-names.json'], needs: ['OSRM'] },
-  { script: 'scripts/07-streets.mjs', inputs: ['data/graph.json'], outputs: ['web/streets/manifest.json'], needs: ['Overpass'] },
+  { script: 'scripts/07-streets.mjs', inputs: ['data/graph.json'], outputs: ['legacy/web/streets/manifest.json'], needs: ['Overpass'] },
   {
     script: 'scripts/05-bundle.mjs',
     inputs: ['data/graph.json', 'data/map.json', 'data/puzzles.json', 'data/road-names.json'],
-    outputs: ['web/data.json'],
+    outputs: ['legacy/web/data.json'],
     needs: [],
   },
-  // Everything below consumes web/data.json, which is why 05-bundle must run
-  // first. package.json's data:map had 04-terrain second and 05-bundle third,
-  // so 04-terrain read the previous run's bundle.
+  // Everything below consumes legacy/web/data.json, which is why 05-bundle
+  // must run first. package.json's data:map had 04-terrain second and
+  // 05-bundle third, so 04-terrain read the previous run's bundle.
+  //
+  // This whole cluster (05-bundle onward) feeds the retired legacy game and
+  // the never-shipped canvas engine — see legacy/README.md. Kept live so the
+  // legacy build can still be regenerated for reference; not part of the
+  // core-loop direction.
   {
     script: 'scripts/04-terrain.py',
-    inputs: ['data/map.json', 'web/data.json'],
-    outputs: ['web/terrain.webp', 'web/terrain-detail.webp', 'web/terrain-tiles.json'],
+    inputs: ['data/map.json', 'legacy/web/data.json'],
+    outputs: ['legacy/web/terrain.webp', 'legacy/web/terrain-detail.webp', 'legacy/web/terrain-tiles.json'],
     needs: [],
   },
   {
     script: 'scripts/10-water-raster.py',
-    inputs: ['data/map.json', 'web/data.json'],
-    outputs: ['web/water.webp', 'web/water-detail.webp'],
+    inputs: ['data/map.json', 'legacy/web/data.json'],
+    outputs: ['legacy/web/water.webp', 'legacy/web/water-detail.webp'],
     needs: [],
   },
   {
     script: 'scripts/11-urban-satellite-raster.py',
-    inputs: ['data/map.json', 'web/data.json'],
-    outputs: ['web/urban-day.webp', 'web/urban-night.webp'],
+    inputs: ['data/map.json', 'legacy/web/data.json'],
+    outputs: ['legacy/web/urban-day.webp', 'legacy/web/urban-night.webp'],
     needs: [],
   },
-  { script: 'scripts/09-real-osm-forests.mjs', inputs: ['web/data.json'], outputs: ['web/cartography.json'], needs: [] },
+  { script: 'scripts/09-real-osm-forests.mjs', inputs: ['legacy/web/data.json'], outputs: ['legacy/web/cartography.json'], needs: [] },
 ];
 
 /**
  * Outputs older than something they were built from. Deduped on the
  * (output, input) pair — two pipeline stages can legitimately declare the
- * same output+input (e.g. web/cartography.json's two producers, both fed by
- * web/data.json), but the staleness report should say so once, not once per
- * stage that happens to share the pair.
+ * same output+input (e.g. legacy/web/cartography.json's two producers, both
+ * fed by legacy/web/data.json), but the staleness report should say so once,
+ * not once per stage that happens to share the pair.
  */
 export function stalenessCheck(mtimes) {
   const stale = [];
@@ -70,11 +75,12 @@ export function stalenessCheck(mtimes) {
 }
 
 /**
- * web/streets/manifest.json maps city index -> geonameid. Indices are
+ * legacy/web/streets/manifest.json maps city index -> geonameid. Indices are
  * positional, so growing the roster reorders them and silently repoints every
- * entry. web/app.js:286 takes the city's position from the current graph and
- * web/app.js:291 takes its street geometry from this manifest, so a
- * disagreement draws one city's streets at another city's location.
+ * entry. legacy/web/app.js:286 takes the city's position from the current
+ * graph and legacy/web/app.js:291 takes its street geometry from this
+ * manifest, so a disagreement draws one city's streets at another city's
+ * location.
  */
 export function manifestAgreement(manifest, cities) {
   let agree = 0;

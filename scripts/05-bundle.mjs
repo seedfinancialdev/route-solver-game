@@ -5,7 +5,8 @@
 // The graph ships whole because the game finds the fastest route itself at
 // reveal time; that keeps the payload small and lets practice mode play any pair.
 //
-// Output: web/data.json
+// Output: legacy/web/data.json — the legacy shipped game's bundle. See
+// legacy/README.md: this pipeline stage is retired along with the game it fed.
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { project } from './lib/proj.mjs';
@@ -152,15 +153,15 @@ const bundle = {
   puzzles: pack.puzzles.map((p) => [p.a, p.b, p.budgetMin, p.optimalMin, p.shortestMin]),
 };
 
-mkdirSync(new URL('../web/', import.meta.url), { recursive: true });
-const out = new URL('../web/data.json', import.meta.url);
+mkdirSync(new URL('../legacy/web/', import.meta.url), { recursive: true });
+const out = new URL('../legacy/web/data.json', import.meta.url);
 writeFileSync(out, JSON.stringify(bundle));
 
 const pts = edges.map((e) => (e.length - 5) / 2);
 const tierMix = { 0: 0, 1: 0, 2: 0 };
 for (const e of edges) for (const c of e[4]) tierMix[c]++;
 console.log(`  road stretches by pace — slow ${tierMix[0]}, ordinary ${tierMix[1]}, motorway ${tierMix[2]}`);
-console.log(`web/data.json — ${(readFileSync(out).length / 1024).toFixed(0)} KB`);
+console.log(`legacy/web/data.json — ${(readFileSync(out).length / 1024).toFixed(0)} KB`);
 console.log(`  ${cities.length} cities, ${edges.length} roads, ${bundle.puzzles.length} puzzles`);
 console.log(`  road shape points per hop: min ${Math.min(...pts)}, median `
   + `${pts.slice().sort((a, b) => a - b)[pts.length >> 1]}, max ${Math.max(...pts)}`);

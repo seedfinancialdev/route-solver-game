@@ -1,16 +1,21 @@
 ---
 name: perf-profile
-description: Use after changing anything under web/, after any raster or cartography rebuild, or when asked whether the game has got heavier. Audits what a player downloads and finds assets shipped but never loaded.
+description: Use after changing anything under legacy/web/, after any raster or cartography rebuild, or when asked whether the legacy game has got heavier. Audits what a player downloads and finds assets shipped but never loaded. Scoped to legacy/ — the retired shipped game and canvas-engine prototype; core-loop has no web UI yet.
 ---
 
 # perf-profile
 
     npm run perf
 
-Walks outward from `web/index.html`, following references transitively, and
-splits everything in `web/` into eager (reachable from the entry point),
-deferred (reached only through a manifest) and orphaned (reachable from
-nothing). Then checks totals against `web/perf-budget.json`.
+Walks outward from `legacy/web/index.html`, following references
+transitively, and splits everything in `legacy/web/` into eager (reachable
+from the entry point), deferred (reached only through a manifest) and
+orphaned (reachable from nothing). Then checks totals against
+`legacy/web/perf-budget.json`.
+
+This audits the retired game in `legacy/`, not core-loop — core-loop has no
+web UI yet (that's Slice 4, tracked in issue #7). Re-scope this tool once a
+core-loop UI exists to audit instead.
 
 ## Reading a failure
 
@@ -20,8 +25,8 @@ pipeline stage that builds it. Add it to `knownOrphans` only as a deliberate
 decision to keep shipping dead weight, with a reason.
 
 **"over budget"** — decide whether the growth is worth it. If it is, edit
-`web/perf-budget.json` in the same commit as the change that caused it, so the
-move is reviewable. Never raise a budget just to get a green run.
+`legacy/web/perf-budget.json` in the same commit as the change that caused it,
+so the move is reviewable. Never raise a budget just to get a green run.
 
 ## Known state
 

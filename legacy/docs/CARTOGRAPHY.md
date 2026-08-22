@@ -1,3 +1,7 @@
+> **Retired 2026-08-22.** Documents `legacy/web/app.css` and
+> `legacy/web/map/theme-config.js`, both retired along with the games they
+> styled. See `/README.md`.
+
 # Cartography bible
 
 Which parts of the map's look carry information the player acts on, and which

@@ -52,7 +52,7 @@ if (badIndices.length) {
 
 // --- street manifest ---------------------------------------------------------
 console.log('\n=== street manifest vs graph ===');
-const MANIFEST_PATH = 'web/streets/manifest.json';
+const MANIFEST_PATH = 'legacy/web/streets/manifest.json';
 if (!existsSync(new URL(MANIFEST_PATH, ROOT))) {
   console.log(`  warn  no ${MANIFEST_PATH} — street detail not built`);
 } else {
@@ -63,7 +63,7 @@ if (!existsSync(new URL(MANIFEST_PATH, ROOT))) {
     if (disagree.length) {
       fail(`${disagree.length} of ${checked} manifest entries point at a different city `
         + 'than the graph has at that index — the game draws the wrong city\'s streets '
-        + '(web/app.js:286 takes position from the graph, :291 takes geometry from here). '
+        + '(legacy/web/app.js:286 takes position from the graph, :291 takes geometry from here). '
         + 'Rebuild with npm run data:streets');
       for (const d of disagree.slice(0, 5)) {
         const name = graph.cities[d.index]?.name ?? '(no such city)';
