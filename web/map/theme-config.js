@@ -1,6 +1,17 @@
 /**
  * Map Engine Theme Configuration & 24-Hour Solar Time-of-Day System
  * Calibrated for Natural Full-Color Physical Atlas Realism & Cannonball Racing.
+ *
+ * `road` is ONE hue per preset, for every road on the map. How fast a stretch
+ * runs is carried by width and opacity together (roadWidthsFor and PACE_ALPHA
+ * in cartography-layer.js), never by colour — the shipped SVG renderer works
+ * the same way (web/app.css:228-230), and docs/CARTOGRAPHY.md's "never hue
+ * alone" rule makes width the arbiter so the tell survives colour blindness.
+ *
+ * Hue is deliberately unspent. It is held for real OSM road class, which is
+ * a different variable from pace: a motorway crossing the Apennines is still
+ * a motorway while it runs slow, and the gap between what a road IS and how
+ * it actually drives is the thing the player is meant to learn to read.
  */
 
 export const THEME_PRESETS = {
@@ -20,9 +31,7 @@ export const THEME_PRESETS = {
     terrainBlend: 'overlay',
     roadCasing: '#1a1d24',
     roadDivider: '#1a1d24',
-    roadMotorway: '#e64122',
-    roadTrunk: '#f59e0b',
-    roadPrimary: '#4b5563',
+    road: '#c0392b',
     roadSecondary: '#374151',
     roadWidthMotorway: 3.2,
     roadWidthTrunk: 2.2,
@@ -51,9 +60,7 @@ export const THEME_PRESETS = {
     terrainBlend: 'overlay',
     roadCasing: '#141820',
     roadDivider: '#141820',
-    roadMotorway: '#e64122',
-    roadTrunk: '#f59e0b',
-    roadPrimary: '#4b5563',
+    road: '#c0392b',
     roadSecondary: '#374151',
     roadWidthMotorway: 3.2,
     roadWidthTrunk: 2.2,
@@ -82,9 +89,7 @@ export const THEME_PRESETS = {
     terrainBlend: 'multiply',
     roadCasing: '#04070b',
     roadDivider: '#04070b',
-    roadMotorway: '#ff4d2e',
-    roadTrunk: '#f59e0b',
-    roadPrimary: '#475569',
+    road: '#ff4d2e',
     roadSecondary: '#1e293b',
     roadWidthMotorway: 3.4,
     roadWidthTrunk: 2.4,
@@ -113,9 +118,7 @@ export const THEME_PRESETS = {
     terrainBlend: 'overlay',
     roadCasing: '#181410',
     roadDivider: '#181410',
-    roadMotorway: '#e66b4e',
-    roadTrunk: '#cca152',
-    roadPrimary: '#737a85',
+    road: '#e66b4e',
     roadSecondary: '#4d5159',
     roadWidthMotorway: 3.2,
     roadWidthTrunk: 2.2,
@@ -144,9 +147,7 @@ export const THEME_PRESETS = {
     terrainBlend: 'overlay',
     roadCasing: '#060a0f',
     roadDivider: '#060a0f',
-    roadMotorway: '#e63946',
-    roadTrunk: '#f4a261',
-    roadPrimary: '#457b9d',
+    road: '#e63946',
     roadSecondary: '#2a9d8f',
     roadWidthMotorway: 3.0,
     roadWidthTrunk: 2.0,

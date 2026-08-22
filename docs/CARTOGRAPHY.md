@@ -100,10 +100,32 @@ scenery colour; automate only if it proves to bite.
 `web/map-studio/` drives. None of it reaches a player today. Recorded here so
 the contract is ready when it ships.
 
-**Would be load-bearing:** `roadMotorway`, `roadTrunk`, `roadPrimary` — pace
-tier colour, actually read by `web/map/cartography-layer.js:224-236`;
+**Would be load-bearing:** `road` — the one hue every road on the canvas draws
+in, read via `roadDrawPlan()` (`web/map/cartography-layer.js`);
 `cityNode`, `cityNodeActive`, `cityNodeBorder` (scenery versus actionable);
 `routeLine`, `routeLineGlow`.
+
+**Hue does not encode pace, and is deliberately unspent.** The canvas briefly
+gave each pace tier its own hue under the tokens `roadMotorway` / `roadTrunk` /
+`roadPrimary` — red, amber, slate. That was wrong three ways: it made `--road`
+red mean "a road you can take" in the SVG and "the fastest tier" in the canvas;
+it made hue the loudest tier signal, breaking **Never hue alone** above, which
+wants width as the arbiter; and it spent the road-*class* vocabulary on pace
+data, so a slow mountain stretch of a real motorway drew as a "primary".
+
+Pace is now width and opacity only, exactly as the shipped SVG does it. Hue is
+held for real OSM road class — a different variable from pace, and the gap
+between what a road *is* and how it actually drives is the thing the player is
+meant to learn to read. `tests/road-palette.test.mjs` stops pace creeping back
+into hue.
+
+**Opacity is the second pace channel.** `PACE_ALPHA`
+(`web/map/cartography-layer.js`) is `.95 / .74 / .56` for fast / ordinary /
+slow — deliberately the shipped SVG's own values (`web/app.css:228-230`), so
+both renderers state the tell at the same strength. It must stay ordered the
+same way as width; `tests/road-palette.test.mjs` checks the two channels agree
+over the buckets each zoom band actually draws. Above 2000 km the fastest
+network is held back to `0.45` because it is the only thing drawn.
 
 **Currently inert:** `roadWidthMotorway`, `roadWidthTrunk`, `roadWidthPrimary`
 and `roadSecondary` are defined in all five presets (one sets 3.4 : 2.4 : 1.5,

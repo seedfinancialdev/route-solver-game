@@ -21,6 +21,52 @@ const STRATEGIC_WAYPOINTS = [
 ];
 
 /**
+ * How strongly each pace tier states itself, alongside its width.
+ *
+ * Hue does NOT carry pace — every road draws in the theme's single `road`
+ * colour, and how fast it runs is width and opacity together. docs/CARTOGRAPHY.md
+ * requires the two channels to agree ("must not be inverted against width"),
+ * which tests/road-palette.test.mjs checks over the buckets each zoom draws.
+ * The values are the shipped SVG's own (web/app.css:228-230), so both
+ * renderers state the tell at the same strength.
+ */
+export const PACE_ALPHA = { fast: 0.95, ordinary: 0.74, slow: 0.56 };
+
+/** Used when a theme predates the single-hue `road` token. */
+const DEFAULT_ROAD = '#c0392b';
+
+/**
+ * Above 2000 km the fastest network is the only thing drawn and carries the
+ * whole overview alone, so it is held back to read as a network rather than a
+ * wall of colour. Pre-existing behaviour, preserved from the `rgba(230, 65,
+ * 34, 0.45)` literal this replaced — only the hue moved to the theme.
+ */
+const OVERVIEW_FAST_ALPHA = 0.45;
+
+/**
+ * The ordered road passes for one frame: what colour, how wide, how strongly.
+ *
+ * Extracted from render() for the same reason roadWidthsFor was — so the
+ * contract can be checked in Node without a canvas (tests/road-palette.test.mjs).
+ * Slowest first, so the fastest network lands on top and is never buried under
+ * the slow one at the zoom where corridor decisions get made.
+ */
+export function roadDrawPlan(zoomKm, theme) {
+  const { mwWidth, trWidth, prWidth, drawPrimaries, drawTrunks } = roadWidthsFor(zoomKm);
+  const color = (theme && theme.road) || DEFAULT_ROAD;
+  const plan = [];
+  if (drawPrimaries) plan.push({ tier: 'slow', width: prWidth, alpha: PACE_ALPHA.slow, color });
+  if (drawTrunks) plan.push({ tier: 'ordinary', width: trWidth, alpha: PACE_ALPHA.ordinary, color });
+  plan.push({
+    tier: 'fast',
+    width: mwWidth,
+    alpha: zoomKm > 2000 ? OVERVIEW_FAST_ALPHA : PACE_ALPHA.fast,
+    color,
+  });
+  return plan;
+}
+
+/**
  * Road stroke widths and draw gates for a given zoom, factored out of render()
  * so the width-ordering constraint (tier 2 fastest, draws heaviest — see
  * road-tiers.js) is testable in Node without a canvas: `render()` below is the
@@ -195,10 +241,10 @@ export class CartographyLayer {
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      // Split along each road's length: a city-to-city road is routinely
-      // motorway in the middle and slow at both ends, and the difference is the
-      // whole tell. Tier 2 is the fastest and draws heaviest — see road-tiers.js.
-      const { motorways, trunks, primaries } = bucketRoadRuns(g.adj);
+      // Split along each road's length: a city-to-city road is routinely fast
+      // in the middle and slow at both ends, and the difference is the whole
+      // tell. Tier 2 is the fastest and draws heaviest — see road-tiers.js.
+      const { fast, ordinary, slow } = bucketRoadRuns(g.adj);
       const { mwWidth, trWidth, prWidth, drawPrimaries, drawTrunks } = roadWidthsFor(zoomKm);
 
       const casingCol = theme.roadCasing || '#1a1d24';
@@ -209,39 +255,33 @@ export class CartographyLayer {
 
         if (drawPrimaries) {
           ctx.lineWidth = (prWidth + 1.2) / scaleX;
-          this.drawShapeBatch(ctx, primaries);
+          this.drawShapeBatch(ctx, slow);
         }
 
         ctx.lineWidth = (trWidth + 1.4) / scaleX;
-        this.drawShapeBatch(ctx, trunks);
+        this.drawShapeBatch(ctx, ordinary);
 
         ctx.lineWidth = (mwWidth + 1.8) / scaleX;
-        this.drawShapeBatch(ctx, motorways);
+        this.drawShapeBatch(ctx, fast);
       }
 
-      // PASS 2: Vibrant Highway Surface Core
-      if (drawPrimaries) {
-        ctx.strokeStyle = theme.roadPrimary || '#4b5563';
-        ctx.lineWidth = prWidth / scaleX;
-        this.drawShapeBatch(ctx, primaries);
+      // PASS 2: Road surface. One hue for every road — how fast a stretch runs
+      // is width and opacity together, never colour. Slowest first so the fast
+      // network lands on top. See roadDrawPlan and docs/CARTOGRAPHY.md.
+      const runsByTier = { fast, ordinary, slow };
+      for (const pass of roadDrawPlan(zoomKm, theme)) {
+        ctx.strokeStyle = pass.color;
+        ctx.globalAlpha = pass.alpha;
+        ctx.lineWidth = pass.width / scaleX;
+        this.drawShapeBatch(ctx, runsByTier[pass.tier]);
       }
-
-      if (drawTrunks) {
-        ctx.strokeStyle = theme.roadTrunk || '#f59e0b';
-        ctx.lineWidth = trWidth / scaleX;
-        this.drawShapeBatch(ctx, trunks);
-      }
-
-      const isOverview = zoomKm > 2000;
-      ctx.strokeStyle = isOverview ? 'rgba(230, 65, 34, 0.45)' : (theme.roadMotorway || '#e64122');
-      ctx.lineWidth = mwWidth / scaleX;
-      this.drawShapeBatch(ctx, motorways);
+      ctx.globalAlpha = 1;
 
       // PASS 3: Dual-Lane Centerline Divider (Zoom <= 350 km)
       if (zoomKm <= 350) {
         ctx.strokeStyle = casingCol;
         ctx.lineWidth = 0.8 / scaleX;
-        this.drawShapeBatch(ctx, motorways);
+        this.drawShapeBatch(ctx, fast);
       }
 
       ctx.restore();
