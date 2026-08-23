@@ -125,10 +125,12 @@ class Heap {
 }
 
 /**
- * Shortest path by minutes. `penalty` optionally multiplies specific edges,
- * which is how alternative corridors get found — see corridors() below.
+ * Shortest path by minutes, or by metres when `byDistance` is set. `penalty`
+ * optionally multiplies specific edges, which is how alternative corridors get
+ * found — see corridors() below. The returned `minutes` is always real travel
+ * time, whatever the search was weighted by.
  */
-export function route(g, src, dst, penalty = null) {
+export function route(g, src, dst, penalty = null, byDistance = false) {
   const dist = new Float64Array(g.n).fill(Infinity);
   const prevNode = new Int32Array(g.n).fill(-1);
   const prevEdge = new Int32Array(g.n).fill(-1);
@@ -145,7 +147,9 @@ export function route(g, src, dst, penalty = null) {
     for (let k = g.off[u]; k < g.off[u + 1]; k++) {
       const v = g.to[k], i = g.via[k];
       if (done[v]) continue;
-      const w = travelMinutes(g, i) * (penalty ? penalty[i] : 1);
+      // byDistance costs the SHORTEST route, not the fastest — the game's
+      // thesis is that those differ, and the gate measures by how much.
+      const w = byDistance ? g.m[i] : travelMinutes(g, i) * (penalty ? penalty[i] : 1);
       const nd = d + w;
       if (nd < dist[v]) { dist[v] = nd; prevNode[v] = u; prevEdge[v] = i; heap.push(nd, v); }
     }

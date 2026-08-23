@@ -23,7 +23,8 @@
     "atlas": "node scripts/serve-atlas.mjs",
     "atlas:data": "node atlas/build-geojson.mjs",
     "atlas:check": "node atlas/check-style.mjs",
-    "osm:build": "node scripts/16-build-osm-graph.mjs"
+    "osm:build": "node scripts/16-build-osm-graph.mjs",
+    "runs:check": "node --max-old-space-size=6000 scripts/17-check-runs.mjs"
   },
   "devDependencies": {
     "d3-delaunay": "^6.0.4",
