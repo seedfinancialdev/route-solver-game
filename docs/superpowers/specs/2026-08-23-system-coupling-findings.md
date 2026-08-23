@@ -91,7 +91,109 @@ optimisation. All second-order against a cost that is nearly uniform anyway.
 
 ---
 
-## 3. Enforcement — untested, and structurally the best candidate
+## 3. Enforcement exposure — varies, but in the reinforcing direction
+
+Measured without new data, using speed-limit transitions: police enforce where
+the limit drops, so a motorway has almost none and a primary road through
+villages is made of them.
+
+Exposure does vary — 1.8x on limit drops per 100 km, 5x on urban share. But the
+direction is wrong:
+
+| Cape to Cape | drops/100km | urban share |
+| --- | --- | --- |
+| corridor 0 (fastest) | 5.4 | 0.3% |
+| corridor 1 (+7.2%) | 6.9 | 0.5% |
+| corridor 2 (+18.7%) | 9.6 | 1.7% |
+
+**The fastest corridor has the least exposure.** The slow corridors are slow
+because they use primary roads through villages, which is the same reason they
+are policed. Enforcement widens the gap rather than closing it — the same
+failure as fuel.
+
+Recorded as a method note: *variance is not the test.* Three measurements in a
+row reported "differs materially" when what mattered was whether the difference
+could **reverse** a ranking. It could not.
+
+---
+
+## 4. Traffic — the largest system by far, and the metric nearly hid it
+
+### Percentage of total was the wrong measure
+
+Measured as a share of run time, departure timing looked negligible on long
+runs: 1.5% on Cape to Cape, 3.8% on Roca. That conclusion was an artifact of
+dividing by a large number.
+
+In absolute terms:
+
+| run | traffic costs | departure choice worth |
+| --- | --- | --- |
+| Roca to the Bosphorus (34 h) | 4h55 – 6h24 | **1h30** |
+| The Grand Tour (75 h) | 9h59 – 11h24 | **1h29** |
+
+Traffic is the largest system measured — bigger than everything else combined.
+And ninety minutes is decisive in a race where the field is separated by far
+less.
+
+### Departure sets the PHASE of a sequence of encounters
+
+Metro encounters stay essentially constant whatever time you leave — 64-65 on
+Roca, 114 on the Grand Tour. What changes is how many are hit at peak:
+**18 to 34, nearly double.** Same cities, different phase.
+
+That also corrects the run-length conclusion. Departure leverage is ~1h30 on a
+34-hour run and ~1h29 on a 75-hour one — **it does not decay in absolute terms**.
+Only the percentage shrinks, because the denominator grows. Against an absolute
+record, a longer run gives more room to win or lose, not less.
+
+### What it still does not do
+
+Departure timing does not change which corridor or which order wins. Every
+corridor slows together. But that is a narrower question than whether it is a
+decision, and ninety minutes plainly is one.
+
+### Not yet modelled: incidents
+
+An accident is discrete, route-specific and time-specific. It cannot average out
+the way recurring congestion does, and it is the one thing that could make a
+slower corridor suddenly correct. The snapshot mechanism the design intent
+already specifies for weather is the right shape for it.
+
+---
+
+## 5. Checkpoint ordering — the first genuine decision
+
+Checkpoints inside cities, pass-through rather than stops, visitable in any
+order. The Grand Tour: Barcelona to Istanbul by way of Paris, Munich, Rome and
+Copenhagen.
+
+| | |
+| --- | --- |
+| median ordering costs | **+17.3%** |
+| worst ordering costs | **+32%** |
+
+The first system to change the answer. Everything else measured zero.
+
+The winning order is not obvious either — **Barcelona, Paris, Copenhagen,
+Munich, Rome, Istanbul**, a northern sweep before turning south-east.
+
+Why this works where corridors did not: a motorway route *bypasses* city
+centres, so through-traffic barely touches it. A checkpoint inside the city
+forces urban penetration, which is where traffic actually bites — measured at
+66% on an 86 km leg through the Randstad.
+
+**Caveat:** four intermediate checkpoints is 24 orderings, which a player can
+brute-force if the planner shows exact times. Six is 720, eight is 40,320. The
+other half of the answer is that the planner should not hand over solved
+numbers — estimating against forecasts keeps ordering a judgement.
+
+**Ordering does not interact with departure time.** The same order wins at every
+hour. They are two independent decisions rather than one coupled problem.
+
+---
+
+## Old section: enforcement as originally framed
 
 Not yet measured. It is the only candidate whose cost varies with **place**
 rather than with distance or time, which is the property the other two lack. A

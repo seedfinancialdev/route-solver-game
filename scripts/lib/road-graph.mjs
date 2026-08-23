@@ -321,3 +321,49 @@ export function bestOrder(matrix, n) {
     permutations: costs.length,
   };
 }
+
+/**
+ * Shortest path where an edge's cost depends on WHEN you reach it.
+ *
+ * `dist[u]` is the arrival time at u in minutes from departure, so the clock at
+ * any edge is departMinutes + dist[u]. That makes the search time-dependent
+ * without a second dimension of state, which is only valid because the
+ * congestion model is FIFO — leaving later never gets you there earlier.
+ *
+ * This is the search that can reverse a corridor ranking. The static one cannot:
+ * with no time in the world, the motorway wins on every axis at once.
+ *
+ * @param timeCost (edgeIndex, clockMinutes) -> minutes to traverse
+ */
+export function routeTimed(g, src, dst, departMinutes, timeCost, penalty = null) {
+  const dist = new Float64Array(g.n).fill(Infinity);
+  const prevNode = new Int32Array(g.n).fill(-1);
+  const prevEdge = new Int32Array(g.n).fill(-1);
+  const done = new Uint8Array(g.n);
+  const heap = new Heap();
+  dist[src] = 0;
+  heap.push(0, src);
+
+  while (heap.size) {
+    const [d, u] = heap.pop();
+    if (done[u]) continue;
+    done[u] = 1;
+    if (u === dst) break;
+    const clock = departMinutes + d;
+    for (let k = g.off[u]; k < g.off[u + 1]; k++) {
+      const v = g.to[k], i = g.via[k];
+      if (done[v]) continue;
+      const w = timeCost(i, clock) * (penalty ? penalty[i] : 1);
+      const nd = d + w;
+      if (nd < dist[v]) { dist[v] = nd; prevNode[v] = u; prevEdge[v] = i; heap.push(nd, v); }
+    }
+  }
+  if (!Number.isFinite(dist[dst])) return null;
+
+  const edges = [];
+  for (let v = dst; v !== src && prevEdge[v] >= 0; v = prevNode[v]) edges.push(prevEdge[v]);
+  edges.reverse();
+  let metres = 0;
+  for (const i of edges) metres += g.m[i];
+  return { edges, minutes: dist[dst], km: metres / 1000, set: new Set(edges) };
+}

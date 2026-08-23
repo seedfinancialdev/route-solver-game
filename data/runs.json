@@ -124,6 +124,58 @@
         "an island: no borders, no jurisdiction variety, denser network",
         "a circuit needs checkpoints or it is degenerate"
       ]
+    },
+    {
+      "id": "grand-tour",
+      "name": "The Grand Tour",
+      "style": "point-to-point",
+      "ordered": false,
+      "note": "Checkpoints are pass-through, not stops: you must drive through the point, the clock never pauses. The whole cost of a checkpoint is entering and leaving the city at whatever hour your ordering puts you there.",
+      "from": {
+        "name": "Barcelona",
+        "detail": "city centre intersection",
+        "country": "ES",
+        "lat": 41.3874,
+        "lon": 2.1686
+      },
+      "to": {
+        "name": "Istanbul",
+        "detail": "city centre intersection",
+        "country": "TR",
+        "lat": 41.0055,
+        "lon": 28.9769
+      },
+      "checkpoints": [
+        {
+          "name": "Paris",
+          "country": "FR",
+          "lat": 48.8566,
+          "lon": 2.3522
+        },
+        {
+          "name": "Munich",
+          "country": "DE",
+          "lat": 48.1351,
+          "lon": 11.582
+        },
+        {
+          "name": "Rome",
+          "country": "IT",
+          "lat": 41.9028,
+          "lon": 12.4964
+        },
+        {
+          "name": "Copenhagen",
+          "country": "DK",
+          "lat": 55.6761,
+          "lon": 12.5683
+        }
+      ],
+      "tests": [
+        "sequencing across a continent, not a perimeter — no obvious order",
+        "checkpoints INSIDE cities, so urban penetration is unavoidable",
+        "order determines arrival hour, arrival hour determines cost"
+      ]
     }
   ]
 }
