@@ -101,6 +101,44 @@ partial. The two renderers each hold a different half of a map.
 
 ---
 
+## Regression to fix: weight stopped stating pace
+
+`2026-08-21-map-representation-design.md` settles it — colour states road TYPE,
+weight states PACE. The atlas currently breaks that: colour and width both state
+class, which is exactly the redundancy that spec removed.
+
+The reason was defensible at the time. Going all-roads meant the measured pace
+tell only existed for 2,160 curated edges, and the OpenMapTiles schema the
+vector tiles use carries `class`, `surface`, `toll` and `expressway` but **no
+`maxspeed`**. Deriving a speed from class would only have restated the colour.
+
+That reasoning is now out of date. The road graph carries a `kmh` on **every**
+edge, real or inferred, with a `maxspeedReal` flag saying which. The tiles do
+not have it; we do.
+
+So restoring weight-to-pace means **rendering roads from our own vector tiles**,
+built from the graph with speed baked in, rather than from OpenFreeMap's. That
+is a real project. It is also the same project that makes speed limits
+displayable during a run, which the race needs anyway — see
+`2026-08-22-player-experience.md`.
+
+Until then the map is honestly redundant rather than dishonestly invented.
+
+---
+
+## Cheap wins already available
+
+- **3D terrain.** MapLibre renders real terrain off the same `raster-dem`
+  source already wired for hillshade; exaggeration is one number. The map
+  should feel like relief, not a texture.
+- **Time of day.** The ground responding to the departure hour is presentation,
+  not simulation, and nothing in the current renderer blocks it. Roads must not
+  respond — evidence that changes with the light is decoration
+  (`2026-08-21-map-representation-design.md`).
+- **Traffic**, when it exists, is a paint property on roads already drawn.
+
+---
+
 ## Structural faults to fix, not inherit
 
 1. **Two renderers, neither complete.** The prettier one carries less

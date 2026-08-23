@@ -52,8 +52,9 @@ import numpy as np
 import osmium
 
 CLASSES = [
-    'motorway', 'trunk', 'primary', 'secondary',
-    'motorway_link', 'trunk_link', 'primary_link', 'secondary_link',
+    'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
+    'unclassified', 'residential', 'living_street',
+    'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link',
 ]
 CLASS_ID = {c: i for i, c in enumerate(CLASSES)}
 KEEP = set(CLASSES)
@@ -61,8 +62,10 @@ KEEP = set(CLASSES)
 # Fallback when maxspeed is absent or unparseable. This fires a lot: 42.5% real
 # in the Iberian build, so most edges use these.
 DEFAULT_KMH = {
-    'motorway': 120, 'trunk': 100, 'primary': 80, 'secondary': 70,
+    'motorway': 120, 'trunk': 100, 'primary': 80, 'secondary': 70, 'tertiary': 60,
+    'unclassified': 50, 'residential': 30, 'living_street': 15,
     'motorway_link': 60, 'trunk_link': 55, 'primary_link': 50, 'secondary_link': 45,
+    'tertiary_link': 40,
 }
 
 FLAG_ONEWAY = 1

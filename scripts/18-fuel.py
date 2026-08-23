@@ -16,9 +16,13 @@ osmium's full area machinery. Getting those node locations uses the same cursor
 trick as scripts/15-filter-roads.py: refs sorted once, PBF nodes arrive in id
 order, so membership is O(1) per node rather than a lookup.
 
-Output: data/fuel.json — [lon, lat, kind] where kind is 0 fuel, 1 services.
+One extract in, one file out, cached — same shape as scripts/15-filter-roads.py
+so the work parallelises across countries and a re-run is free. Merged by
+scripts/16-build-osm-graph.mjs.
 
-Usage: scripts/18-fuel.py data/fuel.json a.osm.pbf b.osm.pbf ...
+Output: [lon, lat, kind] where kind is 0 fuel, 1 services.
+
+Usage: scripts/18-fuel.py in.osm.pbf out.json
 """
 import json
 import os
@@ -78,9 +82,12 @@ class Locate(osmium.SimpleHandler):
             self.out[n.id] = (n.location.lon, n.location.lat)
 
 
-def main(out_path, pbfs):
+def main(pbf, out_path):
+    if os.path.exists(out_path):
+        print(f'{os.path.basename(out_path)} cached, skipping')
+        return
     points = []
-    for pbf in pbfs:
+    if True:
         name = os.path.basename(pbf)
         print(f'pass 1  {name}', flush=True)
         c = Collect()
@@ -114,12 +121,14 @@ def main(out_path, pbfs):
         seen.add(key)
         uniq.append([lon, lat, k])
 
-    with open(out_path, 'w') as fh:
+    tmp = f'{out_path}.partial'
+    with open(tmp, 'w') as fh:
         json.dump({
             'note': 'kind: 0 = amenity=fuel, 1 = highway=services',
-            'sources': [os.path.basename(p) for p in pbfs],
+            'source': os.path.basename(pbf),
             'stations': uniq,
         }, fh)
+    os.rename(tmp, out_path)
 
     fuel = sum(1 for p in uniq if p[2] == FUEL)
     print(f'\n{len(uniq):,} stations ({fuel:,} fuel, {len(uniq) - fuel:,} services)')
@@ -127,7 +136,7 @@ def main(out_path, pbfs):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
+    if len(sys.argv) != 3:
         print(__doc__)
         sys.exit(1)
-    main(sys.argv[1], sys.argv[2:])
+    main(sys.argv[1], sys.argv[2])

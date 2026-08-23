@@ -24,8 +24,8 @@ if (!window.ATLAS_STYLE) {
   const map = new maplibregl.Map({
     container: 'map',
     style: window.ATLAS_STYLE,
-    center: [10.2, 47.6],       // the Alps: terrain and corridors in one view
-    zoom: 5.4,
+    center: [9.5, 48.5],        // wide enough to hold a whole career run
+    zoom: 4.2,
     maxZoom: 15,
     hash: true,
     attributionControl: { compact: true },
@@ -66,6 +66,7 @@ if (!window.ATLAS_STYLE) {
   const GROUPS = {
     't-hill': ['hillshade'],
     't-osm': ['roads-casing', 'roads', 'road-labels'],
+    't-routes': ['route-halo', 'route-alt', 'route-best'],
     't-labels': ['place-labels', 'city-labels'],
   };
   map.on('load', () => {

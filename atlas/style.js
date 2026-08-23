@@ -96,6 +96,7 @@
       },
       cities: { type: 'geojson', data: './cities.geojson' },
       runs: { type: 'geojson', data: './runs.geojson' },
+      routes: { type: 'geojson', data: './run-routes.geojson' },
     },
     layers: [
       { id: 'ground', type: 'background', paint: { 'background-color': '#5a714d' } },
@@ -158,6 +159,29 @@
       { id: 'city-dots', type: 'circle', source: 'cities',
         paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 2.2, 8, 5],
           'circle-color': '#ffffff', 'circle-stroke-color': '#0b0f17', 'circle-stroke-width': 1.4 } },
+      // ---- the run being planned -------------------------------------------
+      // Sits above the road network, not inside it: this is a route under
+      // consideration, not part of the world. The fastest corridor reads
+      // solid; the alternatives are the choice, so they stay present but
+      // quieter rather than being hidden.
+      { id: 'route-halo', type: 'line', source: 'routes',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#0b1016', 'line-blur': 1,
+          'line-width': zoomWidth([3, 5, 7, 11, 12, 20]),
+          'line-opacity': 0.55 } },
+      { id: 'route-alt', type: 'line', source: 'routes',
+        filter: ['>', ['get', 'rank'], 0],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#8fb7cf', 'line-dasharray': [2.5, 1.8],
+          'line-width': zoomWidth([3, 1.4, 7, 2.6, 12, 4]),
+          'line-opacity': 0.75 } },
+      { id: 'route-best', type: 'line', source: 'routes',
+        filter: ['==', ['get', 'rank'], 0],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#ffffff',
+          'line-width': zoomWidth([3, 2.2, 7, 4, 12, 6.5]),
+          'line-opacity': 0.92 } },
+
       // ---- career run endpoints -------------------------------------------
       { id: 'run-ends', type: 'circle', source: 'runs',
         paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 5, 8, 9],

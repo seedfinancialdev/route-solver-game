@@ -29,17 +29,28 @@ import sys
 import numpy as np
 import osmium
 
+# Every road a car can drive, except `service`.
+# A spine of motorway-to-secondary is not enough. The last kilometres of a run
+# are real time — tens of minutes in a dense city — and a fuel detour has to be
+# ROUTED, not estimated: a station 500 m away as the crow flies can be 4 km by
+# road, on the wrong side of a dual carriageway with no junction. Straight-line
+# detour costs were tried and are not close.
+#
+# `service` is excluded: 21% of all drivable ways and almost entirely parking
+# aisles and driveways. The cost of that is the last ~50 m onto a forecourt,
+# which is seconds, not the kilometres the spine-only version was fudging.
 KEEP = {
-    'motorway', 'trunk', 'primary', 'secondary',
-    'motorway_link', 'trunk_link', 'primary_link', 'secondary_link',
+    'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
+    'unclassified', 'residential', 'living_street',
+    'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link',
 }
-
 
 def wanted(tags):
     hw = tags.get('highway')
     if hw not in KEEP or tags.get('access') in ('no', 'private'):
         return None
     return hw
+
 
 
 class CollectRefs(osmium.SimpleHandler):
@@ -50,7 +61,7 @@ class CollectRefs(osmium.SimpleHandler):
         self.ways = 0
 
     def way(self, w):
-        if not wanted(w.tags) or len(w.nodes) < 2:
+        if len(w.nodes) < 2 or not wanted(w.tags):
             return
         self.ways += 1
         self.refs.extend(n.ref for n in w.nodes)
@@ -93,7 +104,7 @@ class Writer(osmium.SimpleHandler):
             self.nodes_out += 1
 
     def way(self, w):
-        if wanted(w.tags) and len(w.nodes) >= 2:
+        if len(w.nodes) >= 2 and wanted(w.tags):
             self.w.add_way(w)
             self.ways_out += 1
 
