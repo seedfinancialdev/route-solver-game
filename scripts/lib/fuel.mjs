@@ -51,7 +51,7 @@ function metres(lon1, lat1, lon2, lat2) {
  * misses: a town station two kilometres off a motorway junction. The motorway
  * node is not that station's nearest node, but the driver can still reach it.
  */
-export function bestNear(stations, lon, lat, reachM = REACH_M) {
+export function bestNear(stations, lon, lat, reachM = REACH_M, onlyKind = null) {
   const cx = Math.floor(lon / CELL), cy = Math.floor(lat / CELL);
   let best = null, bestCost = Infinity;
   for (let dx = -1; dx <= 1; dx++) {
@@ -59,6 +59,7 @@ export function bestNear(stations, lon, lat, reachM = REACH_M) {
       for (const [slon, slat, kind] of stations.grid.get(`${cx + dx}:${cy + dy}`) || []) {
         const d = metres(lon, lat, slon, slat);
         if (d > reachM) continue;
+        if (onlyKind !== null && kind !== onlyKind) continue;
         const cost = STOP_MINUTES[kind] + detourMinutes(d, kind);
         if (cost < bestCost) { bestCost = cost; best = { lon: slon, lat: slat, kind, snapMetres: d, cost }; }
       }

@@ -24,9 +24,10 @@
     "atlas:data": "node atlas/build-geojson.mjs",
     "atlas:check": "node atlas/check-style.mjs",
     "osm:build": "node scripts/16-build-osm-graph.mjs",
-    "runs:check": "node --max-old-space-size=6000 scripts/17-check-runs.mjs",
-    "runs:geometry": "node --max-old-space-size=6000 scripts/19-run-geometry.mjs",
-    "fuel:gate": "node --max-old-space-size=6000 scripts/20-fuel-gate.mjs"
+    "runs:check": "node --max-old-space-size=14000 scripts/17-check-runs.mjs",
+    "runs:geometry": "node --max-old-space-size=14000 scripts/19-run-geometry.mjs",
+    "fuel:gate": "node --max-old-space-size=14000 scripts/20-fuel-gate.mjs",
+    "fuel:spacing": "node --max-old-space-size=14000 scripts/21-station-spacing.mjs"
   },
   "devDependencies": {
     "d3-delaunay": "^6.0.4",

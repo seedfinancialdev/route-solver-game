@@ -26,6 +26,7 @@ export function loadGraph(dir) {
     e: meta.edges,
   };
   buildCsr(g);
+  findMainComponent(g);
   buildIndex(g);
   return g;
 }
@@ -57,11 +58,49 @@ function buildCsr(g) {
   g.off = off; g.to = to; g.via = via;
 }
 
+/**
+ * Flood-fill the largest connected component.
+ *
+ * Snapping has to ignore everything outside it. With residential roads in the
+ * graph the nearest node to a landmark is frequently a disconnected stub — a
+ * severed service road, a fragment by a headland — and routing from it fails
+ * outright. Punta de Tarifa did exactly this: it snapped 390 m to an isolated
+ * node and Cape to Cape became unroutable, having worked fine on the smaller
+ * spine graph where no such node was nearby.
+ */
+function findMainComponent(g) {
+  const comp = new Int32Array(g.n).fill(-1);
+  const stack = new Int32Array(g.n);
+  let best = -1, bestSize = 0, id = 0;
+  for (let start = 0; start < g.n; start++) {
+    if (comp[start] !== -1) continue;
+    let top = 0, size = 0;
+    stack[top++] = start;
+    comp[start] = id;
+    while (top) {
+      const u = stack[--top];
+      size++;
+      for (let k = g.off[u]; k < g.off[u + 1]; k++) {
+        const v = g.to[k];
+        if (comp[v] === -1) { comp[v] = id; stack[top++] = v; }
+      }
+    }
+    if (size > bestSize) { bestSize = size; best = id; }
+    id++;
+  }
+  g.comp = comp;
+  g.mainComp = best;
+  g.mainSize = bestSize;
+  g.components = id;
+}
+
 /** Coarse grid index, good enough to snap a lat/lon to the nearest node. */
 function buildIndex(g, cell = 0.05) {
   const grid = new Map();
   const key = (x, y) => `${Math.floor(x / cell)}:${Math.floor(y / cell)}`;
   for (let i = 0; i < g.n; i++) {
+    // Only the main component is snappable — see findMainComponent.
+    if (g.comp[i] !== g.mainComp) continue;
     const k = key(g.xy[2 * i], g.xy[2 * i + 1]);
     let list = grid.get(k);
     if (!list) grid.set(k, (list = []));
