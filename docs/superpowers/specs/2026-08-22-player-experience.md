@@ -159,6 +159,42 @@ refreshed.
 
 ---
 
+## Teaching the pin system without giving advice
+
+Players have to be taught where branches and spotters go, and bad advice would
+be worse than none. The resolution: **surface structure, never advice.**
+
+**A branch point is a fact, not a judgement.** It is the last common node before
+two corridors diverge, which falls straight out of the corridor set as a graph
+operation. Telling a player "your options split here" is the same kind of
+statement as drawing a fork in the road. It does not say which way to go.
+
+**A branch's value is measurable.** It is how much the downstream options differ
+once conditions vary. Two corridors that land within 1% of each other whatever
+happens make a worthless branch and should not be offered; two that swing 15%
+on what a spotter finds are the decision of the run. That is the same
+character-spread measure the run criteria already use — computed, not guessed.
+
+**A spotter's value has three computable conditions:** it sits upstream of a
+branch, inside the lead-time window (far enough ahead to act on, near enough to
+still be true), and observes something that actually varies at that place.
+
+**Then fade it.** Mark divergence points early, ranked by consequence, showing
+only the few that matter. Stop marking them later. The training wheels coming
+off is the progression, and it is visible — the same arc as recon.
+
+Two failure modes to design against:
+
+- **Showing every divergence turns branches into a checklist.** A 6,000 km run
+  has a handful of real forks and a great many trivial ones. Ranking by
+  consequence is what keeps placement a decision.
+- **Today every branch is worthless.** With no route-coupled system the fastest
+  corridor is always fastest, no information changes anything, and the mechanic
+  would teach a lie. The machinery can be built; that a given branch is worth
+  taking cannot be validated until at least two systems bite.
+
+---
+
 ## Confidence
 
 **Decided:** no suggested route; the baseline-to-record ladder; pins as the
