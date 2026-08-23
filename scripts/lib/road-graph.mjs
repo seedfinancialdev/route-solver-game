@@ -194,3 +194,91 @@ export function corridors(g, src, dst, { tolerance = 1.20, maxOverlap = 0.65, ro
   }
   return accepted;
 }
+
+/**
+ * Travel minutes from one node to every other. Same search as route(), without
+ * the early exit.
+ *
+ * A checkpoint run needs the cost of every leg between every pair. Calling
+ * route() for each pair is O(n^2) searches; one full sweep per checkpoint is
+ * O(n), which is the difference between 81 searches and 9 on an eight-point
+ * circuit.
+ */
+export function timesFrom(g, src) {
+  const dist = new Float64Array(g.n).fill(Infinity);
+  const done = new Uint8Array(g.n);
+  const heap = new Heap();
+  dist[src] = 0;
+  heap.push(0, src);
+  while (heap.size) {
+    const [d, u] = heap.pop();
+    if (done[u]) continue;
+    done[u] = 1;
+    for (let k = g.off[u]; k < g.off[u + 1]; k++) {
+      const v = g.to[k];
+      if (done[v]) continue;
+      const nd = d + travelMinutes(g, g.via[k]);
+      if (nd < dist[v]) { dist[v] = nd; heap.push(nd, v); }
+    }
+  }
+  return dist;
+}
+
+/**
+ * Cheapest order to visit `stops` between a fixed first and last node.
+ *
+ * Brute force over permutations of the middle. A circuit's decision is
+ * sequencing rather than corridor choice, so this is what its difficulty
+ * actually rests on — and with the handful of checkpoints a run carries, exact
+ * beats approximate.
+ */
+export function bestOrder(matrix, n) {
+  const middle = [];
+  for (let i = 1; i < n - 1; i++) middle.push(i);
+  let best = null, bestCost = Infinity, worstCost = 0;
+  const costs = [];
+  const permute = (arr, k = 0) => {
+    if (k === arr.length) {
+      const order = [0, ...arr, n - 1];
+      let cost = 0;
+      for (let i = 1; i < order.length; i++) cost += matrix[order[i - 1]][order[i]];
+      costs.push(cost);
+      if (cost < bestCost) { bestCost = cost; best = order.slice(); }
+      if (cost > worstCost) worstCost = cost;
+      return;
+    }
+    for (let i = k; i < arr.length; i++) {
+      [arr[k], arr[i]] = [arr[i], arr[k]];
+      permute(arr, k + 1);
+      [arr[k], arr[i]] = [arr[i], arr[k]];
+    }
+  };
+  permute(middle);
+  // What a competent player actually does: take the nearest unvisited stop
+  // each time. If that lands on the optimum, the sequencing "decision" is
+  // obvious and the run is a formality however much variance the full
+  // permutation set shows — a coastal ring is the clear case.
+  const seen = new Set([0, n - 1]);
+  let at = 0, greedy = 0;
+  while (seen.size < n) {
+    let next = -1, bestLeg = Infinity;
+    for (let i = 1; i < n - 1; i++) {
+      if (seen.has(i)) continue;
+      if (matrix[at][i] < bestLeg) { bestLeg = matrix[at][i]; next = i; }
+    }
+    greedy += bestLeg; seen.add(next); at = next;
+  }
+  greedy += matrix[at][n - 1];
+
+  costs.sort((a, b) => a - b);
+  return {
+    greedy,
+    order: best,
+    minutes: bestCost,
+    worst: worstCost,
+    // The median ordering is what an uninformed player lands on. Best-vs-median
+    // is the size of the decision; best-vs-authored only tests the author.
+    median: costs[Math.floor(costs.length / 2)],
+    permutations: costs.length,
+  };
+}

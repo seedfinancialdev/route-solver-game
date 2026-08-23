@@ -1,6 +1,6 @@
 {
   "generated": "2026-08-22",
-  "note": "Career runs. Endpoints are hand-picked terminal points — see docs/superpowers/specs/2026-08-22-run-criteria.md section A. Both are real, findable places; neither can be meaningfully extended in the same direction.",
+  "note": "Career runs. Endpoints are hand-picked terminal points — see docs/superpowers/specs/2026-08-22-run-criteria.md. A run is start, optional checkpoints, finish; a circuit is a run whose finish is its start. Ordered checkpoints let the author control the route shape; unordered ones hand the player a sequencing problem.",
   "runs": [
     {
       "id": "cape-to-cape",
@@ -24,7 +24,10 @@
         "fuel scarcity above the Arctic Circle",
         "the Øresund crossing: bridge or ferry",
         "a long high-speed German section where derestricted autobahn matters"
-      ]
+      ],
+      "style": "point-to-point",
+      "checkpoints": [],
+      "ordered": true
     },
     {
       "id": "roca-to-bosphorus",
@@ -48,6 +51,78 @@
         "non-Schengen border crossings on a competitive corridor",
         "the widest jurisdiction spread of any European route",
         "thin OSM speed-limit coverage in Spain (51%) on the opening leg"
+      ],
+      "style": "point-to-point",
+      "checkpoints": [],
+      "ordered": true
+    },
+    {
+      "id": "britain-circuit",
+      "name": "The Britain Circuit",
+      "style": "circuit",
+      "ordered": false,
+      "from": {
+        "name": "Land's End",
+        "detail": "Southwest tip of Great Britain",
+        "country": "GB",
+        "lat": 50.0657,
+        "lon": -5.7132
+      },
+      "to": {
+        "name": "Land's End",
+        "detail": "Back where it started",
+        "country": "GB",
+        "lat": 50.0657,
+        "lon": -5.7132
+      },
+      "checkpoints": [
+        {
+          "name": "St Davids",
+          "country": "GB",
+          "lat": 51.8819,
+          "lon": -5.267
+        },
+        {
+          "name": "Holyhead",
+          "country": "GB",
+          "lat": 53.309,
+          "lon": -4.632
+        },
+        {
+          "name": "Mallaig",
+          "country": "GB",
+          "lat": 57.006,
+          "lon": -5.828
+        },
+        {
+          "name": "John o' Groats",
+          "country": "GB",
+          "lat": 58.6373,
+          "lon": -3.0689
+        },
+        {
+          "name": "Aberdeen",
+          "country": "GB",
+          "lat": 57.1497,
+          "lon": -2.0943
+        },
+        {
+          "name": "Lowestoft",
+          "country": "GB",
+          "lat": 52.475,
+          "lon": 1.752
+        },
+        {
+          "name": "Dover",
+          "country": "GB",
+          "lat": 51.1279,
+          "lon": 1.3134
+        }
+      ],
+      "tests": [
+        "sequencing rather than corridor choice — Britain has one dominant spine",
+        "an island: no borders, no jurisdiction variety, denser network",
+        "a circuit needs checkpoints or it is degenerate"
       ]
     }
   ]

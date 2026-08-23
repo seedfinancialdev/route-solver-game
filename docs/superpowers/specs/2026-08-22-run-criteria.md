@@ -65,6 +65,42 @@ the proof, and `core-loop/` already does it.
 
 ---
 
+## Route styles, checkpoints, and circuits
+
+A run is **start, optional checkpoints, finish**. A circuit is a run whose
+finish is its start. Checkpoints are the author's control over route shape —
+add as many as the route needs.
+
+**Ordered** checkpoints fix the sequence, so the author controls the shape and
+the player's decision stays corridor choice. **Unordered** checkpoints hand the
+player a sequencing problem instead, and are gated differently.
+
+A circuit **must** carry at least one checkpoint. Without one it is degenerate:
+drive a hundred metres, turn round, finish.
+
+### The sequencing gate
+
+For unordered checkpoints, "≥2 distinct corridors" is the wrong question —
+there is no single origin-destination pair. The gate is instead:
+
+> **Greedy nearest-next must cost at least +10% against the optimal order.**
+
+Measured against *greedy*, not against the median ordering and not against the
+authored one. The authored order only tests the author. The median tests
+whether variance exists, which is not the same as whether the answer is hard —
+measured on the Britain circuit the median ordering costs +45% and the worst
++77%, but a coastal ring has an obvious solution and going round the coast in
+order is nearly optimal. Greedy nearest-next is what a competent player
+actually does, so the gap to it is the size of the real decision.
+
+Britain clears it at +13%.
+
+*Consequence for authoring:* checkpoints strung round a perimeter make a weak
+circuit. Scattered checkpoints, where the good order is not the order your eye
+suggests, make a strong one.
+
+---
+
 ## Career and daily
 
 **Career runs** are hand-picked. Terminal endpoints are editorial, not
@@ -101,4 +137,9 @@ vary a run; they do not decide whether a route is worth generating.
   40 of them in Europe and picking them is editorial, not algorithmic.
 - Whether daily/practice runs use a relaxed version of A, or are a different
   object entirely with their own criteria.
+- Whether islands beyond Great Britain are worth adding. The road-only rule
+  makes each one a closed system: no borders, no jurisdiction variety, and
+  point-to-point runs on them tend to be corridor-poor — Land's End to John
+  o' Groats measured 1,349 km with exactly ONE corridor within +20%, because
+  the M5/M6/A74/A9 spine dominates. Islands earn their place as circuits.
 - The corridor measurement has to be rebuilt over the real road network.
