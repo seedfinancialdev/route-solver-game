@@ -8,10 +8,25 @@ weights we own.
 
 Stores NO geometry. Shapes were 95% of an earlier JSON build (53 MB for
 Portugal, of which 2.8 MB was the actual graph) and the router never reads them
-— the map draws roads from vector tiles. Keeping them would duplicate the
-entire road network for nothing.
+— the map draws roads from vector tiles.
 
-Output is struct-of-arrays binary plus a JSON manifest:
+MEMORY. A dict of node id -> location is fine for Iberia's 4.5 M nodes and
+impossible for Europe's ~80 M. Neither that dict nor a usage-count dict exists
+here:
+
+  * locations come from osmium's disk-backed sparse_file_array index, so the
+    process holds a few hundred MB regardless of extract size;
+  * junction detection sorts an int64 numpy array in place. A Python
+    `sorted()` over the same data materialises one boxed int per reference —
+    that alone took 4.1 GB of peak RSS on Iberia and would be tens of GB on
+    Europe;
+  * the sorted junction array IS the node numbering — position in it is the
+    graph node id — so there is no id-mapping dict either.
+
+Three passes over the PBF, which is I/O the OS caches, in exchange for flat
+memory.
+
+Output: struct-of-arrays binary plus a JSON manifest.
   graph.meta.json   counts, bbox, class enum, provenance
   graph.nodes.bin   Float32 [lon, lat] * N
   graph.edges.bin   Int32 a[], Int32 b[], Uint32 metres[], Uint8 kmh[],
@@ -25,11 +40,15 @@ Usage:
 Needs pyosmium:  python3 -m venv /tmp/osmenv && /tmp/osmenv/bin/pip install osmium
 """
 import array
+import bisect
 import json
 import os
 import sys
+import tempfile
 from collections import defaultdict
+from math import asin, cos, radians, sin, sqrt
 
+import numpy as np
 import osmium
 
 CLASSES = [
@@ -39,8 +58,8 @@ CLASSES = [
 CLASS_ID = {c: i for i, c in enumerate(CLASSES)}
 KEEP = set(CLASSES)
 
-# Fallback when maxspeed is absent or unparseable. This fires a lot: measured
-# 35.9% real coverage in Portugal, so most edges use these.
+# Fallback when maxspeed is absent or unparseable. This fires a lot: 42.5% real
+# in the Iberian build, so most edges use these.
 DEFAULT_KMH = {
     'motorway': 120, 'trunk': 100, 'primary': 80, 'secondary': 70,
     'motorway_link': 60, 'trunk_link': 55, 'primary_link': 50, 'secondary_link': 45,
@@ -49,6 +68,13 @@ DEFAULT_KMH = {
 FLAG_ONEWAY = 1
 FLAG_TOLL = 2
 FLAG_MAXSPEED_REAL = 4   # so the game can be honest about what it knows
+
+
+def wanted(tags):
+    hw = tags.get('highway')
+    if hw not in KEEP or tags.get('access') in ('no', 'private'):
+        return None
+    return hw
 
 
 def parse_maxspeed(value, highway):
@@ -67,18 +93,65 @@ def parse_maxspeed(value, highway):
         return DEFAULT_KMH.get(highway, 60), False
 
 
-class Ways(osmium.SimpleHandler):
-    def __init__(self):
+def haversine(lon1, lat1, lon2, lat2):
+    p1, p2 = radians(lat1), radians(lat2)
+    dp, dl = p2 - p1, radians(lon2 - lon1)
+    h = sin(dp / 2) ** 2 + cos(p1) * cos(p2) * sin(dl / 2) ** 2
+    return 2 * 6371000 * asin(sqrt(h))
+
+
+class CountRefs(osmium.SimpleHandler):
+    """Pass 1: every node reference of every kept way, plus the endpoints.
+
+    An int64 array rather than a Counter: 8 bytes a reference instead of the
+    ~60 a dict entry costs, which is the difference between fitting Europe in
+    memory and not.
+    """
+
+    def __init__(self, refs, ends):
         super().__init__()
-        self.ways = []
-        self.use = defaultdict(int)
+        self.refs = refs
+        self.ends = ends
+        self.kept = 0
 
     def way(self, w):
-        hw = w.tags.get('highway')
-        if hw not in KEEP or w.tags.get('access') in ('no', 'private'):
+        if not wanted(w.tags):
             return
-        refs = [n.ref for n in w.nodes]
-        if len(refs) < 2:
+        nodes = w.nodes
+        if len(nodes) < 2:
+            return
+        self.kept += 1
+        for n in nodes:
+            self.refs.append(n.ref)
+        # A way's first and last node are junctions by definition, even if no
+        # other way touches them — they are where this edge has to terminate.
+        self.ends.append(nodes[0].ref)
+        self.ends.append(nodes[-1].ref)
+
+
+class Build(osmium.SimpleHandler):
+    """Pass 3: split each way at junctions and emit edges.
+
+    Locations arrive already attached to w.nodes because a
+    NodeLocationsForWays handler runs ahead of this one, reading from the
+    on-disk index built in pass 2.
+    """
+
+    def __init__(self, junctions, node_xy, out):
+        super().__init__()
+        self.j = junctions          # sorted array of junction node ids
+        self.xy = node_xy           # Float32 array, 2 per junction, filled here
+        self.out = out
+        self.real_ms = 0
+        self.dropped = 0
+
+    def index_of(self, node_id):
+        i = bisect.bisect_left(self.j, node_id)
+        return i if i < len(self.j) and self.j[i] == node_id else -1
+
+    def way(self, w):
+        hw = wanted(w.tags)
+        if not hw:
             return
         kmh, real = parse_maxspeed(w.tags.get('maxspeed'), hw)
         flags = 0
@@ -88,89 +161,90 @@ class Ways(osmium.SimpleHandler):
             flags |= FLAG_TOLL
         if real:
             flags |= FLAG_MAXSPEED_REAL
-        self.ways.append((refs, CLASS_ID[hw], kmh, flags))
-        for r in refs:
-            self.use[r] += 1
-        self.use[refs[0]] += 1
-        self.use[refs[-1]] += 1
+        cls = CLASS_ID[hw]
 
+        ea, eb, em, ek, ec, ef = self.out
+        start_idx, prev_lon, prev_lat, metres = -1, None, None, 0.0
 
-class Nodes(osmium.SimpleHandler):
-    def __init__(self, wanted, out):
-        super().__init__()
-        self.wanted = wanted
-        self.out = out
+        for n in w.nodes:
+            if not n.location.valid():
+                self.dropped += 1
+                continue
+            lon, lat = n.location.lon, n.location.lat
+            if prev_lon is not None:
+                metres += haversine(prev_lon, prev_lat, lon, lat)
+            prev_lon, prev_lat = lon, lat
 
-    def node(self, n):
-        if n.id in self.wanted:
-            self.out[n.id] = (n.location.lon, n.location.lat)
-
-
-def haversine(a, b):
-    from math import asin, cos, radians, sin, sqrt
-    p1, p2 = radians(a[1]), radians(b[1])
-    dp, dl = p2 - p1, radians(b[0] - a[0])
-    h = sin(dp / 2) ** 2 + cos(p1) * cos(p2) * sin(dl / 2) ** 2
-    return 2 * 6371000 * asin(sqrt(h))
+            idx = self.index_of(n.ref)
+            if idx < 0:
+                continue                      # shape point between junctions
+            self.xy[2 * idx] = lon
+            self.xy[2 * idx + 1] = lat
+            if start_idx < 0:
+                start_idx, metres = idx, 0.0
+                continue
+            if metres >= 1 and idx != start_idx:
+                ea.append(start_idx); eb.append(idx)
+                em.append(int(round(metres)))
+                ek.append(min(255, kmh)); ec.append(cls); ef.append(flags)
+                if real:
+                    self.real_ms += 1
+            start_idx, metres = idx, 0.0
 
 
 def main(out_dir, pbfs):
     os.makedirs(out_dir, exist_ok=True)
-    all_ways, use, loc = [], defaultdict(int), {}
+    refs, ends = array.array('q'), array.array('q')
 
     for pbf in pbfs:
-        print(f'reading {os.path.basename(pbf)}')
-        w = Ways()
-        w.apply_file(pbf)
-        all_ways.extend(w.ways)
-        for k, v in w.use.items():
-            use[k] += v
-        print(f'  {len(w.ways):,} ways kept')
+        print(f'pass 1  {os.path.basename(pbf)}', flush=True)
+        c = CountRefs(refs, ends)
+        c.apply_file(pbf)
+        print(f'        {c.kept:,} ways kept, {len(refs):,} refs so far', flush=True)
 
-    wanted = {r for refs, *_ in all_ways for r in refs}
-    print(f'\nlocating {len(wanted):,} nodes')
-    for pbf in pbfs:
-        Nodes(wanted, loc).apply_file(pbf)
-    print(f'  located {len(loc):,}')
+    print(f'\nfinding junctions in {len(refs):,} references', flush=True)
+    # numpy throughout: every one of these steps in pure Python materialises a
+    # boxed int per reference, which is what made this the memory ceiling.
+    a = np.frombuffer(refs, dtype=np.int64)
+    del refs
+    a = np.sort(a)
+    shared = a[:-1][a[1:] == a[:-1]]           # referenced more than once
+    e = np.frombuffer(ends, dtype=np.int64)
+    del ends
+    junc = np.unique(np.concatenate([shared, e]))
+    del a, shared, e
+    junctions = array.array('q', junc.tobytes())
+    del junc
+    print(f'  {len(junctions):,} junction nodes', flush=True)
 
-    junctions = {n for n, c in use.items() if c > 1}
-    print(f'  {len(junctions):,} junctions')
+    node_xy = array.array('f', [0.0]) * 0
+    node_xy = array.array('f', bytes(8 * len(junctions)))
 
-    # Split each way at junctions. Between junctions is one edge; the shape
-    # in between contributes only its length.
-    node_index, node_list = {}, []
+    idx_dir = tempfile.mkdtemp(prefix='osm-node-idx-')
+    idx_path = os.path.join(idx_dir, 'nodes.idx')
+    out = (array.array('i'), array.array('i'), array.array('I'),
+           array.array('B'), array.array('B'), array.array('B'))
+    builder = Build(junctions, node_xy, out)
 
-    def idx(osm_id):
-        i = node_index.get(osm_id)
-        if i is None:
-            i = len(node_list)
-            node_index[osm_id] = i
-            node_list.append(loc[osm_id])
-        return i
+    # One index across every extract, not one per file: a way near a border
+    # references nodes that live in the neighbouring country's extract, and a
+    # per-file index would silently drop exactly the cross-border edges a
+    # continental run depends on.
+    idx = osmium.index.create_map(f'sparse_file_array,{idx_path}')
+    locations = osmium.NodeLocationsForWays(idx)
+    locations.ignore_errors()
+    try:
+        for pbf in pbfs:
+            print(f'pass 2+3  {os.path.basename(pbf)}  (locations on disk)', flush=True)
+            osmium.apply(osmium.io.Reader(pbf), locations, builder)
+            sz = os.path.getsize(idx_path) if os.path.exists(idx_path) else 0
+            print(f'        {len(out[0]):,} edges so far, node index {sz/1073741824:.2f} GB on disk', flush=True)
+    finally:
+        if os.path.exists(idx_path):
+            os.remove(idx_path)
+        os.rmdir(idx_dir)
 
-    ea, eb, em, ek, ec, ef = (array.array('i'), array.array('i'), array.array('I'),
-                              array.array('B'), array.array('B'), array.array('B'))
-    real_ms = 0
-    for refs, cls, kmh, flags in all_ways:
-        refs = [r for r in refs if r in loc]
-        if len(refs) < 2:
-            continue
-        start, metres = refs[0], 0.0
-        for i in range(1, len(refs)):
-            metres += haversine(loc[refs[i - 1]], loc[refs[i]])
-            r = refs[i]
-            if r in junctions or i == len(refs) - 1:
-                if metres >= 1 and r != start:
-                    ea.append(idx(start)); eb.append(idx(r))
-                    em.append(int(round(metres)))
-                    ek.append(min(255, kmh)); ec.append(cls); ef.append(flags)
-                    if flags & FLAG_MAXSPEED_REAL:
-                        real_ms += 1
-                start, metres = r, 0.0
-
-    nodes = array.array('f')
-    for lon, lat in node_list:
-        nodes.append(lon); nodes.append(lat)
+    ea, eb, em, ek, ec, ef = out
 
     def write(name, arr):
         path = os.path.join(out_dir, name)
@@ -178,20 +252,21 @@ def main(out_dir, pbfs):
             arr.tofile(fh)
         return os.path.getsize(path)
 
-    size = write('graph.nodes.bin', nodes)
+    size = write('graph.nodes.bin', node_xy)
     for name, arr in (('a', ea), ('b', eb), ('m', em), ('kmh', ek), ('cls', ec), ('flags', ef)):
         size += write(f'graph.edges.{name}.bin', arr)
 
-    lons = [p[0] for p in node_list]; lats = [p[1] for p in node_list]
+    lons = [node_xy[2 * i] for i in range(len(junctions)) if node_xy[2 * i]]
+    lats = [node_xy[2 * i + 1] for i in range(len(junctions)) if node_xy[2 * i + 1]]
     meta = {
         'built': __import__('datetime').date.today().isoformat(),
         'sources': [os.path.basename(p) for p in pbfs],
-        'nodes': len(node_list),
+        'nodes': len(junctions),
         'edges': len(ea),
         'classes': CLASSES,
         'flags': {'oneway': FLAG_ONEWAY, 'toll': FLAG_TOLL, 'maxspeedReal': FLAG_MAXSPEED_REAL},
-        'bbox': [min(lons), min(lats), max(lons), max(lats)],
-        'maxspeedRealPct': round(100 * real_ms / max(1, len(ea)), 1),
+        'bbox': [min(lons), min(lats), max(lons), max(lats)] if lons else None,
+        'maxspeedRealPct': round(100 * builder.real_ms / max(1, len(ea)), 1),
         'totalKm': round(sum(em) / 1000),
         'note': 'No geometry: the router does not need it and the map draws roads from vector tiles.',
     }
@@ -200,12 +275,14 @@ def main(out_dir, pbfs):
 
     print(f'\n{meta["nodes"]:,} nodes, {meta["edges"]:,} edges, {meta["totalKm"]:,} km')
     print(f'maxspeed real on {meta["maxspeedRealPct"]}% of edges')
+    if builder.dropped:
+        print(f'{builder.dropped:,} way nodes had no location and were skipped')
     print(f'binary total {size / 1048576:.1f} MB  ->  {out_dir}')
     by = defaultdict(int)
     for c in ec:
         by[CLASSES[c]] += 1
     for c, n in sorted(by.items(), key=lambda kv: -kv[1]):
-        print(f'  {c:<16} {n:>8,}')
+        print(f'  {c:<16} {n:>9,}')
 
 
 if __name__ == '__main__':

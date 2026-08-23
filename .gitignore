@@ -13,3 +13,8 @@ data/road-graph/
 
 # macOS finder droppings
 .DS_Store
+
+# Python toolchain for the OSM pipeline (scripts/14, scripts/15).
+# Recreate with: python3 -m venv .venv && .venv/bin/pip install osmium numpy
+.venv/
+data/raw/osm-roads/
