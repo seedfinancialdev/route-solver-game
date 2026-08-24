@@ -1,4 +1,4 @@
-# What actually changes the answer: nine systems measured
+# What actually changes the answer: ten systems measured
 
 2026-08-23. Findings, not proposals.
 
@@ -10,8 +10,13 @@ The test is cheap and it is the same every time: **does the system change which
 corridor wins?** A cost that scales with time or distance alone cannot, however
 large it is, because a uniform tax does not move an argmin.
 
-Nine have now been measured against it. Two passed, and they are the same one twice:
+Ten have now been measured against it. Two passed, and they are the same one twice:
 choosing checkpoints, and sequencing them.
+
+**One sentence explains the other eight: in European road racing everything good
+is in the same place.** The motorway is fastest, least policed, best served with
+fuel, and where it is derestricted it is also where a fast car pays. Nothing
+slower wins on any axis, so nothing reverses a ranking.
 
 ---
 
@@ -395,6 +400,72 @@ two honest responses:
    and the measurements have narrowed the field to them.
 
 Do both.
+
+---
+
+## 8. The car — inert for routing, decisive for time
+
+Car top speed looked like the best candidate any system has had. Europe carries
+**19,029 km of derestricted autobahn**, 12.4% of all motorway, and it is not
+spread across the network — it is the Rhine-Ruhr, Frankfurt and Munich. On every
+other road a fast car and a slow car both drive the limit. Only there do they
+differ. That is a coupling to **place**, not to road class, which is the
+property every inert system lacked.
+
+Measured over all 1,680 plans on the reference race, cars at 150 / 180 / 220 /
+260 km/h sustained.
+
+**The same plan wins for every car.** Ignoring the car costs +0.0%.
+
+The mechanism is enormous and it still loses:
+
+| derestricted | distance | at 150 | at 260 | gain | behind the winner |
+| --- | --- | --- | --- | --- | --- |
+| 3,198 km | 8,323 km | 65h27 | 56h26 | **9h01** | 22h32 |
+| 3,074 km | 7,675 km | 60h21 | 51h41 | 8h40 | 17h47 |
+| 641 km | 4,314 km | 35h42 | 33h54 | 1h48 | **winner** |
+
+A supercar saves **nine hours** on the German-heavy plan and it is still 22
+hours behind, because that plan is 4,000 km longer. A fast car reshuffles 1,670
+of the 1,680 plans — the biggest move is 398 places — and never touches the top.
+
+### It is not the menu's fault
+
+A second race was built specifically to fix this: four northern cities on the
+German arc, four southern on the Italy-Balkans line, chosen to be comparable in
+distance. It failed the same way. The winning plan is always the four cities
+nearest the direct line, so no comparable alternative exists for a car to prefer.
+
+### It is not the race's fault either
+
+Tested directly on five pairs where the autobahn is genuinely optional — Milan
+to Amsterdam, Milan to Hamburg, Zagreb to Amsterdam, Vienna to Brussels,
+Barcelona to Copenhagen. Every car takes the same corridor on every one.
+
+The reason is visible in the numbers: **the fastest corridor already carries the
+most derestricted autobahn**, because derestricted autobahn is the fastest road,
+so the fastest route is already on it.
+
+| Milan → Amsterdam | km | derestricted |
+| --- | --- | --- |
+| corridor 0 (fastest) | 1,078 | **433 km** |
+| corridor 1 | 1,149 | 351 km |
+| corridor 2 | 1,108 | 126 km |
+
+### What the car is worth, which is a lot
+
+Not a routing decision. A **time** decision, and the numbers are large against a
+medal target:
+
+| lever | worth | measured |
+| --- | --- | --- |
+| 150 → 260 km/h sustained | **1h48** on a 35 h race | more on a German-heavy route, up to 9h |
+| 350 km → 1,000 km range | **2h29** in fuel stops | 3h14 down to 0h45 |
+
+Those pull against each other — a car driven fast empties its tank sooner — and
+which one pays depends on the route. A German-heavy plan rewards speed; a long
+rural plan rewards range. That is a real loadout decision with measured numbers
+behind it, and it belongs to **execution**, not to planning.
 
 ---
 

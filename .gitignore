@@ -20,3 +20,4 @@ data/road-graph/
 data/raw/osm-roads/
 data/checkpoint-matrix.json
 data/fuel-profiles.json
+data/vehicle-legs.json
