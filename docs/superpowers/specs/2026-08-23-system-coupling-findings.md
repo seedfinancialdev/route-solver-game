@@ -1,4 +1,4 @@
-# What actually changes the answer: six systems measured
+# What actually changes the answer: nine systems measured
 
 2026-08-23. Findings, not proposals.
 
@@ -10,7 +10,8 @@ The test is cheap and it is the same every time: **does the system change which
 corridor wins?** A cost that scales with time or distance alone cannot, however
 large it is, because a uniform tax does not move an argmin.
 
-Six systems have now been measured against it. One passed.
+Nine have now been measured against it. Two passed, and they are the same one twice:
+choosing checkpoints, and sequencing them.
 
 ---
 
@@ -310,6 +311,90 @@ continent add five hours each; checkpoints spaced across France would add far
 less. **Whether a regional race can hold four-to-five-checkpoint ordering
 difficulty inside eight to twelve hours is the next measurement**, and it is the
 one that decides whether the shippable race is continental or regional.
+
+---
+
+## 7. Fuel range against the plan — inert, and it settles what the planner can show
+
+The open question was whether a planner can safely show distance and free-flow
+drive time, the way Google does. If those numbers determine the plan, they are
+the answer and there is no puzzle.
+
+Traffic had already failed to change the order. Fuel was the remaining
+candidate with a real mechanism: which legs you drive depends on which cities
+you pick, worst services-only gaps vary 1.9–2× between corridors, and a range
+constraint is not a tax — it binds on some routes and not others.
+
+Measured over all 1,680 plans on the reference race (pick 4 of 8, Barcelona to
+Istanbul), tank carried across checkpoints, greedy-latest refuelling, two
+driver models and five ranges.
+
+| range | any fuel: cost of ignoring it | services only | plans undrivable |
+| --- | --- | --- | --- |
+| 350 km | +0.0% | +0.0% | 0 / 1,680 |
+| 450 km | +0.0% | +0.0% | 0 / 1,680 |
+| 550 km | +0.0% | +0.0% | 0 / 1,680 |
+| 700 km | +0.0% | +0.0% | 0 / 1,680 |
+| 1,000 km | +0.0% | +0.0% | 0 / 1,680 |
+
+**The same plan wins at every range under both models**, and a 350 km car is
+never stranded — European motorway services are dense enough that even a driver
+who refuses to leave the motorway can run the whole race on a small tank.
+
+The per-1000 km column says why:
+
+| model | fuel minutes per 1,000 km | spread |
+| --- | --- | --- |
+| any fuel, 4 km diversion allowed | 19.8 – 41.2 | 2.08× |
+| services only | 16.4 – 18.4 | **1.13×** |
+
+The any-fuel spread looks promising until you notice which way it points: a
+plan pays 41 minutes per 1,000 km when it is forced onto town pumps, and the
+plan that avoids that is the motorway plan, which is also the fastest. Same
+reinforcing failure as enforcement.
+
+Services-only is flatter still at 1.13× — very nearly a pure distance tax.
+
+**The earlier 738 km services gap was route-specific.** It was measured on Cape
+to Cape, which crosses rural Spain and the Arctic. The Grand Tour is core
+European motorway throughout. Fuel range may still bind on an Arctic or rural
+race; it does not bind on this one, and the fuel gate should be run per race
+rather than assumed.
+
+### What this settles
+
+Distance and free-flow drive time are **not** misleading. On this race they are
+very nearly the whole answer:
+
+| system | changes which plan wins? |
+| --- | --- |
+| driving hours | no |
+| fuel as cost | no |
+| **fuel as range** | **no** |
+| enforcement exposure | no — reinforces |
+| traffic, on corridors | no |
+| traffic, on ordering | no — free-flow order wins 233/247 |
+| checkpoint ordering | **yes** |
+| checkpoint selection | **yes** |
+
+Seven of nine inert. Everything that is not distance-or-time either leaves the
+plan alone or points the same way it already pointed.
+
+So a planner that shows Google's numbers gives away the plan. There are exactly
+two honest responses:
+
+1. **Do not show per-leg numbers.** Show the map and a target time. The
+   Gran Turismo model — Bronze / Silver / Gold / Record for the whole race —
+   gives the player a goal without giving them the solution, and prices the
+   selection decision without revealing which set is right.
+2. **Add the thing that is not correlated with road class.** Every inert system
+   failed the same way: it tracked the road hierarchy, and the motorway wins on
+   every axis at once. **Weather and incidents are the only candidates left that
+   do not**, because a storm or a closure sits where it sits regardless of what
+   kind of road is underneath. They are now the highest-value unbuilt system,
+   and the measurements have narrowed the field to them.
+
+Do both.
 
 ---
 

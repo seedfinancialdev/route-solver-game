@@ -33,35 +33,20 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { loadGraph, junctionNode, timesFrom, timesFromTimed, travelMinutes } from './lib/road-graph.mjs';
+import { loadRace } from './lib/race.mjs';
 import { buildUrbanField, throughClasses, congestion } from './lib/traffic.mjs';
 
 const BUCKETS = 8;                     // 3-hour resolution on the cost matrix
 const DEPART_HOUR = Number(process.argv[2] ?? 6);
 const NEAR_TIE = 0.01;                 // within 1% of best counts as "no decision"
 
-const START = { name: 'Barcelona', lon: 2.1686, lat: 41.3874 };
-const FINISH = { name: 'Istanbul', lon: 28.9769, lat: 41.0055 };
-
-// Eight candidates spanning the shape of the continent: one western, three
-// northern, two central, two southern. Subsets of these are the races.
-const CANDIDATES = [
-  { name: 'Paris', lon: 2.3522, lat: 48.8566 },
-  { name: 'Amsterdam', lon: 4.9041, lat: 52.3676 },
-  { name: 'Copenhagen', lon: 12.5683, lat: 55.6761 },
-  { name: 'Berlin', lon: 13.4050, lat: 52.5200 },
-  { name: 'Munich', lon: 11.5820, lat: 48.1351 },
-  { name: 'Vienna', lon: 16.3738, lat: 48.2082 },
-  { name: 'Rome', lon: 12.4964, lat: 41.9028 },
-  { name: 'Milan', lon: 9.1900, lat: 45.4642 },
-];
-
 const CACHE = 'data/checkpoint-matrix.json';
 
-const stops = [START, ...CANDIDATES, FINISH];
+const { race, stops, candidates: CANDIDATES, signature } = loadRace(process.env.RACE || 'grand-tour-menu');
 const N = stops.length;
-const signature = stops.map((s) => `${s.name}@${s.lon},${s.lat}`).join('|');
 
-console.log(`${START.name} -> ${FINISH.name}, departing ${String(DEPART_HOUR).padStart(2, '0')}:00`);
+console.log(`${race.name}: ${stops[0].name} -> ${stops[N - 1].name}, `
+  + `departing ${String(DEPART_HOUR).padStart(2, '0')}:00`);
 console.log(`candidates: ${CANDIDATES.map((c) => c.name).join(', ')}\n`);
 
 // ---- cost matrices --------------------------------------------------------

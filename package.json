@@ -31,7 +31,8 @@
     "enforce:exposure": "node --max-old-space-size=14000 scripts/22-enforcement-exposure.mjs",
     "traffic:gate": "node --max-old-space-size=14000 scripts/24-traffic-gate.mjs",
     "order:gate": "node --max-old-space-size=14000 scripts/25-checkpoint-order-gate.mjs",
-    "order:count": "node --max-old-space-size=14000 scripts/26-checkpoint-count-gate.mjs"
+    "order:count": "node --max-old-space-size=14000 scripts/26-checkpoint-count-gate.mjs",
+    "fuel:ordering": "node --max-old-space-size=14000 scripts/27-fuel-ordering-gate.mjs"
   },
   "devDependencies": {
     "d3-delaunay": "^6.0.4",

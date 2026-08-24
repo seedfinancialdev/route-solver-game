@@ -19,3 +19,4 @@ data/road-graph/
 .venv/
 data/raw/osm-roads/
 data/checkpoint-matrix.json
+data/fuel-profiles.json
