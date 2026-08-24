@@ -1,5 +1,9 @@
 # Run criteria: what makes a route a cannonball
 
+> **Superseded by `2026-08-23-run-criteria.md`.** Sections B and C gated on
+> corridor choice, which has since been measured as inert — the fastest
+> corridor wins under every system tested. Kept for the record.
+
 2026-08-22. Replaces the generation criteria in `data/puzzles.json`
 (`MIN_HOURS` 12, `MAX_HOURS` 40, `MIN_HOPS` 7–16), which were written for
 city-hop puzzles and were flagged as needing a fresh pass in commit 6df541e.

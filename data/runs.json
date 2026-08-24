@@ -1,6 +1,6 @@
 {
   "generated": "2026-08-22",
-  "note": "Career runs. Endpoints are hand-picked terminal points — see docs/superpowers/specs/2026-08-22-run-criteria.md. A run is start, optional checkpoints, finish; a circuit is a run whose finish is its start. Ordered checkpoints let the author control the route shape; unordered ones hand the player a sequencing problem.",
+  "note": "Career races. A race is start, finish, and a menu of candidate checkpoints the player selects from and sequences \u2014 see docs/superpowers/specs/2026-08-23-run-criteria.md. The point-to-point and circuit entries predate that and are kept as measurement fixtures.",
   "runs": [
     {
       "id": "cape-to-cape",
@@ -14,15 +14,15 @@
       },
       "to": {
         "name": "Nordkapp",
-        "detail": "North Cape, Magerøya — northernmost road-reachable point of Europe",
+        "detail": "North Cape, Mager\u00f8ya \u2014 northernmost road-reachable point of Europe",
         "country": "NO",
         "lat": 71.1694,
         "lon": 25.7833
       },
       "tests": [
-        "raw distance — the longest run in the set",
+        "raw distance \u2014 the longest run in the set",
         "fuel scarcity above the Arctic Circle",
-        "the Øresund crossing: bridge or ferry",
+        "the \u00d8resund crossing: bridge or ferry",
         "a long high-speed German section where derestricted autobahn matters"
       ],
       "style": "point-to-point",
@@ -41,7 +41,7 @@
       },
       "to": {
         "name": "Sultanahmet, Istanbul",
-        "detail": "Across the Bosphorus — the eastern edge of Europe",
+        "detail": "Across the Bosphorus \u2014 the eastern edge of Europe",
         "country": "TR",
         "lat": 41.0055,
         "lon": 28.9769
@@ -120,7 +120,7 @@
         }
       ],
       "tests": [
-        "sequencing rather than corridor choice — Britain has one dominant spine",
+        "sequencing rather than corridor choice \u2014 Britain has one dominant spine",
         "an island: no borders, no jurisdiction variety, denser network",
         "a circuit needs checkpoints or it is degenerate"
       ]
@@ -172,9 +172,100 @@
         }
       ],
       "tests": [
-        "sequencing across a continent, not a perimeter — no obvious order",
+        "sequencing across a continent, not a perimeter \u2014 no obvious order",
         "checkpoints INSIDE cities, so urban penetration is unavoidable",
         "order determines arrival hour, arrival hour determines cost"
+      ]
+    },
+    {
+      "id": "grand-tour-menu",
+      "name": "The Grand Tour",
+      "style": "menu",
+      "note": "Pass through any FOUR of the eight, in any order you like. Checkpoints are pass-through, not stops: the clock never pauses, and the whole cost of a checkpoint is entering and leaving the city at whatever hour your plan puts you there.",
+      "from": {
+        "name": "Barcelona",
+        "detail": "city centre intersection",
+        "country": "ES",
+        "lat": 41.3874,
+        "lon": 2.1686
+      },
+      "to": {
+        "name": "Istanbul",
+        "detail": "city centre intersection",
+        "country": "TR",
+        "lat": 41.0055,
+        "lon": 28.9769
+      },
+      "pick": 4,
+      "menu": [
+        {
+          "name": "Paris",
+          "country": "FR",
+          "lat": 48.8566,
+          "lon": 2.3522
+        },
+        {
+          "name": "Amsterdam",
+          "country": "NL",
+          "lat": 52.3676,
+          "lon": 4.9041
+        },
+        {
+          "name": "Copenhagen",
+          "country": "DK",
+          "lat": 55.6761,
+          "lon": 12.5683
+        },
+        {
+          "name": "Berlin",
+          "country": "DE",
+          "lat": 52.52,
+          "lon": 13.405
+        },
+        {
+          "name": "Munich",
+          "country": "DE",
+          "lat": 48.1351,
+          "lon": 11.582
+        },
+        {
+          "name": "Vienna",
+          "country": "AT",
+          "lat": 48.2082,
+          "lon": 16.3738
+        },
+        {
+          "name": "Rome",
+          "country": "IT",
+          "lat": 41.9028,
+          "lon": 12.4964
+        },
+        {
+          "name": "Milan",
+          "country": "IT",
+          "lat": 45.4642,
+          "lon": 9.19
+        }
+      ],
+      "measured": {
+        "gate": "docs/superpowers/specs/2026-08-23-run-criteria.md section B",
+        "world": "2026-08-23",
+        "selectionPenaltyMedian": 0.313,
+        "selectionPenaltyWorst": 0.608,
+        "orderingVsGreedy": 0.103,
+        "nearTieShare": 0.052,
+        "optimalHours": 56.4,
+        "bestSet": [
+          "Paris",
+          "Amsterdam",
+          "Munich",
+          "Vienna"
+        ]
+      },
+      "tests": [
+        "selection, which Google's waypoint optimiser does not do",
+        "sequencing across a continent, not a perimeter",
+        "checkpoints INSIDE cities, so urban penetration is unavoidable"
       ]
     }
   ]
