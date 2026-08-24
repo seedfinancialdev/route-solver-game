@@ -18,3 +18,4 @@ data/road-graph/
 # Recreate with: python3 -m venv .venv && .venv/bin/pip install osmium numpy
 .venv/
 data/raw/osm-roads/
+data/checkpoint-matrix.json

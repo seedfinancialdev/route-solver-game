@@ -21,7 +21,7 @@
 // Usage: npm run order:gate
 
 import { readFileSync } from 'node:fs';
-import { loadGraph, nearestNode, routeTimed, travelMinutes } from './lib/road-graph.mjs';
+import { loadGraph, junctionNode, timesFromTimed, travelMinutes } from './lib/road-graph.mjs';
 import { buildUrbanField, throughClasses, congestion } from './lib/traffic.mjs';
 
 const BUCKETS = 8;                         // 3-hour resolution on the cost matrix
@@ -36,54 +36,24 @@ const hm = (m) => `${Math.floor(m / 60)}h${String(Math.round(m % 60)).padStart(2
 const run = JSON.parse(readFileSync('data/runs.json', 'utf8')).runs
   .find((r) => r.id === (process.argv[2] || 'grand-tour'));
 
-/**
- * A checkpoint is a real intersection, not a city label.
- *
- * Deterministic so every player running this race gets the identical point:
- * the nearest junction to the city centre with three or more ways meeting,
- * which excludes cul-de-sacs and mid-block nodes.
- */
-function checkpointNode(lon, lat) {
-  const n = nearestNode(g, lon, lat);
-  if (n < 0) return n;
-  if (g.off[n + 1] - g.off[n] >= 3) return n;
-  let best = n, bestDeg = g.off[n + 1] - g.off[n];
-  for (let k = g.off[n]; k < g.off[n + 1]; k++) {
-    const v = g.to[k];
-    const deg = g.off[v + 1] - g.off[v];
-    if (deg > bestDeg) { bestDeg = deg; best = v; }
-  }
-  return best;
-}
-
 const stops = [run.from, ...run.checkpoints, run.to];
-const nodes = stops.map((p) => checkpointNode(p.lon, p.lat));
+const nodes = stops.map((p) => junctionNode(g, p.lon, p.lat));
 console.log(`${run.name}: ${stops.map((s) => s.name).join(' / ')}`);
 console.log(`checkpoints are pass-through; ${BUCKETS} time buckets on the cost matrix\n`);
 
 // ---- time-dependent cost matrix ------------------------------------------
-// Routing every ordering directly would be 24 orders x 5 legs of live routing.
-// The matrix is 20 ordered pairs x 8 buckets and every ordering then reads
-// from it, which is the difference between an hour and a few minutes.
+// One sweep answers every destination at once, so the matrix costs one search
+// per (source, hour) rather than one per (source, destination, hour).
 const N = stops.length;
 const matrix = Array.from({ length: N }, () => Array.from({ length: N }, () => new Array(BUCKETS).fill(Infinity)));
-let done = 0;
-const pairs = [];
-for (let i = 0; i < N; i++) {
-  for (let j = 0; j < N; j++) {
-    if (i === j) continue;
-    if (i === N - 1 || j === 0) continue;          // nothing leaves the finish or enters the start
-    pairs.push([i, j]);
-  }
-}
-for (const [i, j] of pairs) {
+let sweep = 0;
+const total = (N - 1) * BUCKETS;                     // nothing ever leaves the finish
+for (let i = 0; i < N - 1; i++) {
   for (let b = 0; b < BUCKETS; b++) {
-    const depart = (b * 24 / BUCKETS) * 60;
-    const r = routeTimed(g, nodes[i], nodes[j], depart, cost);
-    matrix[i][j][b] = r ? r.minutes : Infinity;
+    const d = timesFromTimed(g, nodes[i], (b * 24 / BUCKETS) * 60, cost);
+    for (let j = 0; j < N; j++) matrix[i][j][b] = d[nodes[j]];
+    process.stdout.write(`\r  matrix ${++sweep}/${total} sweeps`);
   }
-  done++;
-  process.stdout.write(`\r  matrix ${done}/${pairs.length} pairs`);
 }
 console.log('\n');
 

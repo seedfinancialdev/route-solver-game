@@ -128,6 +128,35 @@ export function nearestNode(g, lon, lat) {
   return best;
 }
 
+/**
+ * Snap a landmark to a junction you can actually drive out of.
+ *
+ * nearestNode() takes whatever is closest, and in a city centre that is often a
+ * one-way sink — reachable, with no outgoing edge. Vienna's nearest node to the
+ * centre had out-degree 0, so every checkpoint ordering that put Vienna in the
+ * middle was unroutable, and the count gate quietly dropped those races instead
+ * of reporting them.
+ *
+ * Out-degree three or more also excludes cul-de-sacs and mid-block nodes, which
+ * makes the point deterministic: every player running the race gets the same
+ * intersection.
+ */
+export function junctionNode(g, lon, lat, { minDegree = 3, radiusKm = 5 } = {}) {
+  const rings = Math.max(1, Math.ceil((radiusKm / 111) / g.cell));
+  const cx = Math.floor(lon / g.cell), cy = Math.floor(lat / g.cell);
+  let best = -1, bestD = Infinity;
+  for (let dx = -rings; dx <= rings; dx++) {
+    for (let dy = -rings; dy <= rings; dy++) {
+      for (const i of g.grid.get(`${cx + dx}:${cy + dy}`) || []) {
+        if (g.off[i + 1] - g.off[i] < minDegree) continue;
+        const d = (g.xy[2 * i] - lon) ** 2 + (g.xy[2 * i + 1] - lat) ** 2;
+        if (d < bestD) { bestD = d; best = i; }
+      }
+    }
+  }
+  return best >= 0 ? best : nearestNode(g, lon, lat);
+}
+
 /** Minutes to traverse an edge. This is the game's cost model, not OSRM's. */
 export const travelMinutes = (g, i) => (g.m[i] / 1000) / g.kmh[i] * 60;
 
@@ -257,6 +286,41 @@ export function timesFrom(g, src) {
       const v = g.to[k];
       if (done[v]) continue;
       const nd = d + travelMinutes(g, g.via[k]);
+      if (nd < dist[v]) { dist[v] = nd; heap.push(nd, v); }
+    }
+  }
+  return dist;
+}
+
+/**
+ * Arrival time at every node, leaving `src` at `departMinutes`.
+ *
+ * The time-dependent twin of timesFrom(). A checkpoint run needs the cost of
+ * every ordered pair of stops at every departure hour, and routeTimed() answers
+ * one pair per search — 43 pairs across 8 hours is 344 continental searches.
+ * One sweep per source answers every destination at once, so the same matrix
+ * costs 64.
+ *
+ * Correct for the same reason routeTimed() is: `dist[u]` is arrival time, and
+ * the congestion model is FIFO, so leaving later never gets you there earlier.
+ *
+ * @param timeCost (edgeIndex, clockMinutes) -> minutes to traverse
+ */
+export function timesFromTimed(g, src, departMinutes, timeCost) {
+  const dist = new Float64Array(g.n).fill(Infinity);
+  const done = new Uint8Array(g.n);
+  const heap = new Heap();
+  dist[src] = 0;
+  heap.push(0, src);
+  while (heap.size) {
+    const [d, u] = heap.pop();
+    if (done[u]) continue;
+    done[u] = 1;
+    const clock = departMinutes + d;
+    for (let k = g.off[u]; k < g.off[u + 1]; k++) {
+      const v = g.to[k];
+      if (done[v]) continue;
+      const nd = d + timeCost(g.via[k], clock);
       if (nd < dist[v]) { dist[v] = nd; heap.push(nd, v); }
     }
   }
