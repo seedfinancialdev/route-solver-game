@@ -1,4 +1,4 @@
-# What actually changes the answer: three systems measured
+# What actually changes the answer: six systems measured
 
 2026-08-23. Findings, not proposals.
 
@@ -10,7 +10,7 @@ The test is cheap and it is the same every time: **does the system change which
 corridor wins?** A cost that scales with time or distance alone cannot, however
 large it is, because a uniform tax does not move an argmin.
 
-Three systems have now been measured against it.
+Six systems have now been measured against it. One passed.
 
 ---
 
@@ -260,6 +260,40 @@ nothing.
 
 Re-measured at 03:00, 06:00 and 21:00: the whole curve is identical to within
 0.5%. Ordering difficulty does not depend on departure hour either.
+
+### Selection beats ordering, and Google cannot do it
+
+A different format: *pass through any four of these eight, your choice.* Same
+pool, same cached matrix, and the player now picks the set as well as the
+sequence.
+
+| pick k of 8 | choices | wrong pick, median | wrong pick, worst |
+| --- | --- | --- | --- |
+| 2 | 28 | +25.5% | +85.1% |
+| 3 | 56 | +45.5% | +84.9% |
+| **4** | 70 | **+31.3%** | **+60.8%** |
+| 5 | 56 | +32.8% | +52.0% |
+| 6 | 28 | +19.8% | +27.2% |
+| 7 | 8 | +10.6% | +13.0% |
+
+Choosing the wrong four costs **+31.3%** where mis-ordering the right four costs
++21.9%. Selection is the larger decision, and it decays past five only because
+picking six of eight barely leaves anything to choose.
+
+The best four are **Paris, Amsterdam, Munich, Vienna** — the set that drops
+Copenhagen and Rome, the two cities furthest off the axis. That is a judgement
+about the shape of the continent, which is exactly the knowledge the game is
+supposed to reward.
+
+It also answers a problem the ordering result alone does not. Ordering a fixed
+set is a travelling-salesman problem, and **Google Maps solves those** — its
+waypoint optimiser handles up to ten stops, and since the free-flow order is the
+traffic order on 233 of 247 races, its answer would be ours. Ordering by itself
+does not clear the second-browser-tab bar.
+
+Subset selection is not a feature Google offers. Combining them — pick four of
+eight, then sequence them — is the first race format measured that a second
+browser tab does not simply solve.
 
 ### The catch: checkpoint count drags run length with it
 

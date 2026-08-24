@@ -244,6 +244,28 @@ for (const r of rows) {
     + `free-flow plan picks a different order on ${r.blindDiffers}/${r.races}`);
 }
 
+// ---- selection, as opposed to ordering ------------------------------------
+// A different race format: "pass through any k of these cities, your choice".
+// Ordering is a travelling-salesman problem and Google Maps will solve one
+// (its waypoint optimiser handles up to ten stops). Choosing WHICH stops is
+// not a problem it offers to solve, so if selection carries a real penalty it
+// is a decision that survives a second browser tab.
+console.log('\n  Same pool, but the player picks which k to visit:');
+console.log('    k   choices  wrong pick (median)  wrong pick (worst)  best set');
+for (let k = 2; k <= usable.length - 1; k++) {
+  const subsets = subsetsOfSize(usable, k);
+  const optima = subsets.map((ids) => {
+    const costs = permutations(ids).map((p) => evaluate([0, ...p, N - 1], depart));
+    return { ids, cost: Math.min(...costs) };
+  }).sort((a, b) => a.cost - b.cost);
+  const best = optima[0];
+  const median = optima[Math.floor(optima.length / 2)];
+  const worst = optima[optima.length - 1];
+  console.log(`  ${String(k).padStart(3)}  ${String(subsets.length).padStart(7)}  `
+    + `${pct(median.cost / best.cost - 1).padStart(19)}  ${pct(worst.cost / best.cost - 1).padStart(18)}  `
+    + `${best.ids.map((i) => stops[i].name).join(', ')}`);
+}
+
 // ---- what the curve says --------------------------------------------------
 const first = rows[0], last = rows[rows.length - 1];
 console.log();
