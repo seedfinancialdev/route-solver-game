@@ -193,6 +193,92 @@ hour. They are two independent decisions rather than one coupled problem.
 
 ---
 
+## 6. How many checkpoints — the difficulty curve
+
+Ordering is the only system that changed the answer, so the follow-up is a
+design parameter. Measured over **every subset of eight candidate cities**
+between Barcelona and Istanbul — Paris, Amsterdam, Copenhagen, Berlin, Munich,
+Vienna, Rome, Milan — which is 247 distinct races.
+
+| checkpoints | races | orders | median order | per checkpoint | worst order | greedy plan | traffic-blind | within 1% |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2 | 28 | 2 | +14.8% | +7.4% | +14.8% | +2.6% | +0.0% | 51.8% |
+| 3 | 56 | 6 | +17.5% | +5.8% | +27.9% | +6.8% | +0.0% | 19.6% |
+| 4 | 70 | 24 | +21.9% | +5.5% | +37.4% | **+10.3%** | +0.0% | 5.2% |
+| 5 | 56 | 120 | +27.4% | +5.5% | +48.9% | **+12.8%** | +0.0% | 1.1% |
+| 6 | 28 | 720 | +33.4% | +5.6% | +57.6% | +16.9% | +0.0% | 0.2% |
+| 7 | 8 | 5,040 | +39.4% | +5.6% | +67.3% | +22.1% | +0.1% | 0.0% |
+| 8 | 1 | 40,320 | +46.0% | +5.7% | +76.3% | +26.3% | +0.0% | 0.0% |
+
+*greedy plan* is nearest-unvisited-city, priced under traffic. *traffic-blind*
+is the best order chosen on a free-flow map, priced under traffic.
+
+### Permutation count is not difficulty
+
+The median penalty looks like it explodes — +14.8% to +46.0% — but the
+per-checkpoint column shows it is **flat at about 5.5% each from three
+onwards**. Median ordering cost grows linearly in checkpoint count. Nothing
+about the *size* of the penalty accelerates.
+
+What actually gets harder is finding the answer:
+
+| | 2 checkpoints | 4 | 6 |
+| --- | --- | --- | --- |
+| greedy is already optimal | 20 of 28 races | 9 of 70 | 0 of 28 |
+| orders within 1% of best | 51.8% | 5.2% | 0.2% |
+
+At two checkpoints **half of all orderings are effectively tied** and the
+obvious plan is usually right — there is no decision, whatever the spread says.
+By six there is exactly one right answer and no heuristic finds it.
+
+That confirms the gate `2026-08-22-run-criteria.md` already chose: measure
+against **greedy**, not against the median. The median moves smoothly and says
+nothing. Greedy is the difficulty.
+
+### The sweet spot is four to five
+
+| | verdict |
+| --- | --- |
+| 2–3 | greedy is optimal on 37–71% of races. A formality. |
+| **4–5** | greedy costs +10.3% / +12.8%, near-ties down to 5.2% / 1.1%, 24–120 orders. A judgement a person can make. |
+| 6+ | greedy never wins and near-ties vanish, but 720+ orders and a 66-hour run make it a solver's job rather than a decision. |
+
+Four is also where the existing `greedy ≥ +10%` sequencing gate first clears
+reliably. That threshold now has a measured meaning rather than a guessed one.
+
+### Traffic does not affect ordering at all
+
+The free-flow-optimal order is the traffic-optimal order on **233 of 247
+races**, and where it differs it costs **at most +0.4%**. A player who plans the
+sequence with no idea about traffic loses nothing.
+
+This is the fifth system to come back inert on "does it change the answer", and
+it is the sharpest one yet, because traffic is otherwise the largest system
+measured (5–11 hours). Traffic is priced into **the clock**, not into the order.
+Departure timing is worth ~1h30; knowing about traffic when sequencing is worth
+nothing.
+
+Re-measured at 03:00, 06:00 and 21:00: the whole curve is identical to within
+0.5%. Ordering difficulty does not depend on departure hour either.
+
+### The catch: checkpoint count drags run length with it
+
+| checkpoints | 2 | 4 | 6 | 8 |
+| --- | --- | --- | --- | --- |
+| optimal run | 44.6 h | 56.4 h | 66.1 h | 74.3 h |
+
+Every checkpoint added to a continental race costs about five hours. The
+ordering sweet spot at four to five therefore lands on a **56–62 hour race**,
+which is a lot to ask of a player.
+
+The two are only coupled through geography, though. Checkpoints spaced across a
+continent add five hours each; checkpoints spaced across France would add far
+less. **Whether a regional race can hold four-to-five-checkpoint ordering
+difficulty inside eight to twelve hours is the next measurement**, and it is the
+one that decides whether the shippable race is continental or regional.
+
+---
+
 ## Old section: enforcement as originally framed
 
 Not yet measured. It is the only candidate whose cost varies with **place**
