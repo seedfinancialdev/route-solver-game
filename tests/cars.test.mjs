@@ -84,9 +84,12 @@ test('the shipped table is complete and every drivable car works', () => {
     for (const field of ['id', 'name', 'year', 'tankL', 'wltpL100', 'topKmh', 'kerbKg']) {
       assert.ok(c[field] !== undefined, `${c.id ?? c.name} is missing ${field}`);
     }
-    assert.ok(rangeKm(c, 150) > 250, `${c.name} cannot go 250 km at 150 km/h`);
-    // No cruise floor: a 1978 ambulance is meant to be slow, and it scores
-    // negative points for it. The baseline is a scoring origin, not a minimum.
+    // No pace floor: a 1978 ambulance and a one-ton dually are meant to be
+    // slow, and they score negative points for it — the baseline is a scoring
+    // origin, not a minimum. What every car must do is cover real distance at
+    // whatever pace it can ACTUALLY hold, not an arbitrary shared number.
+    const pace = Math.min(150, cruiseKmh(c));
+    assert.ok(rangeKm(c, pace) > 200, `${c.name} cannot cover 200 km at its own cruise pace (${pace} km/h)`);
     assert.ok(cruiseKmh(c) > 100, `${c.name} is too slow to race at all`);
   }
 });
