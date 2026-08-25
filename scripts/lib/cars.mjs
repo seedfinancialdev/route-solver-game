@@ -130,6 +130,30 @@ export const MODS = {
   weight: { label: 'stripped interior', kerbKg: -85, wltpL100: -0.2 },
 };
 
+// Mods that compete for the same space: a tank swap is one choice, not a menu.
+// Everything else in MODS is an independent yes/no toggle.
+const MOD_GROUPS = { tank: ['aux-tank', 'long-range-tank'] };
+
+/**
+ * Every legal build a player can configure: one choice per exclusive group
+ * (or none), plus any subset of the independent mods.
+ *
+ * Precomputed once by build-garage.mjs rather than assembled client-side —
+ * same rule as everything else here: the browser reads numbers, it never
+ * re-derives them.
+ */
+export function legalModSets() {
+  const grouped = new Set(Object.values(MOD_GROUPS).flat());
+  const independent = Object.keys(MODS).filter((k) => !grouped.has(k));
+  const tankChoices = [null, ...MOD_GROUPS.tank];
+
+  let sets = tankChoices.map((t) => (t ? [t] : []));
+  for (const mod of independent) {
+    sets = sets.flatMap((s) => [s, [...s, mod]]);
+  }
+  return sets;
+}
+
 /** Apply modifications to a car, returning a new one. Order does not matter. */
 export function applyMods(car, mods = []) {
   const out = { ...car, mods: [...mods] };

@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   consumptionAt, cruiseKmh, rangeKm, performancePoints, applyMods, loadCars, dominated,
-  BASELINE, REFERENCE_KMH,
+  legalModSets, MODS, BASELINE, REFERENCE_KMH,
 } from '../scripts/lib/cars.mjs';
 
 const golf = { name: 'test hatch', tankL: 50, wltpL100: 4.5, topKmh: 216, kerbKg: 1320 };
@@ -115,4 +115,38 @@ test('range is compared at one pace, so a fast car is not charged twice', () => 
   // Same tank, same engine, different gearing: the fast one must score higher.
   assert.ok(performancePoints(fast) > performancePoints(slow));
   assert.equal(rangeKm(fast, REFERENCE_KMH), rangeKm(slow, REFERENCE_KMH));
+});
+
+// ---- legal mod combinations -------------------------------------------------
+//
+// Player-facing configuration: tank mods compete for the same space (you fit
+// one auxiliary tank, not two), so they are mutually exclusive. Everything
+// else - tune, derestrict, aero, weight - is an independent yes/no choice.
+
+test('legalModSets enumerates every combination of independent mods, once per tank choice', () => {
+  const sets = legalModSets();
+  // 3 tank choices (none, aux-tank, long-range-tank) x 2^4 independent mods
+  assert.equal(sets.length, 48);
+});
+
+test('legalModSets never combines both tank mods in one build', () => {
+  for (const set of legalModSets()) {
+    assert.ok(!(set.includes('aux-tank') && set.includes('long-range-tank')),
+      `illegal build: ${set.join('+')}`);
+  }
+});
+
+test('legalModSets includes the stock build with no mods at all', () => {
+  const sets = legalModSets();
+  assert.ok(sets.some((s) => s.length === 0));
+});
+
+test('legalModSets includes every real mod id at least once', () => {
+  const seen = new Set(legalModSets().flat());
+  for (const key of Object.keys(MODS)) assert.ok(seen.has(key), `${key} never appears in any build`);
+});
+
+test('legalModSets has no duplicate builds', () => {
+  const sets = legalModSets().map((s) => [...s].sort().join('+'));
+  assert.equal(new Set(sets).size, sets.length);
 });
