@@ -22,9 +22,11 @@
     color: #93a1b0; font-size: 11px; }
   #hud { left: 12px; bottom: 12px; padding: 9px 12px; font-variant-numeric: tabular-nums; }
   #hud b { font-weight: 600; }
-  #garage-link { left: 12px; top: 12px; padding: 8px 12px; font-size: 12px; color: #eef2f6;
+  #garage-link, #race-link { left: 12px; padding: 8px 12px; font-size: 12px; color: #eef2f6;
     text-decoration: none; }
-  #garage-link:hover { border-color: rgba(255,255,255,.3); }
+  #garage-link { top: 12px; }
+  #race-link { top: 54px; }
+  #garage-link:hover, #race-link:hover { border-color: rgba(255,255,255,.3); }
   .maplibregl-ctrl-attrib { font-size: 10px; }
   #err { display: none; position: absolute; z-index: 9; left: 12px; top: 12px; right: 260px;
     padding: 11px 13px; border-radius: 10px; background: #45161a; color: #ffd9d2;
@@ -58,6 +60,7 @@
 </div>
 
 <a class="panel" id="garage-link" href="./garage.html">&#128295; Garage</a>
+<a class="panel" id="race-link" href="./race.html">&#127937; Race</a>
 
 <div id="err"></div>
 

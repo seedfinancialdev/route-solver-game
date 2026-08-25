@@ -157,6 +157,23 @@ export function junctionNode(g, lon, lat, { minDegree = 3, radiusKm = 5 } = {}) 
   return best >= 0 ? best : nearestNode(g, lon, lat);
 }
 
+/**
+ * Whether an edge is derestricted autobahn — no posted limit.
+ *
+ * The graph flattens "no limit" to a single 150 km/h value (see
+ * scripts/14-road-graph.py, parse_maxspeed), so this is not a speed check —
+ * it is motorway class, exactly that value, AND the maxspeedReal flag, which
+ * excludes ordinary 150 km/h stretches and the 60 km/h default that would
+ * otherwise land on 150 by coincidence on a road with no tag at all. 19,029 km
+ * of the graph qualifies, concentrated in Germany — see measurement 8,
+ * docs/superpowers/specs/2026-08-23-system-coupling-findings.md.
+ */
+export function isDerestricted(g, edge) {
+  const REAL = g.meta.flags.maxspeedReal;
+  const MOTORWAY = g.meta.classes.indexOf('motorway');
+  return g.cls[edge] === MOTORWAY && g.kmh[edge] === 150 && !!(g.flags[edge] & REAL);
+}
+
 /** Minutes to traverse an edge. This is the game's cost model, not OSRM's. */
 export const travelMinutes = (g, i) => (g.m[i] / 1000) / g.kmh[i] * 60;
 

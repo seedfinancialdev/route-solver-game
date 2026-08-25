@@ -7,7 +7,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { junctionNode, nearestNode, timesFrom, timesFromTimed, travelMinutes } from '../scripts/lib/road-graph.mjs';
+import {
+  junctionNode, nearestNode, timesFrom, timesFromTimed, travelMinutes, isDerestricted,
+} from '../scripts/lib/road-graph.mjs';
 
 /** Four nodes in a line, every edge 1 km at 60 km/h, so every hop is 1 minute. */
 function lineGraph() {
@@ -113,4 +115,24 @@ test('junctionNode prefers the nearest qualifying junction', () => {
 test('junctionNode falls back to the nearest node when nothing qualifies', () => {
   const g = sinkAndJunction();
   assert.equal(junctionNode(g, 10.0, 50.0, { minDegree: 99 }), 0);
+});
+
+// ---- derestricted autobahn --------------------------------------------------
+//
+// 12.4% of European motorway carries no posted limit, concentrated in
+// Germany. The graph flattens it to a single 150 km/h value with the
+// maxspeedReal flag set — this predicate is how every script (the vehicle
+// gate, the resolver) agrees on what counts as "unlimited" rather than each
+// reimplementing the same three-part check.
+test('isDerestricted requires motorway class, exactly 150, and a real reading', () => {
+  const g = {
+    meta: { classes: ['motorway', 'trunk'], flags: { maxspeedReal: 4 } },
+    cls: Uint8Array.from([0, 0, 0, 1]),
+    kmh: Uint8Array.from([150, 130, 150, 150]),
+    flags: Uint8Array.from([4, 4, 0, 4]),
+  };
+  assert.equal(isDerestricted(g, 0), true);   // motorway, 150, real
+  assert.equal(isDerestricted(g, 1), false);  // motorway, but posted 130
+  assert.equal(isDerestricted(g, 2), false);  // motorway, 150, but a DEFAULT not a real reading
+  assert.equal(isDerestricted(g, 3), false);  // trunk, not motorway
 });

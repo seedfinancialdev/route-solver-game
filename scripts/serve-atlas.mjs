@@ -1,5 +1,10 @@
-// Static server for the atlas. The game is static files at this stage; this
-// exists only because a browser will not fetch JSON from a file:// page.
+// Server for the atlas. Static files, same as always, plus one real route:
+// POST /resolve, which is the one thing that cannot live in the browser — the
+// road graph is 772MB and Node-only, so resolving a player's actual plan
+// (their order, their car, their departure) has to happen here. See
+// docs/superpowers/specs/2026-08-22-infrastructure-decisions.md,
+// "server-authoritative simulation" — this is the first real instance of it,
+// not a new decision.
 //
 // Separate from legacy/scripts/serve.mjs, which serves the retired game out of
 // legacy/web/. Same shape, different root — not worth sharing a module for.
@@ -7,6 +12,11 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { loadGraph, junctionNode } from './lib/road-graph.mjs';
+import { buildUrbanField, throughClasses } from './lib/traffic.mjs';
+import { loadCars, applyMods } from './lib/cars.mjs';
+import { resolveRun } from './lib/resolve.mjs';
 
 const ROOT = new URL('../atlas/', import.meta.url).pathname;
 const PORT = Number(process.env.PORT || 8140);
@@ -19,7 +29,66 @@ const TYPES = {
   '.geojson': 'application/geo+json; charset=utf-8',
 };
 
+console.log('\n  loading the road graph for /resolve...');
+const t0 = Date.now();
+const g = loadGraph('data/road-graph');
+const urban = buildUrbanField(g);
+const through = throughClasses(g);
+const cars = loadCars();
+const carsById = new Map(cars.map((c) => [c.id, c]));
+// Today's incidents come from OUR file, never from the request body. A
+// client telling the server what delays apply today is the same mistake as
+// a client telling the server its own final time — see
+// docs/superpowers/specs/2026-08-22-infrastructure-decisions.md,
+// "server-authoritative simulation".
+const RACE_DAY = process.env.RACE_DAY || 'data/race-day-2026-08-25.json';
+const today = JSON.parse(readFileSync(RACE_DAY, 'utf8'));
+console.log(`  ready in ${((Date.now() - t0) / 1000).toFixed(1)}s — ${today.incidents.length} incident(s) today\n`);
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', (chunk) => { data += chunk; });
+    req.on('end', () => resolve(data));
+    req.on('error', reject);
+  });
+}
+
+async function handleResolve(req, res) {
+  let payload;
+  try { payload = JSON.parse(await readBody(req)); } catch {
+    res.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ error: 'invalid JSON body' }));
+    return;
+  }
+  const { stops, carId, mods, departMinutes } = payload;
+  if (!Array.isArray(stops) || stops.length < 2 || typeof departMinutes !== 'number') {
+    res.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ error: 'need stops[], carId, departMinutes' }));
+    return;
+  }
+  const baseCar = carsById.get(carId);
+  if (!baseCar) {
+    res.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ error: `unknown car "${carId}"` }));
+    return;
+  }
+  let car;
+  try { car = applyMods(baseCar, mods || []); } catch (e) {
+    res.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ error: e.message }));
+    return;
+  }
+
+  const nodeStops = stops.map((s) => ({ name: s.name, node: junctionNode(g, s.lon, s.lat) }));
+  const order = nodeStops.map((_, i) => i);
+  const result = resolveRun({ g, urban, through }, nodeStops, order, car, departMinutes, today.incidents);
+  if (!result) {
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: false, reason: 'unreachable' }));
+    return;
+  }
+  res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true, ...result }));
+}
+
 createServer(async (req, res) => {
+  if (req.method === 'POST' && req.url === '/resolve') { await handleResolve(req, res); return; }
+
   const path = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   const file = join(ROOT, normalize(path === '/' ? '/index.html' : path));
   if (!file.startsWith(ROOT)) { res.writeHead(403).end('forbidden'); return; }
@@ -35,4 +104,4 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(404).end('not found');
   }
-}).listen(PORT, () => console.log(`\n  Atlas at http://localhost:${PORT}/\n`));
+}).listen(PORT, () => console.log(`  Atlas at http://localhost:${PORT}/\n`));
