@@ -1,0 +1,241 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Garage — Atlas</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  html, body { margin: 0; min-height: 100%; background: #0a1119; color: #eef2f6;
+    font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  a { color: inherit; }
+  .mono { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+
+  header { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; gap: 10px 20px;
+    align-items: center; padding: 12px 16px; background: rgba(10,17,25,.94);
+    border-bottom: 1px solid rgba(255,255,255,.09); backdrop-filter: blur(12px); }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .01em; }
+  header .back { font-size: 12px; color: #93a1b0; text-decoration: none; border: 1px solid rgba(255,255,255,.14);
+    border-radius: 6px; padding: 4px 9px; }
+  header .back:hover { color: #eef2f6; border-color: rgba(255,255,255,.3); }
+
+  .cap { display: flex; align-items: center; gap: 9px; }
+  .cap label { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: #93a1b0; }
+  .cap input[type="range"] { width: 160px; accent-color: #e8503a; }
+  .cap .val { min-width: 3.2ch; }
+  .admits { font-size: 12px; color: #93a1b0; white-space: nowrap; }
+  .admits b { color: #eef2f6; font-weight: 600; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { font-size: 11.5px; font-weight: 500; padding: 4px 9px; border-radius: 5px;
+    border: 1px solid rgba(255,255,255,.14); background: transparent; color: #93a1b0; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; }
+  .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dot); }
+  .chip[aria-pressed="true"] { background: rgba(255,255,255,.07); color: #eef2f6; border-color: rgba(255,255,255,.24); }
+
+  .prov { margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #93a1b0;
+    cursor: pointer; user-select: none; }
+  .prov input { accent-color: #e8503a; }
+
+  main { padding: 4px 16px 50px; max-width: 1400px; margin: 0 auto; }
+
+  .cat-band { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    border-left: 3px solid var(--cat); padding: 2px 0 2px 12px; margin: 26px 0 12px; }
+  .cat-band h2 { font-size: 14px; margin: 0; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--cat); }
+  .cat-band .brief { font-size: 12px; color: #93a1b0; max-width: 60ch; }
+  .cat-band .n { margin-left: auto; font-size: 11px; color: #5c6a76; white-space: nowrap; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+
+  .card { background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.09); border-radius: 8px;
+    padding: 12px 13px; display: flex; flex-direction: column; gap: 9px; transition: opacity .15s, filter .15s; }
+  .card[data-excluded="true"] { opacity: .32; filter: grayscale(.6); }
+
+  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .card-name { font-size: 14.5px; font-weight: 600; line-height: 1.2; }
+  .card-year { color: #5c6a76; }
+  .fuel { flex: none; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; color: #93a1b0;
+    border: 1px solid rgba(255,255,255,.16); border-radius: 3px; padding: 2px 5px; white-space: nowrap; }
+
+  dl.specs { display: grid; grid-template-columns: auto 1fr; row-gap: 3px; column-gap: 8px;
+    border-top: 1px solid rgba(255,255,255,.08); border-bottom: 1px solid rgba(255,255,255,.08);
+    padding: 7px 0; }
+  dl.specs dt { color: #5c6a76; font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase; align-self: center; }
+  dl.specs dd { margin: 0; text-align: right; }
+  dl.specs dd.pending { color: #5c6a76; font-style: italic; font: 11px ui-sans-serif, system-ui, sans-serif; }
+
+  .pp-row { display: flex; justify-content: space-between; font-size: 10.5px; letter-spacing: .05em;
+    text-transform: uppercase; color: #5c6a76; }
+  .pp-row .v { font: 13px ui-monospace, monospace; color: #eef2f6; letter-spacing: 0; text-transform: none; }
+  .pp-track { position: relative; height: 6px; background: rgba(255,255,255,.06); border-radius: 3px; margin-top: 3px; }
+  .pp-fill { position: absolute; top: 0; bottom: 0; background: var(--cat); border-radius: 3px; }
+  .pp-zero { position: absolute; top: -2px; bottom: -2px; width: 1px; background: rgba(255,255,255,.3); }
+  .pp-track.pending { background: repeating-linear-gradient(-45deg, rgba(255,255,255,.05), rgba(255,255,255,.05) 4px,
+    rgba(255,255,255,.11) 4px, rgba(255,255,255,.11) 5px); }
+
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag { font-size: 10px; font-weight: 500; padding: 2px 6px; border-radius: 3px; }
+  .tag-out { background: rgba(228,90,60,.14); color: #ff8a70; border: 1px solid rgba(228,90,60,.4); }
+  .tag-partial { color: #93a1b0; border: 1px dashed rgba(255,255,255,.24); }
+  .tag-pending { background: rgba(255,255,255,.05); color: #5c6a76; border: 1px solid rgba(255,255,255,.1); }
+  .tag-clear { color: #5c6a76; border: 1px solid rgba(255,255,255,.1); }
+
+  .prov-note { display: none; font-size: 11px; color: #93a1b0; border-top: 1px dashed rgba(255,255,255,.1);
+    padding-top: 8px; line-height: 1.5; }
+  .prov-note b { color: #eef2f6; font-weight: 500; }
+  body[data-prov="on"] .prov-note { display: block; }
+
+  footer { max-width: 1400px; margin: 30px auto 0; padding: 16px 16px 40px; color: #5c6a76; font-size: 11.5px;
+    border-top: 1px solid rgba(255,255,255,.08); }
+  footer p { max-width: 76ch; margin: 0 0 8px; }
+</style>
+
+<header>
+  <a class="back" href="./index.html">&larr; map</a>
+  <h1>Garage</h1>
+  <div class="cap">
+    <label for="ppCap">Reg. cap</label>
+    <input type="range" id="ppCap">
+    <span class="val mono" id="ppCapVal">—</span>
+  </div>
+  <span class="admits" id="admits"></span>
+  <div class="chips" id="chips"></div>
+  <label class="prov"><input type="checkbox" id="prov"> real-world basis</label>
+</header>
+
+<main id="main"></main>
+
+<footer id="footer"></footer>
+
+<script>
+(function () {
+  "use strict";
+
+  fetch("./garage.json").then(function (r) { return r.json(); }).then(function (data) {
+    var cars = data.cars;
+    var active = new Set(data.categories.map(function (c) { return c.key; }));
+    var cap = data.ppRange[1];
+    var CAT_COLORS = { executive: "#5b9bd9", poster: "#e8503a", camouflage: "#98a068", tuner: "#e0a53c", wildcard: "#3ba894" };
+
+    var main = document.getElementById("main");
+    var chips = document.getElementById("chips");
+    var ppCap = document.getElementById("ppCap");
+    var ppCapVal = document.getElementById("ppCapVal");
+    var admits = document.getElementById("admits");
+
+    var lo = Math.floor(data.ppRange[0] / 10) * 10, hi = Math.ceil(data.ppRange[1] / 10) * 10;
+    ppCap.min = lo; ppCap.max = hi; ppCap.value = hi;
+    ppCapVal.textContent = hi;
+
+    document.getElementById("footer").innerHTML =
+      "<p><b class='mono'>PP</b> is minutes saved over a baseline car (" + data.baseline.tankL + "L tank, "
+      + data.baseline.wltpL100 + " L/100km, " + data.baseline.topKmh + " km/h, " + data.baseline.kerbKg
+      + " kg) on the reference race, at " + data.referenceKmh + " km/h. The tick on each gauge marks zero.</p>"
+      + "<p><b>Outclassed</b> = another car in the category is quicker AND longer-legged. With only speed and range "
+      + "modelled that is unavoidable in places — reliability, police attention and weather would un-dominate "
+      + "them, and none of those exist yet. <b>Partial data</b> marks the two cars with no published factory figure "
+      + "for a coachbuilt box or that curb weight — period-typical estimates, not sourced ones.</p>";
+
+    data.categories.forEach(function (cat) {
+      var chip = document.createElement("button");
+      chip.className = "chip"; chip.type = "button";
+      chip.setAttribute("aria-pressed", "true");
+      chip.style.setProperty("--dot", CAT_COLORS[cat.key]);
+      chip.innerHTML = "<span class='dot'></span>" + cat.label.split(" ")[0];
+      chip.addEventListener("click", function () {
+        if (active.has(cat.key)) { active.delete(cat.key); chip.setAttribute("aria-pressed", "false"); }
+        else { active.add(cat.key); chip.setAttribute("aria-pressed", "true"); }
+        render();
+      });
+      chips.appendChild(chip);
+    });
+
+    ppCap.addEventListener("input", function () { cap = Number(ppCap.value); ppCapVal.textContent = cap; render(); });
+    document.getElementById("prov").addEventListener("change", function (e) {
+      document.body.setAttribute("data-prov", e.target.checked ? "on" : "off");
+    });
+
+    function fuelLabel(f) { return f === "petrol" ? "Petrol" : f === "diesel" ? "Diesel" : "Electric"; }
+
+    function cardFor(car) {
+      var pending = !!car.status;
+      var excluded = !pending && car.pp > cap;
+      var el = document.createElement("article");
+      el.className = "card";
+      el.style.setProperty("--cat", CAT_COLORS[car.category]);
+      el.dataset.excluded = excluded ? "true" : "false";
+
+      var specs = pending
+        ? "<dt>Battery</dt><dd>" + car.batteryKwh + " kWh</dd>"
+          + "<dt>Consumption</dt><dd>" + car.kwhPer100.toFixed(1) + " kWh/100km</dd>"
+          + "<dt>Top speed</dt><dd>" + car.topKmh + " km/h</dd>"
+          + "<dt>Range</dt><dd class='pending'>no charging model yet</dd>"
+        : "<dt>Tank</dt><dd>" + car.tankL + " L</dd>"
+          + "<dt>Cruise</dt><dd>" + car.cruiseKmh + " km/h</dd>"
+          + "<dt>Range @" + data.referenceKmh + "</dt><dd>" + car.rangeKm + " km</dd>"
+          + "<dt>L/100 @" + data.referenceKmh + "</dt><dd>" + car.consumptionAt180.toFixed(1) + "</dd>"
+          + "<dt>Kerb</dt><dd>" + car.kerbKg.toLocaleString() + " kg</dd>";
+
+      var pp;
+      if (pending) {
+        pp = "<div class='pp-row'><span>Performance points</span><span class='v'>—</span></div>"
+          + "<div class='pp-track pending'></div>";
+      } else {
+        var span = data.ppRange[1] - data.ppRange[0] || 1;
+        var fillPct = Math.max(0, Math.min(100, ((car.pp - data.ppRange[0]) / span) * 100));
+        var zeroPct = Math.max(0, Math.min(100, ((0 - data.ppRange[0]) / span) * 100));
+        var left = car.pp >= 0 ? zeroPct : fillPct;
+        var width = Math.abs(fillPct - zeroPct);
+        pp = "<div class='pp-row'><span>Performance points</span><span class='v'>" + car.pp + "</span></div>"
+          + "<div class='pp-track'><div class='pp-zero' style='left:" + zeroPct + "%'></div>"
+          + "<div class='pp-fill' style='left:" + left + "%;width:" + width + "%'></div></div>";
+      }
+
+      var tags = pending ? "<span class='tag tag-pending'>No cost model — pending charging system</span>"
+        : car.dominatedBy ? "<span class='tag tag-out'>Outclassed by " + car.dominatedBy + "</span>"
+        : "<span class='tag tag-clear'>Undominated pick</span>";
+      if (car.partial) tags += "<span class='tag tag-partial'>Partial data</span>";
+
+      el.innerHTML =
+        "<div class='card-head'><div><div class='card-name'>" + car.name + "</div>"
+        + "<div class='card-year mono'>" + car.year + "</div></div>"
+        + "<span class='fuel'>" + fuelLabel(car.fuel) + "</span></div>"
+        + "<dl class='specs mono'>" + specs + "</dl>"
+        + pp
+        + "<div class='tags'>" + tags + "</div>"
+        + "<div class='prov-note'><b>Based on:</b> " + car.basedOn + ". " + car.sourceNote + "</div>";
+      return el;
+    }
+
+    function render() {
+      main.innerHTML = "";
+      var admitted = 0, total = 0;
+      data.categories.forEach(function (cat) {
+        var inCat = cars.filter(function (c) { return c.category === cat.key; })
+          .slice().sort(function (a, b) { return (b.status ? -Infinity : b.pp) - (a.status ? -Infinity : a.pp); });
+        var section = document.createElement("section");
+        if (!active.has(cat.key)) { section.style.display = "none"; }
+        var band = document.createElement("div");
+        band.className = "cat-band";
+        band.style.setProperty("--cat", CAT_COLORS[cat.key]);
+        band.innerHTML = "<h2>" + cat.label + "</h2><span class='brief'>" + cat.brief + "</span>"
+          + "<span class='n'>" + inCat.length + " cars</span>";
+        section.appendChild(band);
+        var grid = document.createElement("div");
+        grid.className = "grid";
+        inCat.forEach(function (car) {
+          if (!car.status) { total++; if (car.pp <= cap) admitted++; }
+          grid.appendChild(cardFor(car));
+        });
+        section.appendChild(grid);
+        main.appendChild(section);
+      });
+      admits.innerHTML = "<b>" + admitted + "</b> of " + total + " priceable admitted";
+    }
+
+    render();
+  }).catch(function (err) {
+    document.getElementById("main").innerHTML =
+      "<p style='padding:20px;color:#ff8a70'>Could not load garage.json — run <code>npm run atlas:garage</code> first.<br>"
+      + err + "</p>";
+  });
+})();
+</script>

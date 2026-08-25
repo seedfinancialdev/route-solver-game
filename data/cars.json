@@ -133,7 +133,8 @@
       "wltpL100": 26.0,
       "basedOn": "1978 Dodge Sportsman (B300 chassis) ambulance conversion",
       "sourceNote": "ESTIMATED, not fully sourced: 36-gal factory tank is real; a coachbuilt ambulance box has no published factory spec, so weight (base B300 ~4,900 lb + box/equipment) and top speed are period-typical engineering estimates, not found figures.",
-      "notes": "The definitive real-world and cinematic deception vehicle used to trick the police."
+      "notes": "The definitive real-world and cinematic deception vehicle used to trick the police.",
+      "partial": true
     },
     {
       "id": "sierra-c35",
@@ -147,7 +148,8 @@
       "wltpL100": 20.0,
       "basedOn": "1980 GMC C-35 dually pickup",
       "sourceNote": "ESTIMATED, not fully sourced: 20-gal long-bed tank is real; no factory curb weight for the C-35 one-ton dually specifically was found, so weight and top speed are period-comparable estimates from the C/K30-C35 family.",
-      "notes": "The heavy-duty movie throwback built to smash through obstacles and take off-road shortcuts."
+      "notes": "The heavy-duty movie throwback built to smash through obstacles and take off-road shortcuts.",
+      "partial": true
     },
     {
       "id": "dearborn-regent",

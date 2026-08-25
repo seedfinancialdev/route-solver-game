@@ -21,7 +21,7 @@
     "balance": "node play/balance-check.mjs",
     "core-loop:play": "node core-loop/play.mjs",
     "atlas": "node scripts/serve-atlas.mjs",
-    "atlas:data": "node atlas/build-geojson.mjs",
+    "atlas:data": "node atlas/build-geojson.mjs && node atlas/build-garage.mjs",
     "atlas:check": "node atlas/check-style.mjs",
     "osm:build": "node scripts/16-build-osm-graph.mjs",
     "runs:check": "node --max-old-space-size=14000 scripts/17-check-runs.mjs",
@@ -34,7 +34,8 @@
     "order:count": "node --max-old-space-size=14000 scripts/26-checkpoint-count-gate.mjs",
     "fuel:ordering": "node --max-old-space-size=14000 scripts/27-fuel-ordering-gate.mjs",
     "vehicle:gate": "node --max-old-space-size=14000 scripts/28-vehicle-gate.mjs",
-    "garage": "node scripts/30-garage.mjs"
+    "garage": "node scripts/30-garage.mjs",
+    "atlas:garage": "node atlas/build-garage.mjs"
   },
   "devDependencies": {
     "d3-delaunay": "^6.0.4",
