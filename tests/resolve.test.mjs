@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { carMinutes, resolveRun, edgeLine } from '../scripts/lib/resolve.mjs';
+import { carMinutes, resolveRun, edgeLine, resolveLegWithWaypoint } from '../scripts/lib/resolve.mjs';
 
 /** Same shape as road-graph.test.mjs's fixtures: a straight line, one hop per
  * segment, but with a mix of capped and derestricted edges so car cruise
@@ -116,4 +116,101 @@ test('resolveRun attaches real coordinates to each leg', () => {
   const result = resolveRun({ g, ...noTraffic }, stops, [0, 1, 2], car, 6 * 60, []);
   assert.deepEqual(result.legs[0].coordinates, [[0, 0], [1, 0], [2, 0]]);
   assert.deepEqual(result.legs[1].coordinates, [[2, 0], [3, 0]]);
+});
+
+// ---- routing through a dragged waypoint ------------------------------------
+//
+// This is the mechanism behind "drag the route like Google Maps": force a
+// leg through a specific point instead of taking the default fastest path.
+// A diamond graph — a short direct path and a longer alternate — is the
+// smallest fixture that can actually prove a forced waypoint changes the
+// path, not just relabels the same one.
+//
+//      1
+//    ↗   ↘
+//   0      3     0->1->3 short (100 km); 0->2->3 long (160 km)
+//    ↘   ↗
+//      2
+function diamondGraph() {
+  return {
+    meta: { flags: { oneway: 1, maxspeedReal: 4 }, classes: ['motorway'] },
+    n: 4,
+    e: 4,
+    a: Int32Array.from([0, 1, 0, 2]),
+    b: Int32Array.from([1, 3, 2, 3]),
+    m: Uint32Array.from([50000, 50000, 80000, 80000]),
+    kmh: Uint8Array.from([100, 100, 100, 100]),
+    cls: Uint8Array.from([0, 0, 0, 0]),
+    flags: Uint8Array.from([4, 4, 4, 4]),
+    xy: Float32Array.from([0, 0, 1, 0, 0, 1, 2, 0]),  // 0=(0,0) 1=(1,0) 2=(0,1) 3=(2,0)
+    off: Uint32Array.from([0, 2, 3, 4, 4]),
+    to: Int32Array.from([1, 2, 3, 3]),
+    via: Uint32Array.from([0, 2, 1, 3]),
+    // junctionNode()/nearestNode() need the grid index loadGraph() normally
+    // builds — one cell per node here is enough for these tests' clicks.
+    cell: 1,
+    grid: new Map([['0:0', [0]], ['1:0', [1]], ['0:1', [2]], ['2:0', [3]]]),
+  };
+}
+
+test('resolveRun takes the short direct path when nothing forces a detour', () => {
+  const g = diamondGraph();
+  const car = { topKmh: 176 };
+  const stops = [{ name: 'Start', node: 0 }, { name: 'End', node: 3 }];
+  const result = resolveRun({ g, ...noTraffic }, stops, [0, 1], car, 6 * 60, []);
+  assert.equal(result.legs[0].km, 100);
+});
+
+test('resolveLegWithWaypoint routes through the forced point even when it is not on the fast path', () => {
+  const g = diamondGraph();
+  const car = { topKmh: 176 };
+  const from = { name: 'Start', node: 0 }, to = { name: 'End', node: 3 };
+  const detour = resolveLegWithWaypoint({ g, ...noTraffic }, from, to, [0, 1], car, 6 * 60, []);
+  assert.equal(detour.km, 160, 'should take the long way, via node 2, not the short direct path');
+});
+
+test('resolveLegWithWaypoint costs more than the undetoured leg when the forced point is out of the way', () => {
+  const g = diamondGraph();
+  const car = { topKmh: 176 };
+  const stops = [{ name: 'Start', node: 0 }, { name: 'End', node: 3 }];
+  const direct = resolveRun({ g, ...noTraffic }, stops, [0, 1], car, 6 * 60, []);
+  const detour = resolveLegWithWaypoint({ g, ...noTraffic }, stops[0], stops[1], [0, 1], car, 6 * 60, []);
+  assert.ok(detour.minutes > direct.legs[0].minutes);
+});
+
+test('resolveLegWithWaypoint traces real coordinates through the waypoint, with no duplicate at the join', () => {
+  const g = diamondGraph();
+  const car = { topKmh: 176 };
+  const from = { name: 'Start', node: 0 }, to = { name: 'End', node: 3 };
+  const detour = resolveLegWithWaypoint({ g, ...noTraffic }, from, to, [0, 1], car, 6 * 60, []);
+  assert.deepEqual(detour.coordinates, [[0, 0], [0, 1], [2, 0]]);
+});
+
+test('resolveLegWithWaypoint snaps a raw click near a junction to that junction', () => {
+  const g = diamondGraph();
+  const car = { topKmh: 176 };
+  const from = { name: 'Start', node: 0 }, to = { name: 'End', node: 3 };
+  // Click slightly off node 2's exact position (0, 1), but within its own grid
+  // cell (cell size 1) so this tests snapping itself, not nearestNode's
+  // separate cross-cell ring search, which road-graph.test.mjs already covers.
+  const detour = resolveLegWithWaypoint({ g, ...noTraffic }, from, to, [0.05, 1.05], car, 6 * 60, []);
+  assert.equal(detour.km, 160);
+});
+
+test('resolveLegWithWaypoint still applies a matching incident to the whole leg', () => {
+  const g = diamondGraph();
+  const car = { topKmh: 176 };
+  const from = { name: 'Start', node: 0 }, to = { name: 'End', node: 3 };
+  const detour = resolveLegWithWaypoint({ g, ...noTraffic }, from, to, [0, 1], car, 6 * 60,
+    [{ from: 'Start', to: 'End', delayMinutes: 20, note: 'test' }]);
+  assert.equal(detour.incidentMinutes, 20);
+});
+
+test('resolveLegWithWaypoint returns null when the forced point cannot reach the destination', () => {
+  const g = diamondGraph();
+  g.off = Uint32Array.from([0, 2, 3, 3, 4]); // node 2 now has no outgoing edge
+  const car = { topKmh: 176 };
+  const from = { name: 'Start', node: 0 }, to = { name: 'End', node: 3 };
+  const detour = resolveLegWithWaypoint({ g, ...noTraffic }, from, to, [0, 1], car, 6 * 60, []);
+  assert.equal(detour, null);
 });

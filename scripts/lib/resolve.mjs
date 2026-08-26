@@ -12,7 +12,7 @@
 // cruise speed on the 19,029 km of derestricted autobahn that measurement 8
 // found — see docs/superpowers/specs/2026-08-23-system-coupling-findings.md.
 
-import { routeTimed, isDerestricted } from './road-graph.mjs';
+import { routeTimed, junctionNode, isDerestricted } from './road-graph.mjs';
 import { congestion } from './traffic.mjs';
 import { cruiseKmh } from './cars.mjs';
 
@@ -21,6 +21,14 @@ import { cruiseKmh } from './cars.mjs';
 export function carMinutes(g, edge, car) {
   const kmh = isDerestricted(g, edge) ? cruiseKmh(car) : Math.min(g.kmh[edge], cruiseKmh(car));
   return (g.m[edge] / 1000) / kmh * 60;
+}
+
+/** This car's per-edge time-of-day cost function, shared by every routeTimed
+ * call in this module so a detour is priced the exact same way the default
+ * route is. */
+function legCost(world, car) {
+  const { g, urban, through } = world;
+  return (edge, clock) => carMinutes(g, edge, car) * congestion(g, urban, through, edge, clock);
 }
 
 function findIncident(incidents, fromName, toName) {
@@ -56,8 +64,8 @@ export function edgeLine(g, edges) {
  *          unreachable — never NaN, never a partial result silently returned.
  */
 export function resolveRun(world, stops, order, car, departMinutes, incidents) {
-  const { g, urban, through } = world;
-  const cost = (edge, clock) => carMinutes(g, edge, car) * congestion(g, urban, through, edge, clock);
+  const { g } = world;
+  const cost = legCost(world, car);
 
   let clock = departMinutes;
   const legs = [];
@@ -77,4 +85,43 @@ export function resolveRun(world, stops, order, car, departMinutes, incidents) {
   }
   const totalMinutes = legs.reduce((s, l) => s + l.minutes, 0);
   return { totalMinutes, arrivalMinutes: departMinutes + totalMinutes, legs };
+}
+
+/**
+ * Resolve one leg forced through a specific point — the mechanism behind
+ * dragging the route on the map, Google-Maps-style. The default route (see
+ * resolveRun) is the naive backfill; this is what happens the instant a
+ * player drops a dragged waypoint onto it. No new pathfinding: a forced
+ * waypoint is just two ordinary routeTimed searches back to back, from the
+ * leg's start to the waypoint and from the waypoint to the leg's end, priced
+ * by the exact same cost function so a detour and the default are directly
+ * comparable.
+ *
+ * @param waypointLonLat  a raw map click — snapped to the nearest real
+ *                        junction via junctionNode(), the same snap every
+ *                        other checkpoint in this game gets
+ * @returns the same leg shape resolveRun's legs[] use, or null if the
+ *          waypoint cannot reach either the start or the destination
+ */
+export function resolveLegWithWaypoint(world, from, to, waypointLonLat, car, departMinutes, incidents) {
+  const { g } = world;
+  const cost = legCost(world, car);
+  const waypointNode = junctionNode(g, waypointLonLat[0], waypointLonLat[1]);
+
+  const first = routeTimed(g, from.node, waypointNode, departMinutes, cost);
+  if (!first) return null;
+  const second = routeTimed(g, waypointNode, to.node, departMinutes + first.minutes, cost);
+  if (!second) return null;
+
+  const incident = findIncident(incidents, from.name, to.name);
+  const minutes = first.minutes + second.minutes + (incident ? incident.delayMinutes : 0);
+  return {
+    from: from.name, to: to.name, minutes, km: first.km + second.km,
+    incidentMinutes: incident ? incident.delayMinutes : 0,
+    incidentNote: incident ? incident.note : null,
+    // second's line repeats the waypoint junction where it joins first's —
+    // drop that one duplicate rather than leave a zero-length seam.
+    coordinates: edgeLine(g, first.edges).concat(edgeLine(g, second.edges).slice(1)),
+    viaWaypoint: true,
+  };
 }
