@@ -51,6 +51,49 @@ export function edgeLine(g, edges) {
 }
 
 /**
+ * Resolve one leg, optionally forced through a waypoint — the shared engine
+ * behind both a plain leg and a dragged one. A forced waypoint is just two
+ * ordinary routeTimed searches back to back (start-to-waypoint,
+ * waypoint-to-destination) instead of one, priced by the exact same cost
+ * function, so a detour and the default are directly comparable rather than
+ * apples to oranges. No new pathfinding either way.
+ *
+ * @returns the leg shape resolveRun's legs[] use, or null if any leg of the
+ *          search is unreachable.
+ */
+function resolveOneLeg(world, from, to, departMinutes, cost, incidents, waypointLonLat) {
+  const { g } = world;
+  let first, second = null;
+  if (waypointLonLat) {
+    const waypointNode = junctionNode(g, waypointLonLat[0], waypointLonLat[1]);
+    first = routeTimed(g, from.node, waypointNode, departMinutes, cost);
+    if (!first) return null;
+    second = routeTimed(g, waypointNode, to.node, departMinutes + first.minutes, cost);
+    if (!second) return null;
+  } else {
+    first = routeTimed(g, from.node, to.node, departMinutes, cost);
+    if (!first) return null;
+  }
+
+  const incident = findIncident(incidents, from.name, to.name);
+  const baseMinutes = first.minutes + (second ? second.minutes : 0);
+  const coordinates = second
+    // second's line repeats the waypoint junction where it joins first's —
+    // drop that one duplicate rather than leave a zero-length seam.
+    ? edgeLine(g, first.edges).concat(edgeLine(g, second.edges).slice(1))
+    : edgeLine(g, first.edges);
+  return {
+    from: from.name, to: to.name,
+    minutes: baseMinutes + (incident ? incident.delayMinutes : 0),
+    km: first.km + (second ? second.km : 0),
+    incidentMinutes: incident ? incident.delayMinutes : 0,
+    incidentNote: incident ? incident.note : null,
+    coordinates,
+    ...(waypointLonLat ? { viaWaypoint: true } : {}),
+  };
+}
+
+/**
  * Resolve one plan: an ordered stop sequence, in this car, leaving at this
  * time, on this day's incidents.
  *
@@ -60,42 +103,36 @@ export function edgeLine(g, edges) {
  * @param car     anything cruiseKmh() accepts — a garage car, modded or not
  * @param incidents  today's [{ from, to, delayMinutes, note }], matched by
  *                   stop name in either direction
+ * @param detours    { legIndex: [lon, lat] } — legs the player has dragged a
+ *                   waypoint onto, 0-based against `order` (leg 0 is
+ *                   order[0]->order[1]). A dragged leg shifts the arrival
+ *                   clock for every leg after it, which can change THEIR
+ *                   traffic price too — that is why this lives inside the
+ *                   same sequential clock every leg already shares, rather
+ *                   than as a standalone single-leg call.
  * @returns { totalMinutes, arrivalMinutes, legs } or null if any leg is
  *          unreachable — never NaN, never a partial result silently returned.
  */
-export function resolveRun(world, stops, order, car, departMinutes, incidents) {
-  const { g } = world;
+export function resolveRun(world, stops, order, car, departMinutes, incidents, detours = {}) {
   const cost = legCost(world, car);
 
   let clock = departMinutes;
   const legs = [];
   for (let k = 1; k < order.length; k++) {
     const from = stops[order[k - 1]], to = stops[order[k]];
-    const r = routeTimed(g, from.node, to.node, clock, cost);
-    if (!r) return null;
-    const incident = findIncident(incidents, from.name, to.name);
-    const minutes = r.minutes + (incident ? incident.delayMinutes : 0);
-    legs.push({
-      from: from.name, to: to.name, minutes, km: r.km,
-      incidentMinutes: incident ? incident.delayMinutes : 0,
-      incidentNote: incident ? incident.note : null,
-      coordinates: edgeLine(g, r.edges),
-    });
-    clock += minutes;
+    const leg = resolveOneLeg(world, from, to, clock, cost, incidents, detours[k - 1]);
+    if (!leg) return null;
+    legs.push(leg);
+    clock += leg.minutes;
   }
   const totalMinutes = legs.reduce((s, l) => s + l.minutes, 0);
   return { totalMinutes, arrivalMinutes: departMinutes + totalMinutes, legs };
 }
 
 /**
- * Resolve one leg forced through a specific point — the mechanism behind
- * dragging the route on the map, Google-Maps-style. The default route (see
- * resolveRun) is the naive backfill; this is what happens the instant a
- * player drops a dragged waypoint onto it. No new pathfinding: a forced
- * waypoint is just two ordinary routeTimed searches back to back, from the
- * leg's start to the waypoint and from the waypoint to the leg's end, priced
- * by the exact same cost function so a detour and the default are directly
- * comparable.
+ * Resolve one leg forced through a specific point, standalone — the same
+ * engine resolveRun uses internally for a detoured leg, exposed on its own
+ * for previewing a single leg without re-resolving a whole plan.
  *
  * @param waypointLonLat  a raw map click — snapped to the nearest real
  *                        junction via junctionNode(), the same snap every
@@ -104,24 +141,5 @@ export function resolveRun(world, stops, order, car, departMinutes, incidents) {
  *          waypoint cannot reach either the start or the destination
  */
 export function resolveLegWithWaypoint(world, from, to, waypointLonLat, car, departMinutes, incidents) {
-  const { g } = world;
-  const cost = legCost(world, car);
-  const waypointNode = junctionNode(g, waypointLonLat[0], waypointLonLat[1]);
-
-  const first = routeTimed(g, from.node, waypointNode, departMinutes, cost);
-  if (!first) return null;
-  const second = routeTimed(g, waypointNode, to.node, departMinutes + first.minutes, cost);
-  if (!second) return null;
-
-  const incident = findIncident(incidents, from.name, to.name);
-  const minutes = first.minutes + second.minutes + (incident ? incident.delayMinutes : 0);
-  return {
-    from: from.name, to: to.name, minutes, km: first.km + second.km,
-    incidentMinutes: incident ? incident.delayMinutes : 0,
-    incidentNote: incident ? incident.note : null,
-    // second's line repeats the waypoint junction where it joins first's —
-    // drop that one duplicate rather than leave a zero-length seam.
-    coordinates: edgeLine(g, first.edges).concat(edgeLine(g, second.edges).slice(1)),
-    viaWaypoint: true,
-  };
+  return resolveOneLeg(world, from, to, departMinutes, legCost(world, car), incidents, waypointLonLat);
 }

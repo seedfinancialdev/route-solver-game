@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { loadGraph, junctionNode } from './lib/road-graph.mjs';
 import { buildUrbanField, throughClasses } from './lib/traffic.mjs';
 import { loadCars, applyMods } from './lib/cars.mjs';
-import { resolveRun, resolveLegWithWaypoint } from './lib/resolve.mjs';
+import { resolveRun } from './lib/resolve.mjs';
 
 const ROOT = new URL('../atlas/', import.meta.url).pathname;
 const PORT = Number(process.env.PORT || 8140);
@@ -58,21 +58,26 @@ function respond(res, status, body) {
   res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
 }
 
-/** carId + mods -> a real car, or an { error } to send straight back. Shared
- * by /resolve and /resolve-detour so a bad car request fails the same way
- * from either. */
 function resolveCar(carId, mods) {
   const baseCar = carsById.get(carId);
   if (!baseCar) return { error: `unknown car "${carId}"` };
   try { return { car: applyMods(baseCar, mods || []) }; } catch (e) { return { error: e.message }; }
 }
 
+/**
+ * Resolve a whole plan, optionally with one or more legs dragged onto a
+ * waypoint. There is deliberately no separate single-leg detour endpoint: a
+ * dragged leg shifts the arrival clock for every leg after it, which can
+ * change THEIR traffic price too, so a detour has to go through the same
+ * sequential resolve as the rest of the plan — see scripts/lib/resolve.mjs,
+ * resolveRun()'s `detours` parameter.
+ */
 async function handleResolve(req, res) {
   let payload;
   try { payload = JSON.parse(await readBody(req)); } catch {
     respond(res, 400, { error: 'invalid JSON body' }); return;
   }
-  const { stops, carId, mods, departMinutes } = payload;
+  const { stops, carId, mods, departMinutes, detours } = payload;
   if (!Array.isArray(stops) || stops.length < 2 || typeof departMinutes !== 'number') {
     respond(res, 400, { error: 'need stops[], carId, departMinutes' }); return;
   }
@@ -81,38 +86,13 @@ async function handleResolve(req, res) {
 
   const nodeStops = stops.map((s) => ({ name: s.name, node: junctionNode(g, s.lon, s.lat) }));
   const order = nodeStops.map((_, i) => i);
-  const result = resolveRun({ g, urban, through }, nodeStops, order, car, departMinutes, today.incidents);
+  const result = resolveRun({ g, urban, through }, nodeStops, order, car, departMinutes, today.incidents, detours || {});
   if (!result) { respond(res, 200, { ok: false, reason: 'unreachable' }); return; }
   respond(res, 200, { ok: true, ...result });
 }
 
-/**
- * A player dragged a waypoint onto one leg of their route — force that leg
- * through the dropped point and reprice it. See scripts/lib/resolve.mjs,
- * resolveLegWithWaypoint(): two ordinary searches, no new pathfinding.
- */
-async function handleResolveDetour(req, res) {
-  let payload;
-  try { payload = JSON.parse(await readBody(req)); } catch {
-    respond(res, 400, { error: 'invalid JSON body' }); return;
-  }
-  const { from, to, waypoint, carId, mods, departMinutes } = payload;
-  if (!from || !to || !Array.isArray(waypoint) || typeof departMinutes !== 'number') {
-    respond(res, 400, { error: 'need from, to, waypoint [lon, lat], carId, departMinutes' }); return;
-  }
-  const { car, error } = resolveCar(carId, mods);
-  if (error) { respond(res, 400, { error }); return; }
-
-  const fromStop = { name: from.name, node: junctionNode(g, from.lon, from.lat) };
-  const toStop = { name: to.name, node: junctionNode(g, to.lon, to.lat) };
-  const leg = resolveLegWithWaypoint({ g, urban, through }, fromStop, toStop, waypoint, car, departMinutes, today.incidents);
-  if (!leg) { respond(res, 200, { ok: false, reason: 'unreachable' }); return; }
-  respond(res, 200, { ok: true, leg });
-}
-
 createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/resolve') { await handleResolve(req, res); return; }
-  if (req.method === 'POST' && req.url === '/resolve-detour') { await handleResolveDetour(req, res); return; }
 
   const path = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   const file = join(ROOT, normalize(path === '/' ? '/index.html' : path));

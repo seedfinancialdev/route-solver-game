@@ -69,6 +69,10 @@
   table.legs td.num { text-align: right; font-family: ui-monospace, monospace; white-space: nowrap; }
   table.legs tr[data-incident="true"] td { color: #ff8a70; }
   table.legs .note { display: block; font-size: 10.5px; color: #ff8a70; }
+  table.legs tr[data-detoured="true"] td:first-child { color: #facc15; }
+  .reset-detour { font-size: 10px; color: #93a1b0; text-decoration: underline; cursor: pointer; margin-left: 6px; }
+  .reset-detour:hover { color: #eef2f6; }
+  .drag-hint { font-size: 10.5px; color: #5c6a76; margin-top: 6px; }
 
   /* pins */
   .pin { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
@@ -125,6 +129,7 @@
     </div>
     <div class="targets" id="targets"></div>
     <table class="legs"><tbody id="legRows"></tbody></table>
+    <div class="drag-hint">Don't trust a leg? Drag it on the map, like you would in Google Maps.</div>
   </div>
 </div>
 
@@ -306,11 +311,20 @@
 
     var hm = function (m) { return Math.floor(m / 60) + "h" + String(Math.round(m % 60)).padStart(2, "0"); };
 
+    // currentStops/currentDetours are what a drag builds on: the leg
+    // endpoints a drag needs (fixed, from the plan) and the detour map the
+    // next resolve should carry forward. Reset only when the Resolve button
+    // starts an entirely new plan; a drag or a reset updates them in place.
+    var currentStops = null;
+    var currentDetours = {};
+    var dragging = null; // { legIndex, from: [lon,lat], to: [lon,lat] }
+
     function drawRoute(legs) {
       var clearCoords = [], incidentCoords = [];
-      legs.forEach(function (leg) {
+      legs.forEach(function (leg, idx) {
         (leg.incidentMinutes > 0 ? incidentCoords : clearCoords).push({
-          type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: leg.coordinates },
+          type: "Feature", properties: { legIndex: idx },
+          geometry: { type: "LineString", coordinates: leg.coordinates },
         });
       });
       var data = function (feats) { return { type: "FeatureCollection", features: feats }; };
@@ -328,22 +342,84 @@
           paint: { "line-color": "#0b1016", "line-width": 6, "line-opacity": .6 } });
         map.addLayer({ id: "resolved-incident-line", type: "line", source: "resolved-incident",
           paint: { "line-color": "#ff8a70", "line-width": 3, "line-dasharray": [1.5, 1.2] } });
+
+        // The route is draggable the instant it exists — grab either line
+        // layer, drag, drop, and that leg is forced through the drop point.
+        // Bound once here (addLayer only runs once), not inside drawRoute,
+        // which reruns on every resolve and would otherwise stack handlers.
+        ["resolved-clear-line", "resolved-incident-line"].forEach(function (id) {
+          map.on("mousedown", id, function (e) {
+            if (!e.features.length) return;
+            startDrag(e.features[0].properties.legIndex, [e.lngLat.lng, e.lngLat.lat]);
+          });
+          map.on("mouseenter", id, function () { if (!dragging) map.getCanvas().style.cursor = "grab"; });
+          map.on("mouseleave", id, function () { if (!dragging) map.getCanvas().style.cursor = ""; });
+        });
+        map.on("mousemove", function (e) {
+          if (!dragging) return;
+          setPreview([e.lngLat.lng, e.lngLat.lat]);
+        });
+        map.on("mouseup", function (e) {
+          if (!dragging) return;
+          var legIndex = dragging.legIndex, point = [e.lngLat.lng, e.lngLat.lat];
+          endDrag();
+          currentDetours[legIndex] = point;
+          performResolve(currentStops, currentDetours);
+        });
       }
       var routeBounds = new maplibregl.LngLatBounds();
       legs.forEach(function (leg) { leg.coordinates.forEach(function (c) { routeBounds.extend(c); }); });
       map.fitBounds(routeBounds, { padding: 90 });
     }
 
-    goBtn.addEventListener("click", function () {
+    // ---- dragging one leg onto a waypoint --------------------------------
+    // Live preview is a straight rubber-band line while the cursor moves —
+    // no network call per pixel. The real, road-traced reprice (through
+    // /resolve, priced by the same traffic + incident model as the default
+    // route) only happens once on release. See scripts/lib/resolve.mjs.
+
+    function setPreview(cursorLngLat) {
+      var feature = { type: "Feature", properties: {}, geometry: { type: "LineString",
+        coordinates: [dragging.from, cursorLngLat, dragging.to] } };
+      if (map.getSource("drag-preview")) {
+        map.getSource("drag-preview").setData({ type: "FeatureCollection", features: [feature] });
+      } else {
+        map.addSource("drag-preview", { type: "geojson", data: { type: "FeatureCollection", features: [feature] } });
+        map.addLayer({ id: "drag-preview-line", type: "line", source: "drag-preview",
+          paint: { "line-color": "#facc15", "line-width": 2, "line-dasharray": [0.2, 1.6] } });
+      }
+    }
+
+    function startDrag(legIndex, cursorLngLat) {
+      dragging = {
+        legIndex: legIndex,
+        from: [currentStops[legIndex].lon, currentStops[legIndex].lat],
+        to: [currentStops[legIndex + 1].lon, currentStops[legIndex + 1].lat],
+      };
+      map.dragPan.disable();
+      map.getCanvas().style.cursor = "grabbing";
+      setPreview(cursorLngLat);
+    }
+
+    function endDrag() {
+      dragging = null;
+      map.dragPan.enable();
+      map.getCanvas().style.cursor = "";
+      if (map.getSource("drag-preview")) map.getSource("drag-preview").setData({ type: "FeatureCollection", features: [] });
+    }
+
+    // ---- resolving, shared by the Resolve button, a drag, and a reset ----
+
+    function performResolve(stops, detours) {
       var sel = readCarSelection();
-      var stops = [race.from].concat(
-        picked.map(function (name) { return race.candidates.find(function (c) { return c.name === name; }); })
-      ).concat([race.to]);
       goBtn.disabled = true; goBtn.textContent = "Resolving…";
 
-      fetch("/resolve", {
+      return fetch("/resolve", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stops: stops, carId: sel.carId, mods: sel.mods || [], departMinutes: Number(hourSel.value) * 60 }),
+        body: JSON.stringify({
+          stops: stops, carId: sel.carId, mods: sel.mods || [],
+          departMinutes: Number(hourSel.value) * 60, detours: detours,
+        }),
       }).then(function (r) { return r.json(); }).then(function (data) {
         goBtn.disabled = false; goBtn.textContent = "Resolve";
         if (!data.ok) {
@@ -352,6 +428,9 @@
           document.getElementById("medalBadge").outerHTML = "<span class='none' style='font-size:11.5px'>No route found for that plan.</span>";
           return;
         }
+
+        currentStops = stops;
+        currentDetours = detours;
 
         var tier = "none";
         if (data.totalMinutes <= race.medals.record) tier = "record";
@@ -373,13 +452,23 @@
 
         var rows = document.getElementById("legRows");
         rows.innerHTML = "";
-        data.legs.forEach(function (leg) {
+        data.legs.forEach(function (leg, idx) {
           var tr = document.createElement("tr");
           tr.dataset.incident = leg.incidentMinutes > 0 ? "true" : "false";
+          tr.dataset.detoured = leg.viaWaypoint ? "true" : "false";
+          var reset = leg.viaWaypoint ? " <a class='reset-detour' data-leg='" + idx + "'>reset</a>" : "";
           tr.innerHTML = "<td>" + leg.from + " &rarr; " + leg.to
-            + (leg.incidentNote ? "<span class='note'>+" + leg.incidentMinutes + "min — " + leg.incidentNote + "</span>" : "") + "</td>"
+            + (leg.incidentNote ? "<span class='note'>+" + leg.incidentMinutes + "min — " + leg.incidentNote + "</span>" : "")
+            + reset + "</td>"
             + "<td class='num'>" + hm(leg.minutes) + "</td>";
           rows.appendChild(tr);
+        });
+        rows.querySelectorAll(".reset-detour").forEach(function (link) {
+          link.addEventListener("click", function () {
+            var next = Object.assign({}, currentDetours);
+            delete next[Number(link.dataset.leg)];
+            performResolve(currentStops, next);
+          });
         });
 
         drawRoute(data.legs);
@@ -387,6 +476,15 @@
         goBtn.disabled = false; goBtn.textContent = "Resolve";
         goNote.textContent = "Resolve failed: " + err;
       });
+    }
+
+    goBtn.addEventListener("click", function () {
+      var stops = [race.from].concat(
+        picked.map(function (name) { return race.candidates.find(function (c) { return c.name === name; }); })
+      ).concat([race.to]);
+      // A fresh Resolve is a new plan — any detour belonged to the old leg
+      // structure and should not silently carry forward onto a different one.
+      performResolve(stops, {});
     });
   }).catch(function (err) {
     fail("Could not load race.json — run node atlas/build-race.mjs first. " + err);
