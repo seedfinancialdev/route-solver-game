@@ -75,8 +75,12 @@
   .drag-hint { font-size: 10.5px; color: #5c6a76; margin-top: 6px; }
 
   /* pins */
-  .pin { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: 700; color: #0a1119; border: 2px solid rgba(10,17,25,.9); cursor: pointer;
+  /* 34px, not the 26px this started at: a candidate sits in a field of
+     lookalike dots from the base map (other cities, other layers), and a
+     small circle there is easy to miss with a real mouse even though a
+     scripted click always lands dead center. Bigger target, same idea. */
+  .pin { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #0a1119; border: 2px solid rgba(10,17,25,.9); cursor: pointer;
     background: #cdd5db; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
   .pin[data-role="fixed"] { background: #4ade80; cursor: default; }
   .pin[data-role="fixed"][data-fixed="finish"] { background: #f43f5e; }
@@ -177,6 +181,16 @@
 
   Promise.all([raceLoaded, mapReady]).then(function (results) {
     var race = results[0];
+
+    // The base style also draws the career runs (cape-to-cape, the Britain
+    // circuit, ...) for index.html's exploratory map — their corridors and
+    // endpoint pins have nothing to do with the race being planned here, and
+    // sitting on top of it they're just clutter that makes it harder to find
+    // and click this race's own checkpoints. Hide them on this page only.
+    ["route-halo", "route-alt", "route-best", "run-ends", "run-labels"].forEach(function (id) {
+      if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", "none");
+    });
+
     document.getElementById("raceName").textContent = race.name;
     document.getElementById("dayBadge").textContent = race.day || "no date set";
     document.getElementById("pickHeading").textContent = "Checkpoints — pick " + race.pick + " of " + race.candidates.length;
