@@ -28,6 +28,21 @@ function findIncident(incidents, fromName, toName) {
 }
 
 /**
+ * A leg's shape, as junction positions strung together.
+ *
+ * The graph stores no road geometry, only where junctions sit (same caveat
+ * documented in scripts/19-run-geometry.mjs) — so this is straight lines
+ * between them, not a survey-accurate polyline. Good enough to show a player
+ * what road their plan actually took; it will cut corners at close zoom.
+ */
+export function edgeLine(g, edges) {
+  const pts = edges.map((e) => [g.xy[2 * g.a[e]], g.xy[2 * g.a[e] + 1]]);
+  const last = edges[edges.length - 1];
+  pts.push([g.xy[2 * g.b[last]], g.xy[2 * g.b[last] + 1]]);
+  return pts;
+}
+
+/**
  * Resolve one plan: an ordered stop sequence, in this car, leaving at this
  * time, on this day's incidents.
  *
@@ -56,6 +71,7 @@ export function resolveRun(world, stops, order, car, departMinutes, incidents) {
       from: from.name, to: to.name, minutes, km: r.km,
       incidentMinutes: incident ? incident.delayMinutes : 0,
       incidentNote: incident ? incident.note : null,
+      coordinates: edgeLine(g, r.edges),
     });
     clock += minutes;
   }

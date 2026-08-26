@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { carMinutes, resolveRun } from '../scripts/lib/resolve.mjs';
+import { carMinutes, resolveRun, edgeLine } from '../scripts/lib/resolve.mjs';
 
 /** Same shape as road-graph.test.mjs's fixtures: a straight line, one hop per
  * segment, but with a mix of capped and derestricted edges so car cruise
@@ -25,6 +25,7 @@ function lineGraph() {
     kmh: Uint8Array.from([130, 150, 100]),            // capped, DERESTRICTED, capped
     cls: Uint8Array.from([0, 0, 0]),
     flags: Uint8Array.from([4, 4, 4]),                // all real readings
+    xy: Float32Array.from([0, 0, 1, 0, 2, 0, 3, 0]),  // four nodes, due east, one degree apart
     off: Uint32Array.from([0, 1, 3, 5, 6]),
     to: Int32Array.from([1, 0, 2, 1, 3, 2]),
     via: Uint32Array.from([0, 0, 1, 1, 2, 2]),
@@ -88,4 +89,31 @@ test('resolveRun returns null when a leg is unreachable rather than NaN', () => 
   const stops = [{ name: 'A', node: 3 }, { name: 'B', node: 0 }]; // 3 -> 0 is not reachable
   const result = resolveRun({ g, ...noTraffic }, stops, [0, 1], car, 6 * 60, []);
   assert.equal(result, null);
+});
+
+// ---- route geometry, for drawing what actually got resolved ----------------
+//
+// The graph stores no shapes, only junction positions (same caveat as
+// scripts/19-run-geometry.mjs) — a resolved route is straight lines between
+// junctions. Good enough to show a player what road their plan actually
+// took; not survey-accurate close up.
+
+test('edgeLine traces one point per edge start, plus the final destination', () => {
+  const g = lineGraph();
+  const coords = edgeLine(g, [0, 1, 2]); // the whole line, node 0 -> node 3
+  assert.deepEqual(coords, [[0, 0], [1, 0], [2, 0], [3, 0]]);
+});
+
+test('edgeLine on a single edge is just its two endpoints', () => {
+  const g = lineGraph();
+  assert.deepEqual(edgeLine(g, [1]), [[1, 0], [2, 0]]);
+});
+
+test('resolveRun attaches real coordinates to each leg', () => {
+  const g = lineGraph();
+  const car = { topKmh: 250 };
+  const stops = [{ name: 'A', node: 0 }, { name: 'B', node: 2 }, { name: 'C', node: 3 }];
+  const result = resolveRun({ g, ...noTraffic }, stops, [0, 1, 2], car, 6 * 60, []);
+  assert.deepEqual(result.legs[0].coordinates, [[0, 0], [1, 0], [2, 0]]);
+  assert.deepEqual(result.legs[1].coordinates, [[2, 0], [3, 0]]);
 });
