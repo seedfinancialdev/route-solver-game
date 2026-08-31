@@ -42,6 +42,20 @@
   ];
   const ROAD_WIDTH = ['*', CLASS_WIDTH, SURFACE_ADJ];
 
+  // Only classes this game's own road graph actually routes on may draw.
+  // OSM footway/cycleway/path/steps/pedestrian all collapse to OpenMapTiles'
+  // 'path' class in the transportation layer (confirmed against
+  // openmaptiles.org/schema — none of them are 'service', so excluding only
+  // 'service' left them all rendering). That's not neutral scenery: at a
+  // ~300m radius a dense pedestrian/cycle path network visually buries the
+  // real junction it sits next to, exactly the failure a real person caught
+  // running blind-map/README.md's protocol against a Trondheim riverside
+  // candidate. 'minor' and 'residential' are both allowlisted since the live
+  // tileset's exact naming for residential/unclassified/living_street-class
+  // roads (our graph's own terms) was not pinned to a single value.
+  const DRIVABLE = ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor', 'residential'];
+  const ROAD_FILTER = ['match', ['get', 'class'], DRIVABLE, true, false];
+
   function zoomWidth(stops, mult = 1, add = 0) {
     const expr = ['interpolate', ['exponential', 1.4], ['zoom']];
     for (let i = 0; i < stops.length; i += 2) {
@@ -84,12 +98,12 @@
         paint: { 'line-color': '#20648f', 'line-width': zoomWidth([4, 0.4, 10, 1.8]) } },
 
       { id: 'roads-casing', type: 'line', source: 'omt', 'source-layer': 'transportation',
-        filter: ['!=', ['get', 'class'], 'service'],
+        filter: ROAD_FILTER,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: { 'line-color': '#161a21', 'line-opacity': 0.85,
           'line-width': zoomWidth([4, 0.9, 8, 2.8, 13, 10], ROAD_WIDTH, 1.4) } },
       { id: 'roads', type: 'line', source: 'omt', 'source-layer': 'transportation',
-        filter: ['!=', ['get', 'class'], 'service'],
+        filter: ROAD_FILTER,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: { 'line-color': CLASS_COLOUR,
           'line-width': zoomWidth([4, 0.9, 8, 2.8, 13, 10], ROAD_WIDTH) } },
