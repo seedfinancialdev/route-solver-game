@@ -13,7 +13,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { readFileSync } from 'node:fs';
-import { loadGraph, junctionNode } from './lib/road-graph.mjs';
+import { loadGraph, junctionNode } from '../../scripts/lib/road-graph.mjs';
 import { buildUrbanField, throughClasses } from './lib/traffic.mjs';
 import { loadCars, applyMods } from './lib/cars.mjs';
 import { resolveRun } from './lib/resolve.mjs';
@@ -69,7 +69,7 @@ function resolveCar(carId, mods) {
  * waypoint. There is deliberately no separate single-leg detour endpoint: a
  * dragged leg shifts the arrival clock for every leg after it, which can
  * change THEIR traffic price too, so a detour has to go through the same
- * sequential resolve as the rest of the plan — see scripts/lib/resolve.mjs,
+ * sequential resolve as the rest of the plan — see legacy/scripts/lib/resolve.mjs,
  * resolveRun()'s `detours` parameter.
  */
 async function handleResolve(req, res) {

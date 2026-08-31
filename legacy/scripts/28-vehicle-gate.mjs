@@ -27,7 +27,7 @@
 // Usage: npm run vehicle:gate
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { loadGraph, junctionNode, route, corridors } from './lib/road-graph.mjs';
+import { loadGraph, junctionNode, route, corridors } from '../../scripts/lib/road-graph.mjs';
 import { loadRace } from './lib/race.mjs';
 
 const CACHE = 'data/vehicle-legs.json';

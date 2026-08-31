@@ -12,7 +12,7 @@
 // cruise speed on the 19,029 km of derestricted autobahn that measurement 8
 // found — see docs/superpowers/specs/2026-08-23-system-coupling-findings.md.
 
-import { routeTimed, junctionNode, isDerestricted } from './road-graph.mjs';
+import { routeTimed, junctionNode, isDerestricted } from '../../../scripts/lib/road-graph.mjs';
 import { congestion } from './traffic.mjs';
 import { cruiseKmh } from './cars.mjs';
 

@@ -21,7 +21,7 @@
 // Usage: npm run enforce:exposure
 
 import { readFileSync } from 'node:fs';
-import { loadGraph, nearestNode, corridors } from './lib/road-graph.mjs';
+import { loadGraph, nearestNode, corridors } from '../../scripts/lib/road-graph.mjs';
 
 // A drop worth enforcing. Below this it is a rounding difference between two
 // stretches of the same road, not a trap.

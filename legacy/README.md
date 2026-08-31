@@ -7,6 +7,10 @@
 >
 > Paths below are relative to this file (`legacy/`), same as when this was
 > the live README at the repo root.
+>
+> **Also retired here, 2026-08-29:** `atlas/`, the racing-manager prototype
+> that followed this game — a different design, a different retirement, its
+> own reasoning. See `atlas/README.md`.
 
 # Route
 

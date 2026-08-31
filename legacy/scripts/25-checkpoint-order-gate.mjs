@@ -21,7 +21,7 @@
 // Usage: npm run order:gate
 
 import { readFileSync } from 'node:fs';
-import { loadGraph, junctionNode, timesFromTimed, travelMinutes } from './lib/road-graph.mjs';
+import { loadGraph, junctionNode, timesFromTimed, travelMinutes } from '../../scripts/lib/road-graph.mjs';
 import { buildUrbanField, throughClasses, congestion } from './lib/traffic.mjs';
 
 const BUCKETS = 8;                         // 3-hour resolution on the cost matrix

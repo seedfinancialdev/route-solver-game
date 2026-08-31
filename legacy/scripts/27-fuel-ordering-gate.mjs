@@ -23,7 +23,7 @@
 // Usage: npm run fuel:ordering        (needs npm run order:count first)
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { loadGraph, junctionNode, route } from './lib/road-graph.mjs';
+import { loadGraph, junctionNode, route } from '../../scripts/lib/road-graph.mjs';
 import { loadRace } from './lib/race.mjs';
 import { loadStations, bestNear, KIND } from './lib/fuel.mjs';
 

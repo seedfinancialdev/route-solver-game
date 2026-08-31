@@ -32,7 +32,7 @@
 //        npm run order:count -- 21    (departure hour, default 6)
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { loadGraph, junctionNode, timesFrom, timesFromTimed, travelMinutes } from './lib/road-graph.mjs';
+import { loadGraph, junctionNode, timesFrom, timesFromTimed, travelMinutes } from '../../scripts/lib/road-graph.mjs';
 import { loadRace } from './lib/race.mjs';
 import { buildUrbanField, throughClasses, congestion } from './lib/traffic.mjs';
 

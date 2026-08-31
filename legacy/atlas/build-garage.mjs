@@ -1,13 +1,13 @@
 // Emits the garage data the atlas serves as a real page.
 //
 // Same shape as build-geojson.mjs: read from data/, compute through the real
-// library, write static JSON atlas/garage.html fetches at runtime. Every
+// library, write static JSON legacy/atlas/garage.html fetches at runtime. Every
 // number here comes from scripts/lib/cars.mjs — the same functions the CLI
 // garage report and the fuel/vehicle gates use — so what a player sees cannot
 // drift from what the game actually computes. The browser never reimplements
 // the model, including for mods: every legal build is priced here, not there.
 //
-// Output: atlas/garage.json
+// Output: legacy/atlas/garage.json
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import {

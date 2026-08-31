@@ -22,7 +22,7 @@
 // Usage: npm run fuel:spacing
 
 import { readFileSync } from 'node:fs';
-import { loadGraph, nearestNode, corridors } from './lib/road-graph.mjs';
+import { loadGraph, nearestNode, corridors } from '../../scripts/lib/road-graph.mjs';
 import { loadStations, bestNear, KIND, REACH_M } from './lib/fuel.mjs';
 
 const g = loadGraph('data/road-graph');

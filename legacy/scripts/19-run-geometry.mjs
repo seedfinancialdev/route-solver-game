@@ -14,7 +14,7 @@
 // Usage: npm run runs:geometry
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { loadGraph, nearestNode, route, corridors, timesFrom, bestOrder } from './lib/road-graph.mjs';
+import { loadGraph, nearestNode, route, corridors, timesFrom, bestOrder } from '../../scripts/lib/road-graph.mjs';
 
 const g = loadGraph('data/road-graph');
 const runs = JSON.parse(readFileSync('data/runs.json', 'utf8')).runs;

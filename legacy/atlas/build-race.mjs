@@ -10,9 +10,9 @@
 // This does NOT know about cars — the cached matrix has no notion of one, so
 // Record represents the best achievable at legal-limit pace. A player in a
 // fast car on a derestricted-heavy plan can beat it; that is a feature, not
-// an inconsistency — see scripts/lib/resolve.mjs.
+// an inconsistency — see legacy/scripts/lib/resolve.mjs.
 //
-// Output: atlas/race.json
+// Output: legacy/atlas/race.json
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { loadRace } from '../scripts/lib/race.mjs';

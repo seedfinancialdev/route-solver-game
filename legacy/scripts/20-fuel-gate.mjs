@@ -18,7 +18,7 @@
 // Usage: npm run fuel:gate
 
 import { readFileSync } from 'node:fs';
-import { loadGraph, nearestNode, corridors } from './lib/road-graph.mjs';
+import { loadGraph, nearestNode, corridors } from '../../scripts/lib/road-graph.mjs';
 import { loadStations, planFuel, KIND } from './lib/fuel.mjs';
 
 const RANGES_KM = [1200, 900, 700, 550, 450, 350];

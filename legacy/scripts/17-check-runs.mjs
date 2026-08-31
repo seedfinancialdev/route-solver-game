@@ -14,7 +14,7 @@
 // Usage: npm run runs:check
 
 import { readFileSync } from 'node:fs';
-import { loadGraph, nearestNode, route, corridors, timesFrom, bestOrder } from './lib/road-graph.mjs';
+import { loadGraph, nearestNode, route, corridors, timesFrom, bestOrder } from '../../scripts/lib/road-graph.mjs';
 
 const MIN_KM = 2500;
 const MIN_HOURS = 24;

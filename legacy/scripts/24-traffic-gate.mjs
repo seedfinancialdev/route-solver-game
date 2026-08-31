@@ -19,7 +19,7 @@
 // Usage: npm run traffic:gate
 
 import { readFileSync } from 'node:fs';
-import { loadGraph, nearestNode, corridors, routeTimed, travelMinutes } from './lib/road-graph.mjs';
+import { loadGraph, nearestNode, corridors, routeTimed, travelMinutes } from '../../scripts/lib/road-graph.mjs';
 import { buildUrbanField, throughClasses, congestion, urbanness } from './lib/traffic.mjs';
 
 const DEPARTURES = [0, 3, 6, 9, 12, 15, 18, 21];
