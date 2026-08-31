@@ -26,6 +26,7 @@
     "osm:build": "node scripts/16-build-osm-graph.mjs",
     "blind-map:candidates": "node scripts/build-blind-map-candidates.mjs",
     "blind-map:check": "node blind-map/check-style.mjs",
+    "blind-map": "node scripts/serve-blind-map.mjs",
     "runs:check": "node --max-old-space-size=14000 legacy/scripts/17-check-runs.mjs",
     "runs:geometry": "node --max-old-space-size=14000 legacy/scripts/19-run-geometry.mjs",
     "fuel:gate": "node --max-old-space-size=14000 legacy/scripts/20-fuel-gate.mjs",
