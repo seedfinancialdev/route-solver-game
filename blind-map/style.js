@@ -43,17 +43,22 @@
   const ROAD_WIDTH = ['*', CLASS_WIDTH, SURFACE_ADJ];
 
   // Only classes this game's own road graph actually routes on may draw.
-  // OSM footway/cycleway/path/steps/pedestrian all collapse to OpenMapTiles'
-  // 'path' class in the transportation layer (confirmed against
-  // openmaptiles.org/schema — none of them are 'service', so excluding only
-  // 'service' left them all rendering). That's not neutral scenery: at a
-  // ~300m radius a dense pedestrian/cycle path network visually buries the
-  // real junction it sits next to, exactly the failure a real person caught
-  // running blind-map/README.md's protocol against a Trondheim riverside
-  // candidate. 'minor' and 'residential' are both allowlisted since the live
-  // tileset's exact naming for residential/unclassified/living_street-class
-  // roads (our graph's own terms) was not pinned to a single value.
-  const DRIVABLE = ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor', 'residential'];
+  // The complete real enum, per OpenMapTiles' own transportation.yaml schema:
+  // motorway, trunk, primary, secondary, tertiary, minor, path, service,
+  // track, raceway, busway, bus_guideway, ferry (+ *_construction variants).
+  // OSM footway/cycleway/path/steps/pedestrian all collapse to 'path'; none
+  // of them are 'service', so excluding only 'service' left them all
+  // rendering. That's not neutral scenery: at a ~300m radius a dense
+  // pedestrian/cycle path network visually buries the real junction it sits
+  // next to, exactly the failure a real person caught running
+  // blind-map/README.md's protocol against a Trondheim riverside candidate.
+  // 'minor' covers residential/unclassified/living_street (our graph's own
+  // terms) — confirmed against the schema directly, there is no separate
+  // 'residential' class value. Ramps (motorway_link etc., which our graph
+  // does track as distinct classes) keep their PARENT class in this schema
+  // rather than getting their own value, so they're covered by the base six
+  // without needing separate entries.
+  const DRIVABLE = ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor'];
   const ROAD_FILTER = ['match', ['get', 'class'], DRIVABLE, true, false];
 
   function zoomWidth(stops, mult = 1, add = 0) {
