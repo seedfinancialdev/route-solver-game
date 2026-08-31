@@ -1,0 +1,64 @@
+[
+  {
+    "lon": 10.783414840698242,
+    "lat": 59.94990921020508,
+    "classes": [
+      "residential"
+    ]
+  },
+  {
+    "lon": 10.785630226135254,
+    "lat": 59.95158004760742,
+    "classes": [
+      "secondary",
+      "residential"
+    ]
+  },
+  {
+    "lon": 10.79239559173584,
+    "lat": 59.95344924926758,
+    "classes": [
+      "tertiary",
+      "residential"
+    ]
+  },
+  {
+    "lon": 10.74424934387207,
+    "lat": 59.93511199951172,
+    "classes": [
+      "primary",
+      "tertiary",
+      "residential"
+    ]
+  },
+  {
+    "lon": 10.716693878173828,
+    "lat": 59.929264068603516,
+    "classes": [
+      "primary"
+    ]
+  },
+  {
+    "lon": 10.722838401794434,
+    "lat": 59.93178176879883,
+    "classes": [
+      "primary",
+      "tertiary"
+    ]
+  },
+  {
+    "lon": 10.715506553649902,
+    "lat": 59.92881774902344,
+    "classes": [
+      "primary",
+      "unclassified"
+    ]
+  },
+  {
+    "lon": 10.793766021728516,
+    "lat": 59.95022964477539,
+    "classes": [
+      "tertiary"
+    ]
+  }
+]
