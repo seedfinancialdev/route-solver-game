@@ -60,6 +60,10 @@ play/         terminal playtest, bot player models, and the puzzle-balance
               measurement technique (simulate a bot, sweep, verify the trap
               holds) is the new design's balance methodology too — see
               design-intent.md, "Balance methodology".
+blind-map/    the map-legibility test harness — Phase 2 of the build
+              sequence below. Label-stripped style, fog-of-war radius, no
+              pan/zoom. See blind-map/README.md for what it tests and how to
+              run it.
 legacy/       the previous shipped game, the canvas engine prototype that
               preceded core-loop, and (as of 2026-08-29) the atlas racing-
               manager prototype. Three retired things, three separate
@@ -87,7 +91,9 @@ playable slice, retired to `legacy/atlas/` on 2026-08-29 — see
 panorama-coverage candidate set) and a working "blind" evidence surface
 (label-stripped map, fog-of-war radius, tested with real people) before any
 of the live decision loop gets built — see its "Build sequence" section for
-the full seven steps. None of it has started yet.
+the full seven steps. Phase 2, the label-stripped map and fog-of-war radius
+harness, is built — at `blind-map/` — and is awaiting a human running its
+test protocol (`blind-map/README.md`) before Phase 3 gets planned.
 
 Confirmed reusable, per a survey done as part of the retirement:
 `data/road-graph/`'s junction-level topology and `scripts/lib/road-graph.mjs`'s
@@ -105,6 +111,9 @@ npm install
 npm test                 # core-loop and data-pipeline tests
 npm run data:cities && npm run data:graph   # rebuild the shared data/ pipeline
 npm run osm:build         # rebuild data/road-graph/ specifically
+npm run blind-map:candidates   # regenerate blind-map/candidates.json from data/road-graph/
+npm run blind-map:check        # validate blind-map/style.js
+npm run blind-map              # serve the map-legibility test harness locally
 ```
 
 `npm run core-loop:play -- --bot` still runs the Slice-1 proof end to end,
@@ -126,7 +135,9 @@ Per `2026-08-30-design-intent.md`'s build sequence:
 1. **Data foundations.** The destination/ref/lane sidecar on the road graph;
    a small hand-picked panorama-coverage candidate set.
 2. **Prove the map reads.** Label-stripped style, fog-of-war radius, tested
-   with real people before anything downstream gets built.
+   with real people before anything downstream gets built. Built, at
+   `blind-map/`, and awaiting a human running its test protocol
+   (`blind-map/README.md`) before step 3 gets planned.
 3. **The junction-decision loop, minimal.** Real decisions, real backtrack
    cost, placeholder signage.
 4. **Real signs**, once the sidecar and country sign-style data exist.
@@ -137,9 +148,9 @@ Per `2026-08-30-design-intent.md`'s build sequence:
 7. **Only then**: automated destination-first generation at scale, daily
    seed, the v2 meta-loop.
 
-None of it has started yet — see the design doc's "Open questions" for what's
-still genuinely undecided (scoring tiers, the meta-loop's exact shape,
-Mapillary coverage adequacy, launch region).
+Step 2 is built; steps 1 and 3–7 haven't started yet — see the design doc's
+"Open questions" for what's still genuinely undecided (scoring tiers, the
+meta-loop's exact shape, Mapillary coverage adequacy, launch region).
 
 ## Why legacy was retired
 
