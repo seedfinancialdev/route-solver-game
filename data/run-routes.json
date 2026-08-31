@@ -1,0 +1,22 @@
+{
+  "generated": "2026-08-22",
+  "source": "public OSRM demo",
+  "runs": [
+    {
+      "id": "cape-to-cape",
+      "name": "Cape to Cape",
+      "km": 5675,
+      "minutes": 3905,
+      "routesReturned": 2,
+      "distinctCorridors": 1
+    },
+    {
+      "id": "roca-to-bosphorus",
+      "name": "Roca to the Bosphorus",
+      "km": 4132,
+      "minutes": 2566,
+      "routesReturned": 1,
+      "distinctCorridors": 1
+    }
+  ]
+}

@@ -1,155 +1,165 @@
 # Route
 
-A daily route puzzle. You are given a sparse map — country outlines, city dots,
-and the roads leading out of wherever you are standing — and a budget of
-**driving hours**. Pick a neighbouring city, pay the hours that road takes,
-repeat. Reach the target with hours to spare.
+**Navigation and geography literacy, tested directly.** You are dropped onto
+a real road network with an objective, and the only skill in the game is
+inferring, at each junction, which branch leads toward it — from a tight
+visibility radius, a locally-styled sign carrying real destination names and
+distances, sun-shadow direction, and terrain. Not the driving: the car drives
+itself between decisions, you are the navigator. Full design:
+[`docs/superpowers/specs/2026-08-30-design-intent.md`](docs/superpowers/specs/2026-08-30-design-intent.md)
+— the authoritative spec, and every later document is audited against it.
 
-The core loop is judgement, not measurement. You can see exactly how long each
-road is. What you cannot see is how fast it runs, and across this map **the
-shortest route is the fastest route only 27% of the time**. A 250 km motorway
-beats a 210 km road over a pass, every time — and the road's own shape, drawn as
-it actually runs, is the tell.
+That document supersedes `2026-08-20-design-intent.md`'s "Racing manager
+married to GeoGuessr" framing — departure timing, enforcement geography,
+fuel, weather, car loadout, city checkpoints — in full. That framing is
+explicitly rejected in the new document's "What this replaces", kept only so
+the rejected ideas don't come back by accident. It had itself already
+superseded the "remote orchestrator directing an AI driver through a War
+Room" framing from
+[`2026-08-20-core-gameplay-loop-design.md`](docs/superpowers/specs/2026-08-20-core-gameplay-loop-design.md).
+Three framings, two resets — see **Why legacy was retired** below for the
+first and `legacy/atlas/README.md` for the second.
 
-Every time you commit, the game says what it cost: *3h09 for 249 km · 79 km/h ·
-ordinary going*. The map shows terrain, rivers, country names, and the roads out of your current
-city — each drawn with the weight of how fast it runs, the way a road atlas
-weights a motorway against a B road. That is deliberately local: you can read the
-hop in front of you, but not the corridor beyond it, which is where the puzzle
-lives. Everything else on the map — named mountain ranges and seas, the built-up
-footprint of a city, the background towns filling in the space between the ones
-you can act on — is scenery. It's there so the map feels like a real, lived-in
-place rather than 479 dots and lines; none of it is wired to a road, so none of
-it can tell you which one is fast.
+This replaces the previous shipped game — a daily driving-hours route puzzle
+— and a never-shipped canvas map engine that was being built as its
+replacement. Both are retired under `legacy/`: still buildable, playable, and
+worth reusing pieces of, but not the direction anything here is building
+toward. `atlas/` — the playable prototype for the now-superseded racing-
+manager framing — joined them on 2026-08-29. See `legacy/README.md` and
+`legacy/atlas/README.md`.
 
-Hover or focus a candidate before you commit and it hands over what a rally
-crew would actually know going in: the real road you'd be on (OSM's own
-ref/name), the real terrain it crosses, and — live in the corner — the
-country you're in and its real, sourced legal speed limits, which is the
-actual reason some networks measure faster than others. None of it is the one
-thing still genuinely hidden: how fast the road runs.
-
-When the route is locked, both routes drive it again side by side at their real
-paces, so you watch the fast one pull away exactly where it happened. Then the
-numbers, and your route drawn against the fastest way and against the short way
-you were tempted into.
-
-## What's here
+## Where things actually are
 
 ```
-scripts/     the build pipeline. Runs once; the game makes no routing calls.
-play/        the terminal playtest and the player models used to tune the budget
-web/         the game. Static files, no framework, no build step
-docs/SPEC.md the one-page spec
-data/        the generated artefacts
+core-loop/    a Slice-1 architecture proof: a pure step function, module
+              registration, bot-drivability, deterministic replay — proven
+              against a throwaway, invented module with no game-design
+              meaning. Its module is explicitly disposable, but the
+              step/interrupt/replay shape is exactly the new design's live
+              decision loop — see design-intent.md, "The live decision loop".
+data/         real European cities, roads, and driving-hours-aware routing —
+              generated once by scripts/, reused by legacy/atlas/, core-loop/,
+              and (still) by legacy/. Direction-agnostic; nothing here changes
+              with either reset. `data/road-graph/` in particular is already
+              junction-level (real OSM intersections, not collapsed
+              city-to-city edges) — the substrate the new design needs, and
+              still missing the destination/ref/lane sidecar design-intent.md
+              calls for.
+scripts/      the data-generation pipeline. 00-03, 05, 07, 09 build data/;
+              16 builds data/road-graph/ specifically. scripts/lib/
+              (road-graph.mjs, country-facts.mjs) is the reusable routing
+              engine and region data, kept live here regardless of which app
+              calls it — confirmed, by direct inspection, to have zero
+              dependency on anything atlas-specific. The race-format gates
+              and the atlas-specific parts of the routing layer (resolve.mjs
+              among them — it turned out to be built entirely around cars,
+              traffic and incidents, not general routing) retired to
+              legacy/scripts/ alongside the app they served.
+play/         terminal playtest, bot player models, and the puzzle-balance
+              tooling — built for the legacy game's specific rules. The
+              measurement technique (simulate a bot, sweep, verify the trap
+              holds) is the new design's balance methodology too — see
+              design-intent.md, "Balance methodology".
+blind-map/    the map-legibility test harness — Phase 2 of the build
+              sequence below. Label-stripped style, fog-of-war radius, no
+              pan/zoom. See blind-map/README.md for what it tests and how to
+              run it.
+legacy/       the previous shipped game, the canvas engine prototype that
+              preceded core-loop, and (as of 2026-08-29) the atlas racing-
+              manager prototype. Three retired things, three separate
+              retirement notes. Retired, not deleted — still builds and
+              plays. See legacy/README.md and legacy/atlas/README.md.
+docs/superpowers/  design specs and plans. Start at
+              specs/2026-08-30-design-intent.md, the current authoritative
+              spec. specs/2026-08-20-design-intent.md is superseded but kept
+              for its own rejected-ideas record. specs/2026-08-23-run-
+              criteria.md and specs/2026-08-23-system-coupling-findings.md
+              measured which systems actually changed a race's outcome under
+              the old framing; that evidence carries forward into the new
+              design's own reasoning even though the framing it was measured
+              against didn't.
 ```
 
-## Running it
+## What's built, and what the design calls for next
 
-Pan and zoom the map with drag and scroll (pinch on touch); `0` or double-click
-resets the view.
+Nothing is currently playable at the repo root. `atlas/`, the previous
+playable slice, retired to `legacy/atlas/` on 2026-08-29 — see
+`legacy/atlas/README.md` for what it was and why.
+
+`2026-08-30-design-intent.md`'s build sequence starts from data foundations
+(a destination/ref/lane sidecar on the road graph, a small hand-picked
+panorama-coverage candidate set) and a working "blind" evidence surface
+(label-stripped map, fog-of-war radius, tested with real people) before any
+of the live decision loop gets built — see its "Build sequence" section for
+the full seven steps. Phase 2, the label-stripped map and fog-of-war radius
+harness, is built — at `blind-map/` — and is awaiting a human running its
+test protocol (`blind-map/README.md`) before Phase 3 gets planned.
+
+Confirmed reusable, per a survey done as part of the retirement:
+`data/road-graph/`'s junction-level topology and `scripts/lib/road-graph.mjs`'s
+routing primitives (`route`, `routeTimed`, `corridors`, `junctionNode`),
+`core-loop/`'s step/interrupt/replay architecture, and `country-facts.mjs`'s
+sourced per-country speed data. Confirmed net-new: any street-level imagery
+integration, procedural sign rendering, a fog-of-war visibility mechanic, an
+unlabeled basemap, and the destination/ref/lane/sign-style/driving-side data
+the pipeline doesn't produce yet.
+
+## Running things today
 
 ```sh
 npm install
-npm run play                  # terminal playtest — today's puzzle
-npm run play -- --day 12      # a specific day
-npm run play -- --from Porto --to Krakow
-npm run calibrate             # the budget-multiplier sweep
-npm run serve                 # then open http://localhost:8137
+npm test                 # core-loop and data-pipeline tests
+npm run data:cities && npm run data:graph   # rebuild the shared data/ pipeline
+npm run osm:build         # rebuild data/road-graph/ specifically
+npm run blind-map:candidates   # regenerate blind-map/candidates.json from data/road-graph/
+npm run blind-map:check        # validate blind-map/style.js
+npm run blind-map              # serve the map-legibility test harness locally
 ```
 
-Rebuilding the data (needs an OSRM server; see below):
+`npm run core-loop:play -- --bot` still runs the Slice-1 proof end to end,
+human or bot. `npm run doctor` checks the `data/` pipeline.
 
-```sh
-npm run data:cities && npm run data:graph && npm run data:puzzles && npm run data:map
-npm run data:streets   # optional: real street-level detail per city, ~50 min against public OSM mirrors
-```
+**Retired prototypes, still runnable:** `npm run serve` / `npm run perf` /
+`npm run balance` / `npm run play` / `npm run calibrate` target the original
+shipped game in `legacy/web/` (see `legacy/README.md`). `npm run atlas` /
+`npm run atlas:data` / `npm run atlas:garage` and the `runs:*` / `fuel:*` /
+`enforce:*` / `traffic:*` / `order:*` / `vehicle:gate` / `garage` gate
+scripts now target `legacy/atlas/` and `legacy/scripts/` (see
+`legacy/atlas/README.md`); `npm run test:legacy` runs both retired
+prototypes' test suites.
 
-## What the phases turned up
+## What's next
 
-**Phase 0 — the data spike.** 185 cities, 509 edges, one connected component.
-Two findings changed the shape of the thing:
+Per `2026-08-30-design-intent.md`'s build sequence:
 
-- *Sea crossings need no hand-curation.* OSRM marks ferry legs with
-  `mode: "ferry"`, which separates the Messina crossing (6.5 km afloat) from the
-  Øresund bridge (0 km) exactly. Everything below 3 km afloat is a Danube river
-  ferry with a bridge beside it and costs what a bridge costs; everything above
-  is maritime. That one signal drops Sicily, Sardinia, Crete and the Balearics
-  on its own.
-- *Britain, Ireland and the far north are out of the first pass.* Every route
-  onto the islands runs through a ferry or the Chunnel, and a sea hop is a cost
-  no map can show the player. Finland's only land link avoiding Russia is the
-  Tornio corridor, longer than the 420 km hop cap. Both return with world mode.
+1. **Data foundations.** The destination/ref/lane sidecar on the road graph;
+   a small hand-picked panorama-coverage candidate set.
+2. **Prove the map reads.** Label-stripped style, fog-of-war radius, tested
+   with real people before anything downstream gets built. Built, at
+   `blind-map/`, and awaiting a human running its test protocol
+   (`blind-map/README.md`) before step 3 gets planned.
+3. **The junction-decision loop, minimal.** Real decisions, real backtrack
+   cost, placeholder signage.
+4. **Real signs**, once the sidecar and country sign-style data exist.
+5. **Close the loop end to end** on one hand-picked round — panorama,
+   guess-map, scoring, reveal.
+6. **Expand to all four v1 objective types** (station, coast, border
+   crossing, motorway), each with its own candidate-destination finder.
+7. **Only then**: automated destination-first generation at scale, daily
+   seed, the v2 meta-loop.
 
-**Phase 1 — the go/no-go gate.** Comfortably a go: thousands of pairs punish the
-naive "hop toward the target" move. The bar was 200.
+Step 2 is built; steps 1 and 3–7 haven't started yet — see the design doc's
+"Open questions" for what's still genuinely undecided (scoring tiers, the
+meta-loop's exact shape, Mapillary coverage adequacy, launch region).
 
-**Phase 2 — the playtest, and the finding that reshaped the game.** A distance
-budget was built, calibrated to 1.15× optimal, and played. It was too easy, in a
-specific and fatal way: European road distance is close to Euclidean, so perfect
-straight-line planning finds the distance-optimal route at a median cost of
-**1.004× optimal**. Across 8,538 candidate pairs there were exactly **20** where
-straight-line reasoning was even 10% off. The player was holding a ruler, not
-making a decision, and no amount of puzzle selection could change that — the
-ceiling was structural.
+## Why legacy was retired
 
-Time behaves completely differently, because speed is not Euclidean. A motorway
-across the North German Plain runs at 90+ km/h; an Alpine pass or a Balkan
-two-lane runs at 45. Same measurement, different currency:
-
-| the player pays in | straight-line planning costs | pairs where geometry is ≥10% off |
-| --- | --- | --- |
-| kilometres | 1.004× optimal | 20 |
-| **hours** | 1.047× optimal | **1,958** |
-
-So the game switched currency, drew the actual roads on the map — you can judge
-distance now, which is exactly the trap — and set the budget below what taking
-the shortest road costs. On the 2,538 shipped puzzles at a 1.11× budget:
-
-| player | wins |
-| --- | --- |
-| takes the shortest road, every time | **0%** |
-| reads the roads, misjudges their speed, looks three hops ahead | 52% |
-
-## The open questions, answered
-
-1. **Faint distant cities, not strict one-hop visibility.** The deciding number
-   isn't the win rate, it's the dead ends: one hop of sight strands a player on
-   more than a quarter of puzzles, in corners they had no way to see coming.
-2. **No backtracking.** Visited cities aren't selectable. Irreversibility is
-   where the tension lives.
-3. **A bust doesn't end the round.** The gauge drains to zero and then an
-   overrun bar grows back the other way in red, so you can see how deep the hole
-   is; you keep going until you arrive, scoring the overspend. Hard-failing at
-   the moment of overspend hides how close you were, and the near miss is what
-   brings a player back. Dead ends are the only DNF, and they're rare.
-
-## Data and routing
-
-- Cities and background towns: [GeoNames](https://www.geonames.org/) `cities15000`
-  (CC BY 4.0).
-- Boundaries, rivers, lakes, urban footprints, and named physical/marine
-  regions: [Natural Earth](https://www.naturalearthdata.com/) (public domain).
-- Elevation: [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) —
-  a compilation of SRTM, USGS 3DEP, GMTED2010, ETOPO1 and national datasets. The
-  hillshade is computed from it by `scripts/04-terrain.py` rather than taken
-  pre-rendered, which is what lets the map hold up when you zoom. It renders
-  three levels — an overview, a detail pass, and a grid of tiles at the
-  elevation data's own resolution — of which the page paints exactly one.
-- Road distances and durations: OSRM over OpenStreetMap data
-  (ODbL — © OpenStreetMap contributors).
-- Street-level detail: OpenStreetMap way geometry via the public Overpass API
-  (ODbL — © OpenStreetMap contributors), fetched once per city at build time
-  by `scripts/07-streets.mjs` and shipped as static per-city files — the game
-  itself makes no Overpass calls.
-
-`scripts/lib/osrm.mjs` defaults to the public OSRM demo server, which is fine
-for a one-off build of ~600 requests but is explicitly not for production use.
-Point it at your own instance with `OSRM_HOST=http://localhost:5000`. Responses
-are cached under `data/raw/osrm-cache/`, so a rebuild costs nothing.
-
-## Deferred
-
-World mode, fog of war on the city list, streaks and accounts. Nothing here
-needs a backend. A distance budget is deferred too — it was built, measured, and
-replaced; `docs/SPEC.md` records why.
+Both `legacy/` occupants were themselves the *previous* answer to "what is
+this game" — a Cannonball-flavored driving-hours puzzle, then a from-scratch
+visual rendering push toward replacing its map — and neither one is the
+direction design-intent.md sets. Leaving them live in `web/` and
+`docs/SPEC.md` at the repo root, next to a brand new redesign, was making it
+look like three different games were all in progress at once, because they
+were. This reset doesn't change what's buildable — everything in `legacy/`
+still runs — it just stops the repo's top level from claiming to be three
+things it isn't anymore.

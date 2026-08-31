@@ -1,0 +1,379 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Garage — Atlas</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  html, body { margin: 0; min-height: 100%; background: #0a1119; color: #eef2f6;
+    font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  a { color: inherit; }
+  button { font: inherit; color: inherit; }
+  .mono { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+
+  header { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; gap: 10px 20px;
+    align-items: center; padding: 12px 16px; background: rgba(10,17,25,.94);
+    border-bottom: 1px solid rgba(255,255,255,.09); backdrop-filter: blur(12px); }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .01em; }
+  header .back { font-size: 12px; color: #93a1b0; text-decoration: none; border: 1px solid rgba(255,255,255,.14);
+    border-radius: 6px; padding: 4px 9px; }
+  header .back:hover { color: #eef2f6; border-color: rgba(255,255,255,.3); }
+
+  .race-strip { font-size: 12px; color: #93a1b0; padding: 3px 10px; border-radius: 5px;
+    border: 1px solid rgba(255,255,255,.12); }
+  .race-strip b { color: #eef2f6; font-weight: 600; }
+  .race-strip.capped { border-color: rgba(232,80,58,.4); color: #ff8a70; }
+  .race-strip.capped b { color: #ff8a70; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-left: auto; }
+  .chip { font-size: 11.5px; font-weight: 500; padding: 4px 9px; border-radius: 5px;
+    border: 1px solid rgba(255,255,255,.14); background: transparent; color: #93a1b0; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; }
+  .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dot); }
+  .chip[aria-pressed="true"] { background: rgba(255,255,255,.07); color: #eef2f6; border-color: rgba(255,255,255,.24); }
+
+  .selection { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #93a1b0; }
+  .selection b { color: #eef2f6; }
+  .selection button { background: transparent; border: 1px solid rgba(255,255,255,.16); color: #93a1b0;
+    border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; }
+  .selection button:hover { color: #eef2f6; border-color: rgba(255,255,255,.3); }
+
+  main { padding: 4px 16px 50px; max-width: 1400px; margin: 0 auto; }
+
+  .cat-band { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    border-left: 3px solid var(--cat); padding: 2px 0 2px 12px; margin: 26px 0 12px; }
+  .cat-band h2 { font-size: 14px; margin: 0; text-transform: uppercase; letter-spacing: .04em; color: var(--cat); }
+  .cat-band .brief { font-size: 12px; color: #93a1b0; max-width: 60ch; }
+  .cat-band .n { margin-left: auto; font-size: 11px; color: #5c6a76; white-space: nowrap; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+
+  .card { background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.09); border-radius: 8px;
+    display: flex; flex-direction: column; transition: opacity .15s, filter .15s, border-color .15s; }
+  .card[data-blocked="true"] { opacity: .32; filter: grayscale(.6); pointer-events: none; }
+  .card[data-selected="true"] { border-color: #4ade80; box-shadow: 0 0 0 1px #4ade80 inset; }
+
+  .card-top { padding: 12px 13px 10px; display: flex; flex-direction: column; gap: 9px; cursor: pointer; }
+  .card-top:hover .card-name { color: #fff; }
+  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .card-name { font-size: 14.5px; font-weight: 600; line-height: 1.2; transition: color .1s; }
+  .card-year { color: #5c6a76; }
+  .fuel { flex: none; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; color: #93a1b0;
+    border: 1px solid rgba(255,255,255,.16); border-radius: 3px; padding: 2px 5px; white-space: nowrap; }
+
+  dl.specs { display: grid; grid-template-columns: auto 1fr; row-gap: 3px; column-gap: 8px;
+    border-top: 1px solid rgba(255,255,255,.08); border-bottom: 1px solid rgba(255,255,255,.08);
+    padding: 7px 0; }
+  dl.specs dt { color: #5c6a76; font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase; align-self: center; }
+  dl.specs dd { margin: 0; text-align: right; }
+  dl.specs dd.pending { color: #5c6a76; font-style: italic; font: 11px ui-sans-serif, system-ui, sans-serif; }
+
+  .pp-row { display: flex; justify-content: space-between; font-size: 10.5px; letter-spacing: .05em;
+    text-transform: uppercase; color: #5c6a76; }
+  .pp-row .v { font: 13px ui-monospace, monospace; color: #eef2f6; letter-spacing: 0; text-transform: none; }
+  .pp-track { position: relative; height: 6px; background: rgba(255,255,255,.06); border-radius: 3px; margin-top: 3px; }
+  .pp-fill { position: absolute; top: 0; bottom: 0; background: var(--cat); border-radius: 3px; }
+  .pp-zero { position: absolute; top: -2px; bottom: -2px; width: 1px; background: rgba(255,255,255,.3); }
+  .pp-track.pending { background: repeating-linear-gradient(-45deg, rgba(255,255,255,.05), rgba(255,255,255,.05) 4px,
+    rgba(255,255,255,.11) 4px, rgba(255,255,255,.11) 5px); }
+
+  .tag { align-self: flex-start; font-size: 10px; font-weight: 500; padding: 2px 6px; border-radius: 3px; }
+  .tag-pending { background: rgba(255,255,255,.05); color: #5c6a76; border: 1px solid rgba(255,255,255,.1); }
+  .tag-over { background: rgba(232,80,58,.14); color: #ff8a70; border: 1px solid rgba(232,80,58,.4); }
+
+  /* ---- build panel ---- */
+  .build { border-top: 1px solid rgba(255,255,255,.09); padding: 11px 13px 13px; display: flex;
+    flex-direction: column; gap: 10px; background: rgba(0,0,0,.15); }
+  .build-group { display: flex; flex-direction: column; gap: 5px; }
+  .build-label { font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: #5c6a76; }
+  .build-opts { display: flex; flex-wrap: wrap; gap: 5px; }
+  .build-opt { font-size: 11px; padding: 4px 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,.14);
+    background: transparent; color: #93a1b0; cursor: pointer; }
+  .build-opt[aria-pressed="true"] { background: rgba(74,222,128,.14); color: #4ade80; border-color: rgba(74,222,128,.5); }
+  .build-opt:disabled { opacity: .3; cursor: not-allowed; }
+  .build-select { margin-top: 2px; align-self: flex-start; background: #4ade80; color: #0a1119; border: none;
+    border-radius: 6px; padding: 7px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .build-select:hover { background: #6ee89c; }
+  .build-select[data-active="true"] { background: transparent; color: #4ade80; border: 1px solid #4ade80; }
+
+  footer { max-width: 1400px; margin: 30px auto 0; padding: 16px 16px 40px; color: #5c6a76; font-size: 11.5px;
+    border-top: 1px solid rgba(255,255,255,.08); }
+  footer p { max-width: 76ch; margin: 0 0 8px; }
+</style>
+
+<header>
+  <a class="back" href="./index.html">&larr; map</a>
+  <h1>Garage</h1>
+  <span class="race-strip" id="raceStrip"></span>
+  <div class="chips" id="chips"></div>
+</header>
+
+<div class="selection" id="selectionBar" style="padding:8px 16px 0 16px; max-width:1400px; margin:0 auto;">
+  <span id="selectionText">No car selected.</span>
+</div>
+
+<main id="main"></main>
+
+<footer id="footer"></footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var params = new URLSearchParams(location.search);
+  var raceCap = params.has("cap") ? Number(params.get("cap")) : null;
+  var raceName = params.get("race");
+
+  var STORAGE_KEY = "garage-selection";
+  var selection = null; // { carId, mods: [] }
+  try {
+    var stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if (stored && stored.carId) selection = stored;
+  } catch (e) { /* private mode or blocked storage: no persistence, no crash */ }
+
+  fetch("./garage.json").then(function (r) { return r.json(); }).then(function (data) {
+    var cars = data.cars;
+    var byId = {}; cars.forEach(function (c) { byId[c.id] = c; });
+    var active = new Set(data.categories.map(function (c) { return c.key; }));
+    var CAT_COLORS = { executive: "#5b9bd9", poster: "#e8503a", camouflage: "#98a068", tuner: "#e0a53c", wildcard: "#3ba894" };
+    var expanded = null; // car id whose build panel is open
+    var pending = {};    // carId -> mod set being configured right now (before Select)
+
+    var main = document.getElementById("main");
+    var chips = document.getElementById("chips");
+    var raceStrip = document.getElementById("raceStrip");
+
+    raceStrip.innerHTML = raceCap != null
+      ? "<b>" + (raceName || "This race") + "</b> &middot; regulation &le; " + raceCap + " PP"
+      : "<b>Open class</b> &middot; no regulation";
+    raceStrip.className = "race-strip" + (raceCap != null ? " capped" : "");
+
+    function saveSelection() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(selection)); } catch (e) { /* ignore */ }
+      renderSelectionBar();
+    }
+
+    function renderSelectionBar() {
+      var el = document.getElementById("selectionText");
+      if (!selection) { el.textContent = "No car selected."; return; }
+      var car = byId[selection.carId];
+      var build = findBuild(car, selection.mods);
+      var modNames = selection.mods.map(function (m) { return data.mods[m].label; });
+      el.innerHTML = "Selected: <b>" + car.name + "</b>"
+        + (modNames.length ? " (" + modNames.join(", ") + ")" : " (stock)")
+        + " &mdash; <span class='mono'>" + build.pp + " PP</span>"
+        + " &middot; <button id='clearSel' type='button'>clear</button>";
+      document.getElementById("clearSel").addEventListener("click", function () {
+        selection = null; saveSelection(); render();
+      });
+    }
+
+    function findBuild(car, mods) {
+      var key = [...mods].sort().join("+");
+      return car.builds.find(function (b) { return [...b.mods].sort().join("+") === key; });
+    }
+
+    data.categories.forEach(function (cat) {
+      var chip = document.createElement("button");
+      chip.className = "chip"; chip.type = "button";
+      chip.setAttribute("aria-pressed", "true");
+      chip.style.setProperty("--dot", CAT_COLORS[cat.key]);
+      chip.innerHTML = "<span class='dot'></span>" + cat.label.split(" ")[0];
+      chip.addEventListener("click", function () {
+        if (active.has(cat.key)) { active.delete(cat.key); chip.setAttribute("aria-pressed", "false"); }
+        else { active.add(cat.key); chip.setAttribute("aria-pressed", "true"); }
+        render();
+      });
+      chips.appendChild(chip);
+    });
+
+    document.getElementById("footer").innerHTML =
+      "<p><b class='mono'>PP</b> is minutes saved over a baseline car (" + data.baseline.tankL + "L tank, "
+      + data.baseline.wltpL100 + " L/100km, " + data.baseline.topKmh + " km/h, " + data.baseline.kerbKg
+      + " kg) on the reference race, at " + data.referenceKmh + " km/h. Configure a build, then Select it &mdash; "
+      + "a build over the race's regulation cap can't be selected.</p>";
+
+    function fuelLabel(f) { return f === "petrol" ? "Petrol" : f === "diesel" ? "Diesel" : "Electric"; }
+
+    function buildPanelFor(car) {
+      var current = pending[car.id] || (selection && selection.carId === car.id ? selection.mods.slice() : []);
+      pending[car.id] = current;
+
+      var tankMods = ["aux-tank", "long-range-tank"];
+      var otherMods = Object.keys(data.mods).filter(function (m) { return tankMods.indexOf(m) === -1; });
+
+      var el = document.createElement("div");
+      el.className = "build";
+
+      var tankGroup = document.createElement("div");
+      tankGroup.className = "build-group";
+      tankGroup.innerHTML = "<span class='build-label'>Tank</span>";
+      var tankOpts = document.createElement("div");
+      tankOpts.className = "build-opts";
+      [["", "Stock"]].concat(tankMods.map(function (m) { return [m, data.mods[m].label]; })).forEach(function (pair) {
+        var id = pair[0], label = pair[1];
+        var btn = document.createElement("button");
+        btn.type = "button"; btn.className = "build-opt";
+        btn.textContent = label;
+        var isActive = id ? current.indexOf(id) !== -1 : tankMods.every(function (m) { return current.indexOf(m) === -1; });
+        btn.setAttribute("aria-pressed", String(isActive));
+        btn.addEventListener("click", function () {
+          pending[car.id] = current.filter(function (m) { return tankMods.indexOf(m) === -1; });
+          if (id) pending[car.id].push(id);
+          refreshBuildPanel(car);
+        });
+        tankOpts.appendChild(btn);
+      });
+      tankGroup.appendChild(tankOpts);
+      el.appendChild(tankGroup);
+
+      var modGroup = document.createElement("div");
+      modGroup.className = "build-group";
+      modGroup.innerHTML = "<span class='build-label'>Modifications</span>";
+      var modOpts = document.createElement("div");
+      modOpts.className = "build-opts";
+      otherMods.forEach(function (m) {
+        var btn = document.createElement("button");
+        btn.type = "button"; btn.className = "build-opt";
+        btn.textContent = data.mods[m].label;
+        btn.setAttribute("aria-pressed", String(current.indexOf(m) !== -1));
+        btn.addEventListener("click", function () {
+          var i = current.indexOf(m);
+          if (i === -1) current.push(m); else current.splice(i, 1);
+          refreshBuildPanel(car);
+        });
+        modOpts.appendChild(btn);
+      });
+      modGroup.appendChild(modOpts);
+      el.appendChild(modGroup);
+
+      var build = findBuild(car, current);
+      var readout = document.createElement("dl");
+      readout.className = "specs mono";
+      readout.innerHTML =
+        "<dt>Tank</dt><dd>" + build.tankL + " L</dd>"
+        + "<dt>Cruise</dt><dd>" + build.cruiseKmh + " km/h</dd>"
+        + "<dt>Range @" + data.referenceKmh + "</dt><dd>" + build.rangeKm + " km</dd>"
+        + "<dt>PP</dt><dd>" + build.pp + "</dd>";
+      el.appendChild(readout);
+
+      var overCap = raceCap != null && build.pp > raceCap;
+      var isSelected = selection && selection.carId === car.id
+        && [...selection.mods].sort().join("+") === [...current].sort().join("+");
+      var selectBtn = document.createElement("button");
+      selectBtn.type = "button";
+      selectBtn.className = "build-select";
+      selectBtn.setAttribute("data-active", String(!!isSelected));
+      selectBtn.disabled = overCap;
+      selectBtn.textContent = overCap ? "Over regulation cap" : isSelected ? "Selected ✓" : "Select this build";
+      selectBtn.addEventListener("click", function () {
+        selection = { carId: car.id, mods: current.slice() };
+        saveSelection();
+        render();
+      });
+      el.appendChild(selectBtn);
+
+      el._refresh = function () {
+        var fresh = buildPanelFor(car);
+        el.replaceWith(fresh);
+      };
+      return el;
+    }
+
+    function refreshBuildPanel(car) {
+      var old = document.getElementById("build-" + car.id);
+      if (!old) return;
+      var fresh = buildPanelFor(car);
+      fresh.id = "build-" + car.id;
+      old.replaceWith(fresh);
+    }
+
+    function cardFor(car) {
+      var pendingStatus = !!car.status;
+      var el = document.createElement("article");
+      el.className = "card";
+      el.style.setProperty("--cat", CAT_COLORS[car.category]);
+      var blocked = !pendingStatus && raceCap != null && car.pp > raceCap
+        && car.builds.every(function (b) { return b.pp > raceCap; });
+      el.dataset.blocked = blocked ? "true" : "false";
+      el.dataset.selected = selection && selection.carId === car.id ? "true" : "false";
+
+      var specs = pendingStatus
+        ? "<dt>Battery</dt><dd>" + car.batteryKwh + " kWh</dd>"
+          + "<dt>Consumption</dt><dd>" + car.kwhPer100.toFixed(1) + " kWh/100km</dd>"
+          + "<dt>Top speed</dt><dd>" + car.topKmh + " km/h</dd>"
+          + "<dt>Range</dt><dd class='pending'>no charging model yet</dd>"
+        : "<dt>Tank</dt><dd>" + car.tankL + " L</dd>"
+          + "<dt>Cruise</dt><dd>" + car.cruiseKmh + " km/h</dd>"
+          + "<dt>Range @" + data.referenceKmh + "</dt><dd>" + car.rangeKm + " km</dd>";
+
+      var pp;
+      if (pendingStatus) {
+        pp = "<div class='pp-row'><span>Performance points</span><span class='v'>—</span></div>"
+          + "<div class='pp-track pending'></div>";
+      } else {
+        var span = data.ppRange[1] - data.ppRange[0] || 1;
+        var fillPct = Math.max(0, Math.min(100, ((car.pp - data.ppRange[0]) / span) * 100));
+        var zeroPct = Math.max(0, Math.min(100, ((0 - data.ppRange[0]) / span) * 100));
+        var left = car.pp >= 0 ? zeroPct : fillPct;
+        var width = Math.abs(fillPct - zeroPct);
+        pp = "<div class='pp-row'><span>Stock performance points</span><span class='v'>" + car.pp + "</span></div>"
+          + "<div class='pp-track'><div class='pp-zero' style='left:" + zeroPct + "%'></div>"
+          + "<div class='pp-fill' style='left:" + left + "%;width:" + width + "%'></div></div>";
+      }
+
+      var tag = pendingStatus ? "<span class='tag tag-pending'>No cost model &mdash; pending charging system</span>"
+        : blocked ? "<span class='tag tag-over'>No build fits the cap</span>" : "";
+
+      var top = document.createElement("div");
+      top.className = "card-top";
+      top.innerHTML =
+        "<div class='card-head'><div><div class='card-name'>" + car.name + "</div>"
+        + "<div class='card-year mono'>" + car.year + "</div></div>"
+        + "<span class='fuel'>" + fuelLabel(car.fuel) + "</span></div>"
+        + "<dl class='specs mono'>" + specs + "</dl>"
+        + pp + tag;
+      if (!pendingStatus && !blocked) {
+        top.addEventListener("click", function () {
+          expanded = expanded === car.id ? null : car.id;
+          render();
+        });
+      }
+      el.appendChild(top);
+
+      if (!pendingStatus && expanded === car.id) {
+        var panel = buildPanelFor(car);
+        panel.id = "build-" + car.id;
+        el.appendChild(panel);
+      }
+      return el;
+    }
+
+    function render() {
+      main.innerHTML = "";
+      data.categories.forEach(function (cat) {
+        var inCat = cars.filter(function (c) { return c.category === cat.key; })
+          .slice().sort(function (a, b) { return (b.status ? -Infinity : b.pp) - (a.status ? -Infinity : a.pp); });
+        var section = document.createElement("section");
+        if (!active.has(cat.key)) { section.style.display = "none"; }
+        var band = document.createElement("div");
+        band.className = "cat-band";
+        band.style.setProperty("--cat", CAT_COLORS[cat.key]);
+        band.innerHTML = "<h2>" + cat.label + "</h2><span class='brief'>" + cat.brief + "</span>"
+          + "<span class='n'>" + inCat.length + " cars</span>";
+        section.appendChild(band);
+        var grid = document.createElement("div");
+        grid.className = "grid";
+        inCat.forEach(function (car) { grid.appendChild(cardFor(car)); });
+        section.appendChild(grid);
+        main.appendChild(section);
+      });
+      renderSelectionBar();
+    }
+
+    render();
+  }).catch(function (err) {
+    document.getElementById("main").innerHTML =
+      "<p style='padding:20px;color:#ff8a70'>Could not load garage.json — run <code>npm run atlas:garage</code> first.<br>"
+      + err + "</p>";
+  });
+})();
+</script>

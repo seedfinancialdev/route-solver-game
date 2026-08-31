@@ -19,6 +19,7 @@ export const COUNTRIES = new Map(Object.entries({
   BA: 'Bosnia and Herzegovina', RS: 'Serbia', ME: 'Montenegro', MK: 'North Macedonia',
   AL: 'Albania', GR: 'Greece', BG: 'Bulgaria', RO: 'Romania', MD: 'Moldova',
   UA: 'Ukraine', BY: 'Belarus', TR: 'Turkey', XK: 'Kosovo',
+  MC: 'Monaco', AD: 'Andorra', SM: 'San Marino', LI: 'Liechtenstein', GI: 'Gibraltar',
 }));
 
 // Keeps Turkey to Thrace + the Aegean coast rather than dragging the graph

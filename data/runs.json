@@ -1,0 +1,347 @@
+{
+  "generated": "2026-08-22",
+  "note": "Career races. A race is start, finish, and a menu of candidate checkpoints the player selects from and sequences \u2014 see docs/superpowers/specs/2026-08-23-run-criteria.md. The point-to-point and circuit entries predate that and are kept as measurement fixtures.",
+  "runs": [
+    {
+      "id": "cape-to-cape",
+      "name": "Cape to Cape",
+      "from": {
+        "name": "Punta de Tarifa",
+        "detail": "Southernmost point of continental Europe",
+        "country": "ES",
+        "lat": 36.0018,
+        "lon": -5.6089
+      },
+      "to": {
+        "name": "Nordkapp",
+        "detail": "North Cape, Mager\u00f8ya \u2014 northernmost road-reachable point of Europe",
+        "country": "NO",
+        "lat": 71.1694,
+        "lon": 25.7833
+      },
+      "tests": [
+        "raw distance \u2014 the longest run in the set",
+        "fuel scarcity above the Arctic Circle",
+        "the \u00d8resund crossing: bridge or ferry",
+        "a long high-speed German section where derestricted autobahn matters"
+      ],
+      "style": "point-to-point",
+      "checkpoints": [],
+      "ordered": true
+    },
+    {
+      "id": "roca-to-bosphorus",
+      "name": "Roca to the Bosphorus",
+      "from": {
+        "name": "Cabo da Roca",
+        "detail": "Westernmost point of continental Europe",
+        "country": "PT",
+        "lat": 38.7803,
+        "lon": -9.4989
+      },
+      "to": {
+        "name": "Sultanahmet, Istanbul",
+        "detail": "Across the Bosphorus \u2014 the eastern edge of Europe",
+        "country": "TR",
+        "lat": 41.0055,
+        "lon": 28.9769
+      },
+      "tests": [
+        "the big corridor fork: northern Italy and Austria, or the Balkans",
+        "non-Schengen border crossings on a competitive corridor",
+        "the widest jurisdiction spread of any European route",
+        "thin OSM speed-limit coverage in Spain (51%) on the opening leg"
+      ],
+      "style": "point-to-point",
+      "checkpoints": [],
+      "ordered": true
+    },
+    {
+      "id": "britain-circuit",
+      "name": "The Britain Circuit",
+      "style": "circuit",
+      "ordered": false,
+      "from": {
+        "name": "Land's End",
+        "detail": "Southwest tip of Great Britain",
+        "country": "GB",
+        "lat": 50.0657,
+        "lon": -5.7132
+      },
+      "to": {
+        "name": "Land's End",
+        "detail": "Back where it started",
+        "country": "GB",
+        "lat": 50.0657,
+        "lon": -5.7132
+      },
+      "checkpoints": [
+        {
+          "name": "St Davids",
+          "country": "GB",
+          "lat": 51.8819,
+          "lon": -5.267
+        },
+        {
+          "name": "Holyhead",
+          "country": "GB",
+          "lat": 53.309,
+          "lon": -4.632
+        },
+        {
+          "name": "Mallaig",
+          "country": "GB",
+          "lat": 57.006,
+          "lon": -5.828
+        },
+        {
+          "name": "John o' Groats",
+          "country": "GB",
+          "lat": 58.6373,
+          "lon": -3.0689
+        },
+        {
+          "name": "Aberdeen",
+          "country": "GB",
+          "lat": 57.1497,
+          "lon": -2.0943
+        },
+        {
+          "name": "Lowestoft",
+          "country": "GB",
+          "lat": 52.475,
+          "lon": 1.752
+        },
+        {
+          "name": "Dover",
+          "country": "GB",
+          "lat": 51.1279,
+          "lon": 1.3134
+        }
+      ],
+      "tests": [
+        "sequencing rather than corridor choice \u2014 Britain has one dominant spine",
+        "an island: no borders, no jurisdiction variety, denser network",
+        "a circuit needs checkpoints or it is degenerate"
+      ]
+    },
+    {
+      "id": "grand-tour",
+      "name": "The Grand Tour",
+      "style": "point-to-point",
+      "ordered": false,
+      "note": "Checkpoints are pass-through, not stops: you must drive through the point, the clock never pauses. The whole cost of a checkpoint is entering and leaving the city at whatever hour your ordering puts you there.",
+      "from": {
+        "name": "Barcelona",
+        "detail": "city centre intersection",
+        "country": "ES",
+        "lat": 41.3874,
+        "lon": 2.1686
+      },
+      "to": {
+        "name": "Istanbul",
+        "detail": "city centre intersection",
+        "country": "TR",
+        "lat": 41.0055,
+        "lon": 28.9769
+      },
+      "checkpoints": [
+        {
+          "name": "Paris",
+          "country": "FR",
+          "lat": 48.8566,
+          "lon": 2.3522
+        },
+        {
+          "name": "Munich",
+          "country": "DE",
+          "lat": 48.1351,
+          "lon": 11.582
+        },
+        {
+          "name": "Rome",
+          "country": "IT",
+          "lat": 41.9028,
+          "lon": 12.4964
+        },
+        {
+          "name": "Copenhagen",
+          "country": "DK",
+          "lat": 55.6761,
+          "lon": 12.5683
+        }
+      ],
+      "tests": [
+        "sequencing across a continent, not a perimeter \u2014 no obvious order",
+        "checkpoints INSIDE cities, so urban penetration is unavoidable",
+        "order determines arrival hour, arrival hour determines cost"
+      ]
+    },
+    {
+      "id": "grand-tour-menu",
+      "name": "The Grand Tour",
+      "style": "menu",
+      "note": "Pass through any FOUR of the eight, in any order you like. Checkpoints are pass-through, not stops: the clock never pauses, and the whole cost of a checkpoint is entering and leaving the city at whatever hour your plan puts you there.",
+      "from": {
+        "name": "Barcelona",
+        "detail": "city centre intersection",
+        "country": "ES",
+        "lat": 41.3874,
+        "lon": 2.1686
+      },
+      "to": {
+        "name": "Istanbul",
+        "detail": "city centre intersection",
+        "country": "TR",
+        "lat": 41.0055,
+        "lon": 28.9769
+      },
+      "pick": 4,
+      "menu": [
+        {
+          "name": "Paris",
+          "country": "FR",
+          "lat": 48.8566,
+          "lon": 2.3522
+        },
+        {
+          "name": "Amsterdam",
+          "country": "NL",
+          "lat": 52.3676,
+          "lon": 4.9041
+        },
+        {
+          "name": "Copenhagen",
+          "country": "DK",
+          "lat": 55.6761,
+          "lon": 12.5683
+        },
+        {
+          "name": "Berlin",
+          "country": "DE",
+          "lat": 52.52,
+          "lon": 13.405
+        },
+        {
+          "name": "Munich",
+          "country": "DE",
+          "lat": 48.1351,
+          "lon": 11.582
+        },
+        {
+          "name": "Vienna",
+          "country": "AT",
+          "lat": 48.2082,
+          "lon": 16.3738
+        },
+        {
+          "name": "Rome",
+          "country": "IT",
+          "lat": 41.9028,
+          "lon": 12.4964
+        },
+        {
+          "name": "Milan",
+          "country": "IT",
+          "lat": 45.4642,
+          "lon": 9.19
+        }
+      ],
+      "measured": {
+        "gate": "docs/superpowers/specs/2026-08-23-run-criteria.md section B",
+        "world": "2026-08-23",
+        "selectionPenaltyMedian": 0.313,
+        "selectionPenaltyWorst": 0.608,
+        "orderingVsGreedy": 0.103,
+        "nearTieShare": 0.052,
+        "optimalHours": 56.4,
+        "bestSet": [
+          "Paris",
+          "Amsterdam",
+          "Munich",
+          "Vienna"
+        ]
+      },
+      "tests": [
+        "selection, which Google's waypoint optimiser does not do",
+        "sequencing across a continent, not a perimeter",
+        "checkpoints INSIDE cities, so urban penetration is unavoidable"
+      ]
+    },
+    {
+      "id": "north-or-south",
+      "name": "North or South",
+      "style": "menu",
+      "note": "Pass through any FOUR of the eight. Four sit on the northern arc through Germany, four on the southern line through Italy and the Balkans. The two routes are comparable in distance, so the choice is about the CHARACTER of the roads rather than about how far you drive \u2014 which is the condition the Grand Tour menu fails.",
+      "from": {
+        "name": "Barcelona",
+        "detail": "city centre intersection",
+        "country": "ES",
+        "lat": 41.3874,
+        "lon": 2.1686
+      },
+      "to": {
+        "name": "Istanbul",
+        "detail": "city centre intersection",
+        "country": "TR",
+        "lat": 41.0055,
+        "lon": 28.9769
+      },
+      "pick": 4,
+      "menu": [
+        {
+          "name": "Lyon",
+          "country": "FR",
+          "lat": 45.764,
+          "lon": 4.8357
+        },
+        {
+          "name": "Frankfurt",
+          "country": "DE",
+          "lat": 50.1109,
+          "lon": 8.6821
+        },
+        {
+          "name": "Munich",
+          "country": "DE",
+          "lat": 48.1351,
+          "lon": 11.582
+        },
+        {
+          "name": "Vienna",
+          "country": "AT",
+          "lat": 48.2082,
+          "lon": 16.3738
+        },
+        {
+          "name": "Milan",
+          "country": "IT",
+          "lat": 45.4642,
+          "lon": 9.19
+        },
+        {
+          "name": "Bologna",
+          "country": "IT",
+          "lat": 44.4949,
+          "lon": 11.3426
+        },
+        {
+          "name": "Zagreb",
+          "country": "HR",
+          "lat": 45.815,
+          "lon": 15.9819
+        },
+        {
+          "name": "Belgrade",
+          "country": "RS",
+          "lat": 44.7866,
+          "lon": 20.4489
+        }
+      ],
+      "tests": [
+        "whether a menu of comparable-length plans lets the CAR change the plan",
+        "derestricted autobahn against Balkan two-lane, at similar distance"
+      ]
+    }
+  ]
+}

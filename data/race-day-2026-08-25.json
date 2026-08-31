@@ -1,0 +1,10 @@
+{
+  "race": "grand-tour-menu",
+  "date": "2026-08-25",
+  "note": "MODELLED, a stub. This is one hand-authored day for one race, not a general weather/incident system. Real system: a discrete snapshot per race per day, generated rather than written by hand. Incidents are matched by stop NAME (either direction) rather than by node id, so they read and edit like a race notice.",
+  "incidents": [
+    { "from": "Munich", "to": "Vienna", "delayMinutes": 55, "note": "A8/A1 resurfacing near Salzburg — single lane" },
+    { "from": "Paris", "to": "Amsterdam", "delayMinutes": 35, "note": "Heavy rain warning, Nord-Pas-de-Calais" },
+    { "from": "Rome", "to": "Milan", "delayMinutes": 70, "note": "A1 Autostrada del Sole — overnight closure near Bologna" }
+  ]
+}

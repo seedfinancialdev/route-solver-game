@@ -7,3 +7,17 @@ data/raw/dem/
 # play/calibrate-hos.mjs's own cache of its ~20-minute pool scan, so re-sweeping
 # a different multiplier range doesn't redo it. Not a build artifact.
 data/.calibrate-hos-cache.json
+# Derived routing graph. Rebuilt from data/raw/osm/*.pbf by
+# scripts/14-road-graph.py — large, binary, and reproducible.
+data/road-graph/
+
+# macOS finder droppings
+.DS_Store
+
+# Python toolchain for the OSM pipeline (scripts/14, scripts/15).
+# Recreate with: python3 -m venv .venv && .venv/bin/pip install osmium numpy
+.venv/
+data/raw/osm-roads/
+data/checkpoint-matrix.json
+data/fuel-profiles.json
+data/vehicle-legs.json

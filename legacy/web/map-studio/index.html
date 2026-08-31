@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Map Studio & Visual Cartography Sandbox — Route</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0c1017;
+      --panel-bg: rgba(12, 18, 26, 0.88);
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --accent: #00f0ff;
+      --accent-glow: rgba(0, 240, 255, 0.25);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow: hidden;
+      user-select: none;
+    }
+    #studio-viewport {
+      width: 100vw; height: 100vh;
+      position: absolute; top: 0; left: 0;
+    }
+
+    /* Floating Studio Control Panel */
+    .studio-panel {
+      position: absolute; top: 20px; right: 20px;
+      width: 350px; max-height: calc(100vh - 40px);
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+      display: flex; flex-direction: column;
+      z-index: 100;
+      overflow-y: auto;
+    }
+    .panel-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--panel-border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .panel-title {
+      font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .panel-title span { color: var(--accent); }
+    .fps-badge {
+      font-size: 11px; font-weight: 600;
+      padding: 2px 8px; border-radius: 20px;
+      background: rgba(0, 240, 255, 0.15); color: var(--accent);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+    }
+    .panel-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 16px; }
+
+    .control-group { display: flex; flex-direction: column; gap: 8px; }
+    .group-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+    
+    select, input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+    select {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--panel-border);
+      color: var(--text); padding: 8px 12px; border-radius: 6px;
+      font-size: 13px; font-family: inherit; outline: none;
+    }
+
+    /* 24-Hour Time of Day Controls */
+    .time-badge-row {
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .rally-clock {
+      font-size: 13px; font-weight: 700; color: #fbbf24;
+      font-variant-numeric: tabular-nums;
+      background: rgba(245, 158, 11, 0.12);
+      padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .time-btn-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+    }
+    .time-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--panel-border);
+      color: var(--text); padding: 6px 4px; border-radius: 6px;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      transition: all 0.15s ease;
+    }
+    .time-btn:hover { background: rgba(0, 240, 255, 0.15); border-color: var(--accent); }
+    .time-btn.active { background: rgba(0, 240, 255, 0.25); border-color: var(--accent); color: var(--accent); }
+
+    .toggle-row {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; font-weight: 500;
+    }
+    .slider-row {
+      display: flex; flex-direction: column; gap: 4px;
+      font-size: 12px;
+    }
+    .slider-header { display: flex; justify-content: space-between; color: var(--text-muted); }
+
+    /* Switch styling */
+    .switch {
+      position: relative; display: inline-block; width: 36px; height: 20px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(255, 255, 255, 0.15); transition: .2s; border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
+      background-color: white; transition: .2s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: var(--accent); }
+    input:checked + .slider:before { transform: translateX(16px); }
+
+    /* Bottom-Left Authentic Cartographic Scale Bar (OpenStreetMap / Google Maps Standard) */
+    .hud-left {
+      position: absolute; bottom: 20px; left: 20px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px; padding: 10px 14px;
+      display: flex; flex-direction: column; gap: 8px; z-index: 100;
+    }
+    .scale-ruler-container {
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .scale-row {
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .scale-label {
+      font-size: 11px; font-weight: 700; color: var(--text); letter-spacing: 0.02em;
+    }
+    .scale-bar-line {
+      height: 4px;
+      border-left: 2px solid #ffffff;
+      border-right: 2px solid #ffffff;
+      border-bottom: 2px solid #ffffff;
+      transition: width 0.15s ease-out;
+    }
+    .scale-bar-line.mi {
+      border-left: 2px solid #94a3b8;
+      border-right: 2px solid #94a3b8;
+      border-bottom: 2px solid #94a3b8;
+    }
+    .scale-label.mi {
+      color: #94a3b8; font-size: 10px;
+    }
+    .hud-tier-label {
+      font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);
+      border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Fullscreen Canvas Viewport -->
+  <div id="studio-viewport"></div>
+
+  <!-- Floating Control Panel -->
+  <div class="studio-panel">
+    <div class="panel-header">
+      <div class="panel-title"><span>●</span> Map Studio</div>
+      <div class="fps-badge" id="fps-counter">60 FPS</div>
+    </div>
+    <div class="panel-body">
+
+      <!-- 24-Hour Solar Time of Day -->
+      <div class="control-group">
+        <div class="time-badge-row">
+          <div class="group-label">24-Hour Rally Time</div>
+          <div class="rally-clock" id="rally-clock">12:00 CET</div>
+        </div>
+        <input type="range" id="slider-time" min="0" max="24" step="0.25" value="12">
+        <div class="time-btn-grid">
+          <button class="time-btn active" id="btn-time-noon"><span>☀️</span>Noon</button>
+          <button class="time-btn" id="btn-time-dusk"><span>🌅</span>Dusk</button>
+          <button class="time-btn" id="btn-time-night"><span>🌙</span>Night</button>
+          <button class="time-btn" id="btn-time-dawn"><span>🌄</span>Dawn</button>
+        </div>
+      </div>
+
+      <!-- Preset Selector -->
+      <div class="control-group">
+        <div class="group-label">Color Theme Preset</div>
+        <select id="preset-select">
+          <option value="satelliteTopo">Natural Physical Atlas (Default)</option>
+          <option value="satelliteDay">Daylight High Noon</option>
+          <option value="cannonballNight">Night Ops (Cannonball)</option>
+          <option value="vintageTopo">Vintage Topo</option>
+          <option value="nordicSlate">Nordic Slate</option>
+        </select>
+      </div>
+
+      <!-- Forest Blend Mode Selector -->
+      <div class="control-group">
+        <div class="group-label">Forest Relief Blend Mode</div>
+        <select id="forest-blend-select">
+          <option value="multiply">Multiply (Shadow Conforming - Realistic)</option>
+          <option value="overlay">Overlay (Vibrant Topo)</option>
+          <option value="source-over">Normal Solid Flat</option>
+        </select>
+      </div>
+
+      <!-- Layer Toggles -->
+      <div class="control-group">
+        <div class="group-label">Vector & Raster Overlays</div>
+        
+        <div class="toggle-row">
+          <span>Terrain Elevation Relief</span>
+          <label class="switch"><input type="checkbox" id="toggle-terrain" checked><span class="slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <span>Water & Lakes</span>
+          <label class="switch"><input type="checkbox" id="toggle-water" checked><span class="slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <span>Forests & Woodlands</span>
+          <label class="switch"><input type="checkbox" id="toggle-forest" checked><span class="slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <span>Satellite City Imagery & Lights</span>
+          <label class="switch"><input type="checkbox" id="toggle-urban-sat" checked><span class="slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <span>Road Networks</span>
+          <label class="switch"><input type="checkbox" id="toggle-roads" checked><span class="slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <span>Highway Shields & Alpine Passes</span>
+          <label class="switch"><input type="checkbox" id="toggle-shields" checked><span class="slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <span>City Nodes & Labels</span>
+          <label class="switch"><input type="checkbox" id="toggle-nodes" checked><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <!-- Live Sliders -->
+      <div class="control-group">
+        <div class="group-label">Opacity & Shading</div>
+        
+        <div class="slider-row">
+          <div class="slider-header"><span>Terrain Opacity</span><span id="val-terrain">65%</span></div>
+          <input type="range" id="slider-terrain" min="0" max="100" value="65">
+        </div>
+
+        <div class="slider-row">
+          <div class="slider-header"><span>Forest Opacity</span><span id="val-forest">65%</span></div>
+          <input type="range" id="slider-forest" min="0" max="100" value="65">
+        </div>
+
+        <div class="slider-row">
+          <div class="slider-header"><span>Water Opacity</span><span id="val-water">100%</span></div>
+          <input type="range" id="slider-water" min="0" max="100" value="100">
+        </div>
+
+        <div class="slider-row">
+          <div class="slider-header"><span>River Width Scale</span><span id="val-river">1.0x</span></div>
+          <input type="range" id="slider-river" min="5" max="30" value="10">
+        </div>
+
+        <div class="slider-row">
+          <div class="slider-header"><span>Urban / Light Opacity</span><span id="val-farmland">40%</span></div>
+          <input type="range" id="slider-farmland" min="0" max="100" value="40">
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Bottom Left Authentic Scale Bar HUD (OpenStreetMap / Google Maps Standard) -->
+  <div class="hud-left">
+    <div class="scale-ruler-container">
+      <div class="scale-row">
+        <div class="scale-label" id="scale-km-text">200 km</div>
+        <div class="scale-bar-line" id="scale-km-line" style="width: 70px;"></div>
+      </div>
+      <div class="scale-row">
+        <div class="scale-label mi" id="scale-mi-text">100 mi</div>
+        <div class="scale-bar-line mi" id="scale-mi-line" style="width: 56px;"></div>
+      </div>
+    </div>
+    <div class="hud-tier-label" id="stat-tier">Tier 1: Continental Overview</div>
+  </div>
+
+  <script type="module" src="studio.js"></script>
+</body>
+</html>
