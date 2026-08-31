@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { metersPerPixel, metersToPixels } from '../blind-map/fog-radius.mjs';
 
-test('at the equator, zoom 0, meters-per-pixel matches the known Web Mercator reference value', () => {
+test('at the equator, zoom 0, meters-per-pixel matches MapLibre\'s 512px-tile-world reference value (not the generic OSM/Google 256px convention)', () => {
   const mpp = metersPerPixel(0, 0);
-  assert.ok(Math.abs(mpp - 156543.03392) < 0.001);
+  assert.ok(Math.abs(mpp - 78271.51696) < 0.001);
 });
 
 test('meters per pixel halves for each zoom level increase, at fixed latitude', () => {

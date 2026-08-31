@@ -9,7 +9,10 @@
 import { metersToPixels } from './fog-radius.mjs';
 
 const FOG_RADIUS_METERS = 300;
-const FIXED_ZOOM = 16;
+// 15, not 16 — MapLibre's world is 512px-tile-based, one zoom level "ahead"
+// of the 256px OSM/Google convention at the same visual scale. See
+// fog-radius.mjs's EQUATOR_METERS_PER_PIXEL_AT_ZOOM_0 comment.
+const FIXED_ZOOM = 15;
 
 const fail = (msg) => {
   const el = document.getElementById('err');
@@ -39,13 +42,19 @@ async function main() {
     center: [candidates[0].lon, candidates[0].lat],
     zoom: FIXED_ZOOM,
     interactive: false,
+    // Attribution intentionally omitted: this is a local, unpublished dev
+    // test harness, not a published product — not a change in behavior.
     attributionControl: false,
   });
 
+  // Unlike atlas-gl.js, this handler is deliberately NOT narrowed to
+  // style/expression/layer/source errors: the harness needs live internet for
+  // OpenFreeMap vector tiles and AWS terrain tiles, so a tile-load or network
+  // failure is a likely real failure mode here. Staying silent on those would
+  // let a tester think a broken map is fine — worse than an over-eager banner.
   map.on('error', (e) => {
     const msg = e && e.error ? e.error.message : String(e);
-    if (/style|expression|layer|source/i.test(msg)) fail(`Style error: ${msg}`);
-    else console.warn('[blind-map]', msg);
+    fail(`Map error: ${msg}`);
   });
 
   function showCandidate(index) {
@@ -63,4 +72,4 @@ async function main() {
   });
 }
 
-main();
+main().catch(fail);

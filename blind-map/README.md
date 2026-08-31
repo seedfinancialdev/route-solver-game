@@ -29,6 +29,10 @@ npm run blind-map:check        # validate style.js
 npm run blind-map              # serve at http://localhost:8141/
 ```
 
+Needs live internet access while running: the style loads OpenFreeMap vector
+tiles and AWS/Mapzen terrain tiles over the network, so it won't render
+offline.
+
 ## Recording results
 
 Not automated — sit with a tester, show each candidate, ask the questions

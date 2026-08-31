@@ -9,6 +9,9 @@
   #map { position: absolute; inset: 0; }
   #fog {
     position: absolute; inset: 0; pointer-events: none;
+    /* 120px is an arbitrary pre-load placeholder, not derived from any real
+       zoom/latitude — it's only visible for the instant before the map's
+       first "load" event calls showCandidate() and sets --radius-px for real. */
     background: radial-gradient(circle at 50% 50%,
       transparent 0, transparent var(--radius-px, 120px),
       rgba(5,7,10,0.97) calc(var(--radius-px, 120px) + 1px), rgba(5,7,10,0.97) 100%);
