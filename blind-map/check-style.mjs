@@ -5,6 +5,13 @@
 // a style that fails validation is rejected WHOLE, and the only symptom is a
 // console message.
 //
+// The headline rule is the one that broke the original: a ["zoom"]
+// expression is legal ONLY as the input to a top-level step/interpolate.
+// Wrapping such an interpolate in a `*` to apply a per-feature multiplier —
+// the obvious way to write "width scales with zoom AND with road class" — is
+// invalid, and the correct form folds the multiplier into each interpolate
+// output instead.
+//
 // The original's route-specific "pace tell" check is dropped — this style
 // has no routes source and no pace-tiered line-width arrays to check the
 // ordering of.
@@ -12,6 +19,9 @@
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
+// style.js is a plain browser script, and this package is "type": "module", so
+// require() would load it as ESM and find no exports. Run it in a sandbox with
+// a stub window instead, which is also closer to how the browser loads it.
 const sandbox = { window: {} };
 vm.createContext(sandbox);
 vm.runInContext(readFileSync(new URL('./style.js', import.meta.url), 'utf8'), sandbox);
@@ -24,19 +34,21 @@ const ZOOM_HOSTS = new Set(['interpolate', 'interpolate-hcl', 'interpolate-lab',
 const isExpr = (v) => Array.isArray(v) && typeof v[0] === 'string';
 const isZoom = (v) => Array.isArray(v) && v.length === 1 && v[0] === 'zoom';
 
+/** Flag ["zoom"] anywhere inside this subtree. */
 function findZoom(node, path, where) {
   if (isZoom(node)) { problems.push(`${where}: ["zoom"] nested at ${path} — legal only as the input to a TOP-LEVEL step/interpolate`); return; }
   if (!Array.isArray(node)) return;
   node.forEach((child, i) => findZoom(child, `${path}[${i}]`, where));
 }
 
+/** A property value: zoom may appear only as the top-level interpolate/step input. */
 function checkProperty(value, where) {
   if (!isExpr(value)) { findZoom(value, 'value', where); return; }
   if (ZOOM_HOSTS.has(value[0])) {
     const inputIndex = value[0] === 'step' ? 1 : 2;
     value.forEach((child, i) => {
       if (i === 0) return;
-      if (i === inputIndex && isZoom(child)) return;
+      if (i === inputIndex && isZoom(child)) return;      // the one legal place
       findZoom(child, `[${i}]`, where);
     });
     return;
