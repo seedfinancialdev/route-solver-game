@@ -1,121 +1,145 @@
 # Route
 
-**Racing manager married to GeoGuessr.** Mastering route navigation the way a
-real Cannonball record run actually works — departure timing, enforcement
-geography, fuel and weather and mechanical calls, and what it costs when one
-of them goes wrong. Not the driving: there is no AI driver and no crew chief,
-you plan the run and you drive it. Full design:
-[`docs/superpowers/specs/2026-08-20-design-intent.md`](docs/superpowers/specs/2026-08-20-design-intent.md)
+**Navigation and geography literacy, tested directly.** You are dropped onto
+a real road network with an objective, and the only skill in the game is
+inferring, at each junction, which branch leads toward it — from a tight
+visibility radius, a locally-styled sign carrying real destination names and
+distances, sun-shadow direction, and terrain. Not the driving: the car drives
+itself between decisions, you are the navigator. Full design:
+[`docs/superpowers/specs/2026-08-30-design-intent.md`](docs/superpowers/specs/2026-08-30-design-intent.md)
 — the authoritative spec, and every later document is audited against it.
 
-That document supersedes the "remote orchestrator directing an AI driver
-through a War Room" framing this README used to lead with, from
+That document supersedes `2026-08-20-design-intent.md`'s "Racing manager
+married to GeoGuessr" framing — departure timing, enforcement geography,
+fuel, weather, car loadout, city checkpoints — in full. That framing is
+explicitly rejected in the new document's "What this replaces", kept only so
+the rejected ideas don't come back by accident. It had itself already
+superseded the "remote orchestrator directing an AI driver through a War
+Room" framing from
 [`2026-08-20-core-gameplay-loop-design.md`](docs/superpowers/specs/2026-08-20-core-gameplay-loop-design.md).
-That framing, and the architecture-first build order that came with it, are
-both explicitly rejected in design-intent.md's "What this replaces" — kept
-only so the rejected ideas don't come back by accident.
+Three framings, two resets — see **Why legacy was retired** below for the
+first and `legacy/atlas/README.md` for the second.
 
 This replaces the previous shipped game — a daily driving-hours route puzzle
 — and a never-shipped canvas map engine that was being built as its
 replacement. Both are retired under `legacy/`: still buildable, playable, and
 worth reusing pieces of, but not the direction anything here is building
-toward. See `legacy/README.md`.
+toward. `atlas/` — the playable prototype for the now-superseded racing-
+manager framing — joined them on 2026-08-29. See `legacy/README.md` and
+`legacy/atlas/README.md`.
 
 ## Where things actually are
 
 ```
-atlas/        the current playable prototype. A garage (curated cars, priced
-              builds against a performance-points cap) and one race — pick
-              checkpoints, choose a departure hour, drag a leg to reroute it
-              — resolved server-side against the real road graph. Start here:
-              `npm run atlas`. See "What's built" below for how much of the
-              intended loop this actually covers today.
 core-loop/    a Slice-1 architecture proof: a pure step function, module
               registration, bot-drivability, deterministic replay — proven
               against a throwaway, invented module with no game-design
-              meaning. Built to prove
-              2026-08-20-core-gameplay-loop-design.md's build order, which
-              design-intent.md later rejected. Not on the critical path
-              today; its proven patterns (deterministic replay, bot-drivable
-              policies) are real assets a future slice can still reuse.
+              meaning. Its module is explicitly disposable, but the
+              step/interrupt/replay shape is exactly the new design's live
+              decision loop — see design-intent.md, "The live decision loop".
 data/         real European cities, roads, and driving-hours-aware routing —
-              generated once by scripts/, reused by atlas/, core-loop/, and
-              (still) by legacy/. Direction-agnostic; nothing here changes
-              with the reset.
-scripts/      the data-generation and measurement pipeline. 00-03 and 06
-              build data/; 16-28 build and gate atlas/'s race content
-              (the checkpoint matrix, and the fuel/enforcement/traffic/
-              vehicle gates in docs/superpowers/specs/2026-08-23-system-
-              coupling-findings.md); 05, 07-11 build legacy/web/ specifically
-              — still live so the legacy build stays regenerable.
+              generated once by scripts/, reused by legacy/atlas/, core-loop/,
+              and (still) by legacy/. Direction-agnostic; nothing here changes
+              with either reset. `data/road-graph/` in particular is already
+              junction-level (real OSM intersections, not collapsed
+              city-to-city edges) — the substrate the new design needs, and
+              still missing the destination/ref/lane sidecar design-intent.md
+              calls for.
+scripts/      the data-generation pipeline. 00-03, 05, 07, 09 build data/;
+              16 builds data/road-graph/ specifically. scripts/lib/
+              (road-graph.mjs, country-facts.mjs) is the reusable routing
+              engine and region data, kept live here regardless of which app
+              calls it — confirmed, by direct inspection, to have zero
+              dependency on anything atlas-specific. The race-format gates
+              and the atlas-specific parts of the routing layer (resolve.mjs
+              among them — it turned out to be built entirely around cars,
+              traffic and incidents, not general routing) retired to
+              legacy/scripts/ alongside the app they served.
 play/         terminal playtest, bot player models, and the puzzle-balance
-              tooling — built for the legacy game's specific rules, but the
+              tooling — built for the legacy game's specific rules. The
               measurement technique (simulate a bot, sweep, verify the trap
-              holds) is what scripts/17-28's gates generalize, not something
-              thrown out.
-legacy/       the previous shipped game and the canvas engine prototype that
-              preceded core-loop. Retired, not deleted — still builds and
-              plays. See legacy/README.md.
+              holds) is the new design's balance methodology too — see
+              design-intent.md, "Balance methodology".
+legacy/       the previous shipped game, the canvas engine prototype that
+              preceded core-loop, and (as of 2026-08-29) the atlas racing-
+              manager prototype. Three retired things, three separate
+              retirement notes. Retired, not deleted — still builds and
+              plays. See legacy/README.md and legacy/atlas/README.md.
 docs/superpowers/  design specs and plans. Start at
-              specs/2026-08-20-design-intent.md. The most recent and most
-              load-bearing are specs/2026-08-23-run-criteria.md and
-              specs/2026-08-23-system-coupling-findings.md, which measured
-              which systems actually change a race's outcome.
+              specs/2026-08-30-design-intent.md, the current authoritative
+              spec. specs/2026-08-20-design-intent.md is superseded but kept
+              for its own rejected-ideas record. specs/2026-08-23-run-
+              criteria.md and specs/2026-08-23-system-coupling-findings.md
+              measured which systems actually changed a race's outcome under
+              the old framing; that evidence carries forward into the new
+              design's own reasoning even though the framing it was measured
+              against didn't.
 ```
 
-## What's built, and what the design still calls for
+## What's built, and what the design calls for next
 
-The playable slice is `atlas/`: one race (Barcelona → Istanbul, pick 4 of 8
-checkpoints), a garage of curated cars, and server-authoritative route
-resolution with drag-to-reroute. Per
-[`2026-08-23-system-coupling-findings.md`](docs/superpowers/specs/2026-08-23-system-coupling-findings.md),
-checkpoint selection and ordering are currently the *only* systems measured
-to change which plan wins — departure hour, car choice, and fuel each change
-your final time but not which plan is correct.
+Nothing is currently playable at the repo root. `atlas/`, the previous
+playable slice, retired to `legacy/atlas/` on 2026-08-29 — see
+`legacy/atlas/README.md` for what it was and why.
 
-Missing against design-intent.md's own Plan → Execute → Debrief loop:
+`2026-08-30-design-intent.md`'s build sequence starts from data foundations
+(a destination/ref/lane sidecar on the road graph, a small hand-picked
+panorama-coverage candidate set) and a working "blind" evidence surface
+(label-stripped map, fog-of-war radius, tested with real people) before any
+of the live decision loop gets built — see its "Build sequence" section for
+the full seven steps. None of it has started yet.
 
-- **Execute** doesn't exist yet. Resolve returns a final result instantly;
-  there is no running clock and no in-the-moment risk decision.
-- **Debrief** doesn't exist. The result panel is a time, a medal, and a leg
-  table — no loss attribution, no teaching, which design-intent.md calls the
-  most important screen in the game.
-- **One race, hardcoded to one day.** No daily tier, no persistence, no
-  leaderboard — a result vanishes on refresh.
+Confirmed reusable, per a survey done as part of the retirement:
+`data/road-graph/`'s junction-level topology and `scripts/lib/road-graph.mjs`'s
+routing primitives (`route`, `routeTimed`, `corridors`, `junctionNode`),
+`core-loop/`'s step/interrupt/replay architecture, and `country-facts.mjs`'s
+sourced per-country speed data. Confirmed net-new: any street-level imagery
+integration, procedural sign rendering, a fog-of-war visibility mechanic, an
+unlabeled basemap, and the destination/ref/lane/sign-style/driving-side data
+the pipeline doesn't produce yet.
 
 ## Running things today
 
 ```sh
 npm install
-npm test                 # core-loop, data-pipeline, and balance tests
-npm run atlas:data        # build atlas/cities.geojson + garage.json
-npm run atlas:garage       # (re)build the garage from data/cars
-npm run atlas              # serve atlas/ at http://localhost:8140, with /resolve
+npm test                 # core-loop and data-pipeline tests
+npm run data:cities && npm run data:graph   # rebuild the shared data/ pipeline
+npm run osm:build         # rebuild data/road-graph/ specifically
 ```
 
 `npm run core-loop:play -- --bot` still runs the Slice-1 proof end to end,
-human or bot. `npm run doctor` and `npm run balance` check the `data/`
-pipeline and the legacy puzzle set respectively; `npm run perf` and
-`npm run serve` target `legacy/web/` specifically (see their skills).
+human or bot. `npm run doctor` checks the `data/` pipeline.
+
+**Retired prototypes, still runnable:** `npm run serve` / `npm run perf` /
+`npm run balance` / `npm run play` / `npm run calibrate` target the original
+shipped game in `legacy/web/` (see `legacy/README.md`). `npm run atlas` /
+`npm run atlas:data` / `npm run atlas:garage` and the `runs:*` / `fuel:*` /
+`enforce:*` / `traffic:*` / `order:*` / `vehicle:gate` / `garage` gate
+scripts now target `legacy/atlas/` and `legacy/scripts/` (see
+`legacy/atlas/README.md`); `npm run test:legacy` runs both retired
+prototypes' test suites.
 
 ## What's next
 
-Per design-intent.md's own build sequence — not the Slice 2-4 / module
-backlog filed before the pivot (GitHub issues #5-#18, being reconciled
-against this document):
+Per `2026-08-30-design-intent.md`'s build sequence:
 
-1. **A working evidence surface.** Verify (or port) the cartographic
-   discipline in `legacy/docs/CARTOGRAPHY.md` onto atlas/'s map — road
-   character, alternative corridors, and risk exposure all need to read at
-   plan time, not just look right.
-2. **Execute and Debrief, even minimal.** The loop isn't a game without
-   them — see "What's built" above.
-3. **A second race, or a daily tier**, so "one race, one day" stops being
-   literally true.
-4. **Weather and incidents** — the two systems
-   system-coupling-findings.md flags as the highest-value unbuilt ones,
-   since everything else measured is either inert or reinforces whichever
-   road was already fastest.
+1. **Data foundations.** The destination/ref/lane sidecar on the road graph;
+   a small hand-picked panorama-coverage candidate set.
+2. **Prove the map reads.** Label-stripped style, fog-of-war radius, tested
+   with real people before anything downstream gets built.
+3. **The junction-decision loop, minimal.** Real decisions, real backtrack
+   cost, placeholder signage.
+4. **Real signs**, once the sidecar and country sign-style data exist.
+5. **Close the loop end to end** on one hand-picked round — panorama,
+   guess-map, scoring, reveal.
+6. **Expand to all four v1 objective types** (station, coast, border
+   crossing, motorway), each with its own candidate-destination finder.
+7. **Only then**: automated destination-first generation at scale, daily
+   seed, the v2 meta-loop.
+
+None of it has started yet — see the design doc's "Open questions" for what's
+still genuinely undecided (scoring tiers, the meta-loop's exact shape,
+Mapillary coverage adequacy, launch region).
 
 ## Why legacy was retired
 
