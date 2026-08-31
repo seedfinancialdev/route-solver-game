@@ -1,64 +1,68 @@
 [
   {
-    "lon": 10.783414840698242,
-    "lat": 59.94990921020508,
-    "classes": [
-      "residential"
-    ]
-  },
-  {
-    "lon": 10.785630226135254,
-    "lat": 59.95158004760742,
+    "lon": 10.78563,
+    "lat": 59.95158,
     "classes": [
       "secondary",
       "residential"
     ]
   },
   {
-    "lon": 10.79239559173584,
-    "lat": 59.95344924926758,
+    "lon": 16.69798,
+    "lat": 68.49212,
     "classes": [
-      "tertiary",
-      "residential"
-    ]
-  },
-  {
-    "lon": 10.74424934387207,
-    "lat": 59.93511199951172,
-    "classes": [
-      "primary",
-      "tertiary",
-      "residential"
-    ]
-  },
-  {
-    "lon": 10.716693878173828,
-    "lat": 59.929264068603516,
-    "classes": [
-      "primary"
-    ]
-  },
-  {
-    "lon": 10.722838401794434,
-    "lat": 59.93178176879883,
-    "classes": [
-      "primary",
-      "tertiary"
-    ]
-  },
-  {
-    "lon": 10.715506553649902,
-    "lat": 59.92881774902344,
-    "classes": [
-      "primary",
+      "trunk",
       "unclassified"
     ]
   },
   {
-    "lon": 10.793766021728516,
-    "lat": 59.95022964477539,
+    "lon": 10.37872,
+    "lat": 63.42616,
     "classes": [
+      "tertiary",
+      "residential"
+    ]
+  },
+  {
+    "lon": 10.79725,
+    "lat": 63.41159,
+    "classes": [
+      "primary",
+      "residential"
+    ]
+  },
+  {
+    "lon": 11.13383,
+    "lat": 63.20192,
+    "classes": [
+      "primary",
+      "secondary"
+    ]
+  },
+  {
+    "lon": 15.6366,
+    "lat": 58.4231,
+    "classes": [
+      "secondary",
       "tertiary"
+    ]
+  },
+  {
+    "lon": 15.18143,
+    "lat": 58.37982,
+    "classes": [
+      "secondary",
+      "tertiary",
+      "unclassified"
+    ]
+  },
+  {
+    "lon": -0.16366,
+    "lat": 51.53494,
+    "classes": [
+      "primary",
+      "secondary",
+      "unclassified"
     ]
   }
 ]
